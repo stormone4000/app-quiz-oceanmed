@@ -26,6 +26,7 @@ export function VideoLessons() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
     loadCategories();
@@ -33,6 +34,7 @@ export function VideoLessons() {
 
   const loadCategories = async () => {
     try {
+      console.log('[VideoLessons] Tentativo di caricamento delle categorie video...');
       setLoading(true);
       setError(null);
 
@@ -45,13 +47,99 @@ export function VideoLessons() {
         .order('publish_date', { ascending: false });
 
       if (categoriesError) throw categoriesError;
-      setCategories(categoriesData || []);
+      
+      console.log('[VideoLessons] Categorie caricate:', categoriesData?.length || 0);
+      
+      // Se non ci sono dati o c'è un errore, usiamo i dati mock
+      if (!categoriesData || categoriesData.length === 0) {
+        console.log('[VideoLessons] Nessuna categoria trovata, utilizzo dati mock');
+        const mockCategories = getMockCategories();
+        setCategories(mockCategories);
+        setDebugInfo('Visualizzazione dati mock - nessun dato trovato nel database');
+      } else {
+        setCategories(categoriesData);
+        setDebugInfo(`Dati caricati dal database: ${categoriesData.length} categorie`);
+      }
     } catch (error) {
-      console.error('Error loading video categories:', error);
+      console.error('[VideoLessons] Errore durante il caricamento delle categorie:', error);
       setError('Errore durante il caricamento delle video lezioni');
+      
+      // In caso di errore, usiamo i dati mock
+      console.log('[VideoLessons] Utilizzo dati mock a causa dell\'errore');
+      const mockCategories = getMockCategories();
+      setCategories(mockCategories);
+      setDebugInfo('Visualizzazione dati mock - errore di connessione al database');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Funzione per ottenere dati mock
+  const getMockCategories = (): VideoCategory[] => {
+    return [
+      {
+        id: '8a681940-d666-4987-8e04-e379f17b453d',
+        title: 'Corleg 72',
+        icon: 'video',
+        icon_color: 'blue',
+        publish_date: '2025-01-22T00:00:00+00:00',
+        videos: [
+          {
+            id: '2086bb9c-3888-47c3-ba47-843e07e6cdda',
+            category_id: '8a681940-d666-4987-8e04-e379f17b453d',
+            title: 'Quiz Corleg',
+            embed_url: 'https://go.screenpal.com/watch/crnfYhRHk0',
+            publish_date: '2025-01-22T00:00:00+00:00'
+          },
+          {
+            id: '480f607b-dde7-457a-ac9d-e6d1ef49be90',
+            category_id: '8a681940-d666-4987-8e04-e379f17b453d',
+            title: 'Fanali di Navigazione',
+            embed_url: 'https://screenpal.com/player/cYl6XbNRuk?ff=1&title=0&width=100%&height=100%',
+            publish_date: '2025-01-22T00:00:00+00:00'
+          }
+        ]
+      },
+      {
+        id: '55e78da5-9d0a-43f4-89f9-9cd148e5169e',
+        title: 'Navigazione',
+        icon: 'video',
+        icon_color: 'yellow',
+        publish_date: '2025-01-22T00:00:00+00:00',
+        videos: [
+          {
+            id: '38df9c27-a58e-448e-b57d-cd763f172ce6',
+            category_id: '55e78da5-9d0a-43f4-89f9-9cd148e5169e',
+            title: 'Bussola e Magnetismo',
+            embed_url: 'https://screenpal.com/player/c3VwrbVDuSn?ff=1&title=0&width=100%&height=100%',
+            publish_date: '2025-01-22T00:00:00+00:00'
+          },
+          {
+            id: '65a3f467-1294-4eef-874f-2941de4ad2b8',
+            category_id: '55e78da5-9d0a-43f4-89f9-9cd148e5169e',
+            title: 'Lezione di Vela',
+            embed_url: 'https://screenpal.com/player/cr12qDV1cRv?ff=1&title=0&width=100%&height=100%',
+            publish_date: '2025-01-22T00:00:00+00:00'
+          }
+        ]
+      },
+      {
+        id: '306ac72a-4713-46b0-be3a-ed8b47c21afb',
+        title: 'Meteorologia',
+        icon: 'video',
+        icon_color: 'red',
+        publish_date: '2025-01-22T00:00:00+00:00',
+        videos: [
+          {
+            id: '1c984278-3b65-4c68-9f08-474ecbf94917',
+            category_id: '306ac72a-4713-46b0-be3a-ed8b47c21afb',
+            title: 'Lezione Meteo',
+            embed_url: 'https://screenpal.com/player/crhqqbVfHh1?ff=1&title=0&width=100%&height=100%',
+            publish_date: '2025-01-22T00:00:00+00:00'
+          }
+        ]
+      }
+    ];
   };
 
   const formatDate = (dateString: string) => {
@@ -116,6 +204,12 @@ export function VideoLessons() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
         </div>
       </div>
+
+      {debugInfo && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 dark:border-blue-700 p-4 rounded-lg mb-4">
+          <p className="text-blue-700 dark:text-blue-400">{debugInfo}</p>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 dark:border-red-700 p-4 rounded-lg">

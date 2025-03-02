@@ -44,6 +44,7 @@ export function VideoManager() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [editingVideo, setEditingVideo] = useState<VideoItem | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>('');
   const [categoryForm, setCategoryForm] = useState<CategoryForm>({
     title: '',
     icon_color: 'blue',
@@ -62,6 +63,7 @@ export function VideoManager() {
 
   const loadCategories = async () => {
     try {
+      console.log('[VideoManager] Tentativo di caricamento delle categorie video...');
       setLoading(true);
       setError(null);
 
@@ -74,17 +76,104 @@ export function VideoManager() {
         .order('publish_date', { ascending: false });
 
       if (categoriesError) throw categoriesError;
-      setCategories(categoriesData || []);
+      
+      console.log('[VideoManager] Categorie caricate:', categoriesData?.length || 0);
+      
+      // Se non ci sono dati o c'è un errore, usiamo i dati mock
+      if (!categoriesData || categoriesData.length === 0) {
+        console.log('[VideoManager] Nessuna categoria trovata, utilizzo dati mock');
+        const mockCategories = getMockCategories();
+        setCategories(mockCategories);
+        setDebugInfo('Visualizzazione dati mock - nessun dato trovato nel database');
+      } else {
+        setCategories(categoriesData);
+        setDebugInfo(`Dati caricati dal database: ${categoriesData.length} categorie`);
+      }
     } catch (error) {
-      console.error('Error loading video categories:', error);
+      console.error('[VideoManager] Errore durante il caricamento delle categorie:', error);
       setError('Errore durante il caricamento delle video lezioni');
+      
+      // In caso di errore, usiamo i dati mock
+      console.log('[VideoManager] Utilizzo dati mock a causa dell\'errore');
+      const mockCategories = getMockCategories();
+      setCategories(mockCategories);
+      setDebugInfo('Visualizzazione dati mock - errore di connessione al database');
     } finally {
       setLoading(false);
     }
   };
 
+  // Funzione per ottenere dati mock
+  const getMockCategories = (): VideoCategory[] => {
+    return [
+      {
+        id: '8a681940-d666-4987-8e04-e379f17b453d',
+        title: 'Corleg 72',
+        icon: 'video',
+        icon_color: 'blue',
+        publish_date: '2025-01-22T00:00:00+00:00',
+        videos: [
+          {
+            id: '2086bb9c-3888-47c3-ba47-843e07e6cdda',
+            category_id: '8a681940-d666-4987-8e04-e379f17b453d',
+            title: 'Quiz Corleg',
+            embed_url: 'https://go.screenpal.com/watch/crnfYhRHk0',
+            publish_date: '2025-01-22T00:00:00+00:00'
+          },
+          {
+            id: '480f607b-dde7-457a-ac9d-e6d1ef49be90',
+            category_id: '8a681940-d666-4987-8e04-e379f17b453d',
+            title: 'Fanali di Navigazione',
+            embed_url: 'https://screenpal.com/player/cYl6XbNRuk?ff=1&title=0&width=100%&height=100%',
+            publish_date: '2025-01-22T00:00:00+00:00'
+          }
+        ]
+      },
+      {
+        id: '55e78da5-9d0a-43f4-89f9-9cd148e5169e',
+        title: 'Navigazione',
+        icon: 'video',
+        icon_color: 'yellow',
+        publish_date: '2025-01-22T00:00:00+00:00',
+        videos: [
+          {
+            id: '38df9c27-a58e-448e-b57d-cd763f172ce6',
+            category_id: '55e78da5-9d0a-43f4-89f9-9cd148e5169e',
+            title: 'Bussola e Magnetismo',
+            embed_url: 'https://screenpal.com/player/c3VwrbVDuSn?ff=1&title=0&width=100%&height=100%',
+            publish_date: '2025-01-22T00:00:00+00:00'
+          },
+          {
+            id: '65a3f467-1294-4eef-874f-2941de4ad2b8',
+            category_id: '55e78da5-9d0a-43f4-89f9-9cd148e5169e',
+            title: 'Lezione di Vela',
+            embed_url: 'https://screenpal.com/player/cr12qDV1cRv?ff=1&title=0&width=100%&height=100%',
+            publish_date: '2025-01-22T00:00:00+00:00'
+          }
+        ]
+      },
+      {
+        id: '306ac72a-4713-46b0-be3a-ed8b47c21afb',
+        title: 'Meteorologia',
+        icon: 'video',
+        icon_color: 'red',
+        publish_date: '2025-01-22T00:00:00+00:00',
+        videos: [
+          {
+            id: '1c984278-3b65-4c68-9f08-474ecbf94917',
+            category_id: '306ac72a-4713-46b0-be3a-ed8b47c21afb',
+            title: 'Lezione Meteo',
+            embed_url: 'https://screenpal.com/player/crhqqbVfHh1?ff=1&title=0&width=100%&height=100%',
+            publish_date: '2025-01-22T00:00:00+00:00'
+          }
+        ]
+      }
+    ];
+  };
+
   const handleSaveCategory = async () => {
     try {
+      console.log('[VideoManager] Tentativo di salvataggio categoria:', categoryForm);
       setLoading(true);
       setError(null);
 
@@ -99,7 +188,8 @@ export function VideoManager() {
         .single();
 
       if (categoryError) throw categoryError;
-
+      
+      console.log('[VideoManager] Categoria salvata con successo');
       await loadCategories();
       setShowCategoryModal(false);
       setCategoryForm({
@@ -108,7 +198,7 @@ export function VideoManager() {
         publish_date: new Date().toISOString().split('T')[0]
       });
     } catch (error) {
-      console.error('Error saving category:', error);
+      console.error('[VideoManager] Errore durante il salvataggio della categoria:', error);
       setError('Errore durante il salvataggio della categoria');
     } finally {
       setLoading(false);
@@ -117,6 +207,7 @@ export function VideoManager() {
 
   const handleSaveVideo = async () => {
     try {
+      console.log('[VideoManager] Tentativo di salvataggio video:', videoForm);
       setLoading(true);
       setError(null);
 
@@ -134,12 +225,14 @@ export function VideoManager() {
           .eq('id', editingVideo.id);
 
         if (updateError) throw updateError;
+        console.log('[VideoManager] Video aggiornato con successo');
       } else {
         const { error: insertError } = await supabase
           .from('videos')
           .insert([videoData]);
 
         if (insertError) throw insertError;
+        console.log('[VideoManager] Nuovo video creato con successo');
       }
 
       await loadCategories();
@@ -152,7 +245,7 @@ export function VideoManager() {
         publish_date: new Date().toISOString().split('T')[0]
       });
     } catch (error) {
-      console.error('Error saving video:', error);
+      console.error('[VideoManager] Errore durante il salvataggio del video:', error);
       setError('Errore durante il salvataggio del video');
     } finally {
       setLoading(false);
@@ -161,6 +254,7 @@ export function VideoManager() {
 
   const handleDeleteVideo = async (videoId: string) => {
     try {
+      console.log('[VideoManager] Tentativo di eliminazione video:', videoId);
       setLoading(true);
       setError(null);
 
@@ -171,6 +265,7 @@ export function VideoManager() {
 
       if (deleteError) throw deleteError;
 
+      console.log('[VideoManager] Video eliminato con successo');
       setCategories(prevCategories => 
         prevCategories.map(category => ({
           ...category,
@@ -180,7 +275,7 @@ export function VideoManager() {
 
       setDeleteModal(null);
     } catch (error) {
-      console.error('Error deleting video:', error);
+      console.error('[VideoManager] Errore durante l\'eliminazione del video:', error);
       setError('Errore durante l\'eliminazione del video');
     } finally {
       setLoading(false);
@@ -227,6 +322,12 @@ export function VideoManager() {
         </div>
       </div>
 
+      {debugInfo && (
+        <div className="bg-blue-50/20 dark:bg-blue-900/20 border-l-4 border-blue-400 dark:border-blue-700 p-4 rounded-lg mb-4">
+          <p className="text-blue-700 dark:text-blue-400">{debugInfo}</p>
+        </div>
+      )}
+
       {error && (
         <div className="bg-red-50/20 dark:bg-red-900/20 border-l-4 border-red-400 dark:border-red-700 p-4 rounded-lg">
           <p className="text-red-700 dark:text-red-400">{error}</p>
@@ -249,33 +350,86 @@ export function VideoManager() {
             const color = COLORS[category.icon_color as keyof typeof COLORS] || COLORS.blue;
             
             return (
-              <div key={category.id} className="group relative rounded-xl border bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border-white/30 dark:border-slate-700/30 overflow-hidden hover:scale-[1.02] transition-all">
+              <div
+                key={category.id}
+                className="bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-slate-700/30 rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow"
+              >
                 <div className="p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className={`p-3 ${color.bg} dark:${color.bg.replace('bg-', 'bg-')}/30 rounded-lg shadow-inner dark:shadow-none`}>
-                      <Video className={`w-6 h-6 ${color.text} dark:text-opacity-90`} />
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className={`p-3 ${color.bg} rounded-lg`}>
+                        <Video className={`w-6 h-6 ${color.text}`} />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-lg text-white dark:text-slate-100">{category.title}</h3>
+                        <p className="text-sm text-gray-300 dark:text-slate-400">
+                          {category.videos.length} video • {formatDate(category.publish_date)}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-lg text-white dark:text-slate-100">{category.title}</h3>
-                      <p className="text-sm text-gray-200 dark:text-slate-300">
-                        {category.videos.length} video
-                      </p>
+                    
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setVideoForm({
+                            ...videoForm,
+                            category_id: category.id
+                          });
+                          setShowVideoModal(true);
+                        }}
+                        className="text-white/70 hover:text-white dark:text-slate-400 dark:hover:text-white transition-colors"
+                        title="Aggiungi video a questa categoria"
+                      >
+                        <Plus className="w-5 h-5" />
+                      </button>
                     </div>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {category.videos.map(video => (
-                      <button
+                      <div
                         key={video.id}
-                        onClick={() => setSelectedVideo(video)}
-                        className="w-full text-left p-4 rounded-lg hover:bg-white/10 dark:hover:bg-slate-700/30 transition-colors"
+                        className="p-3 rounded-lg bg-white/10 dark:bg-slate-800/30 hover:bg-white/20 dark:hover:bg-slate-800/40 transition-colors group"
                       >
-                        <h4 className="font-medium mb-1 text-white dark:text-slate-100">{video.title}</h4>
-                        <div className="flex items-center gap-2 text-sm text-gray-200 dark:text-slate-400">
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-medium text-blue-300 dark:text-blue-400 group-hover:text-blue-200 dark:group-hover:text-blue-300 transition-colors">
+                            {video.title}
+                          </h4>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => {
+                                setEditingVideo(video);
+                                setVideoForm({
+                                  title: video.title,
+                                  embed_url: video.embed_url,
+                                  category_id: video.category_id,
+                                  publish_date: new Date(video.publish_date).toISOString().split('T')[0]
+                                });
+                                setShowVideoModal(true);
+                              }}
+                              className="text-white/70 hover:text-white dark:text-slate-400 dark:hover:text-white p-1"
+                              title="Modifica video"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteModal({
+                                type: 'video',
+                                id: video.id,
+                                title: video.title
+                              })}
+                              className="text-white/70 hover:text-red-400 dark:text-slate-400 dark:hover:text-red-400 p-1"
+                              title="Elimina video"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-300 dark:text-slate-500">
                           <Calendar className="w-4 h-4" />
                           <span>{formatDate(video.publish_date)}</span>
                         </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -365,10 +519,14 @@ export function VideoManager() {
 
       {/* Delete Confirmation Modal */}
       {deleteModal && (
-        <DeleteModal
-          title="Elimina Notifica"
-          message={`Sei sicuro di voler eliminare la notifica "${deleteModal.title}"? Questa azione non può essere annullata.`}
-          onConfirm={() => handleDelete(deleteModal.id)}
+        <DeleteModal 
+          title={`Eliminare ${deleteModal.type === 'category' ? 'la categoria' : 'il video'} "${deleteModal.title}"?`}
+          message={`Questa azione non può essere annullata.`}
+          onConfirm={() => {
+            if (deleteModal.type === 'video') {
+              handleDeleteVideo(deleteModal.id);
+            }
+          }}
           onCancel={() => setDeleteModal(null)}
           isLoading={loading}
         />
