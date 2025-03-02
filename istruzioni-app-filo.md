@@ -226,6 +226,83 @@ Per garantire che Vercel utilizzi il database Supabase corretto durante il deplo
      3. Verifica che le politiche RLS permettano le operazioni necessarie
      4. Controlla i log di Vercel per messaggi di errore specifici
 
+### Funzioni RPC Personalizzate
+
+L'applicazione utilizza diverse funzioni RPC (Remote Procedure Call) personalizzate per migliorare l'accesso ai dati e bypassare le policy RLS (Row Level Security) quando necessario. Queste funzioni sono definite nel database Supabase e possono essere chiamate dall'applicazione.
+
+#### Funzioni Principali
+
+1. **get_all_users()**
+   - **Scopo**: Recupera tutti gli utenti del sistema
+   - **Accesso**: Solo amministratori (utenti con flag `is_master`)
+   - **Utilizzo**: Nella gestione utenti per visualizzare e modificare gli account
+
+2. **get_dashboard_stats()**
+   - **Scopo**: Ottiene statistiche aggregate per la dashboard
+   - **Accesso**: Solo amministratori e istruttori
+   - **Utilizzo**: Nella dashboard per visualizzare metriche di utilizzo
+
+3. **get_all_videos()**
+   - **Scopo**: Recupera tutte le categorie video e i video associati
+   - **Accesso**: Amministratori e istruttori
+   - **Utilizzo**: Nella sezione video lezioni per la gestione dei contenuti
+
+4. **get_student_videos()**
+   - **Scopo**: Recupera solo le categorie e i video pubblici
+   - **Accesso**: Tutti gli utenti autenticati
+   - **Utilizzo**: Nella sezione video lezioni per gli studenti
+
+#### Implementazione
+
+Le funzioni RPC sono implementate come funzioni SQL con l'attributo `SECURITY DEFINER`, che permette loro di essere eseguite con i privilegi dell'utente che ha creato la funzione, bypassando così le policy RLS.
+
+Esempio di implementazione:
+
+```sql
+CREATE OR REPLACE FUNCTION public.get_all_videos()
+RETURNS TABLE (
+  category_id uuid,
+  category_title text,
+  -- altri campi
+) 
+SECURITY DEFINER
+SET search_path = public
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  is_admin boolean;
+  is_instructor boolean;
+BEGIN
+  -- Verifica dei permessi
+  SELECT 
+    coalesce(auth.jwt() ->> 'app_metadata'::text, '{}')::jsonb -> 'is_master' = 'true'::jsonb,
+    coalesce(auth.jwt() ->> 'app_metadata'::text, '{}')::jsonb -> 'is_instructor' = 'true'::jsonb
+  INTO is_admin, is_instructor;
+  
+  -- Solo gli amministratori e gli istruttori possono accedere
+  IF NOT (is_admin OR is_instructor) THEN
+    RAISE EXCEPTION 'Accesso non autorizzato';
+  END IF;
+  
+  -- Query principale
+  RETURN QUERY
+  SELECT -- campi da selezionare
+  FROM -- tabelle
+  WHERE -- condizioni;
+END;
+$$;
+```
+
+#### Gestione degli Errori
+
+L'applicazione è progettata per gestire gli errori nelle chiamate RPC in modo robusto:
+
+1. Tenta prima di caricare i dati tramite query dirette
+2. Se fallisce, prova a utilizzare la funzione RPC appropriata
+3. Se anche questo fallisce, utilizza dati mock per garantire che l'interfaccia utente rimanga funzionale
+
+Questo approccio a più livelli garantisce che l'applicazione continui a funzionare anche in caso di problemi di connessione o permessi.
+
 ### Comandi Git Utili
 ```bash
 # Verifica lo stato delle modifiche

@@ -34,6 +34,19 @@ interface CategoryForm {
   publish_date: string;
 }
 
+// Interfaccia per i dati restituiti dalla funzione RPC get_all_videos
+interface VideoRPCResult {
+  category_id: string;
+  category_title: string;
+  category_icon?: string;
+  category_icon_color?: string;
+  category_publish_date: string;
+  video_id?: string;
+  video_title?: string;
+  video_embed_url?: string;
+  video_publish_date?: string;
+}
+
 export function VideoManager() {
   const [categories, setCategories] = useState<VideoCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +58,7 @@ export function VideoManager() {
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [editingVideo, setEditingVideo] = useState<VideoItem | null>(null);
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const [totalVideos, setTotalVideos] = useState<number>(0);
   const [categoryForm, setCategoryForm] = useState<CategoryForm>({
     title: '',
     icon_color: 'blue',
@@ -67,6 +81,19 @@ export function VideoManager() {
       setLoading(true);
       setError(null);
 
+      // Prima verifichiamo quanti video ci sono nel database
+      const { count: videoCount, error: countError } = await supabase
+        .from('videos')
+        .select('*', { count: 'exact', head: true });
+      
+      if (countError) {
+        console.error('[VideoManager] Errore nel conteggio dei video:', countError);
+      } else {
+        console.log(`[VideoManager] Totale video nel database: ${videoCount || 0}`);
+        setTotalVideos(videoCount || 0);
+      }
+
+      // Ora carichiamo le categorie con i video associati
       const { data: categoriesData, error: categoriesError } = await supabase
         .from('video_categories')
         .select(`
@@ -75,31 +102,131 @@ export function VideoManager() {
         `)
         .order('publish_date', { ascending: false });
 
-      if (categoriesError) throw categoriesError;
+      if (categoriesError) {
+        console.error('[VideoManager] Errore nel caricamento delle categorie:', categoriesError);
+        throw categoriesError;
+      }
       
-      console.log('[VideoManager] Categorie caricate:', categoriesData?.length || 0);
+      // Contiamo il numero totale di video recuperati
+      let retrievedVideosCount = 0;
+      if (categoriesData) {
+        categoriesData.forEach(category => {
+          retrievedVideosCount += category.videos?.length || 0;
+        });
+      }
+      
+      console.log(`[VideoManager] Categorie caricate: ${categoriesData?.length || 0}, Video recuperati: ${retrievedVideosCount}/${videoCount || 0}`);
+      
+      // Se il numero di video recuperati è inferiore al totale, proviamo con la funzione RPC
+      if (videoCount && retrievedVideosCount < videoCount) {
+        console.log('[VideoManager] Tentativo di caricamento tramite RPC get_all_videos...');
+        await loadCategoriesViaRPC();
+        return;
+      }
       
       // Se non ci sono dati o c'è un errore, usiamo i dati mock
       if (!categoriesData || categoriesData.length === 0) {
         console.log('[VideoManager] Nessuna categoria trovata, utilizzo dati mock');
         const mockCategories = getMockCategories();
         setCategories(mockCategories);
-        setDebugInfo('Visualizzazione dati mock - nessun dato trovato nel database');
+        setDebugInfo(`Visualizzazione dati mock - nessun dato trovato nel database. Totale video nel DB: ${videoCount || 0}`);
       } else {
         setCategories(categoriesData);
-        setDebugInfo(`Dati caricati dal database: ${categoriesData.length} categorie`);
+        setDebugInfo(`Dati caricati dal database: ${categoriesData.length} categorie, ${retrievedVideosCount}/${videoCount || 0} video`);
       }
     } catch (error) {
       console.error('[VideoManager] Errore durante il caricamento delle categorie:', error);
       setError('Errore durante il caricamento delle video lezioni');
       
-      // In caso di errore, usiamo i dati mock
-      console.log('[VideoManager] Utilizzo dati mock a causa dell\'errore');
-      const mockCategories = getMockCategories();
-      setCategories(mockCategories);
-      setDebugInfo('Visualizzazione dati mock - errore di connessione al database');
+      // Proviamo con la funzione RPC
+      console.log('[VideoManager] Tentativo di caricamento tramite RPC get_all_videos dopo errore...');
+      try {
+        await loadCategoriesViaRPC();
+        return;
+      } catch (rpcError) {
+        console.error('[VideoManager] Errore anche con RPC:', rpcError);
+        
+        // In caso di errore anche con RPC, usiamo i dati mock
+        console.log('[VideoManager] Utilizzo dati mock a causa dell\'errore');
+        const mockCategories = getMockCategories();
+        setCategories(mockCategories);
+        setDebugInfo(`Visualizzazione dati mock - errore di connessione al database. Totale video nel DB: ${totalVideos}`);
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Funzione per caricare le categorie tramite RPC
+  const loadCategoriesViaRPC = async () => {
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_all_videos');
+      
+      if (rpcError) {
+        console.error('[VideoManager] Errore nel caricamento tramite RPC:', rpcError);
+        throw rpcError;
+      }
+      
+      console.log('[VideoManager] Dati RPC ricevuti:', rpcData?.length || 0, 'record');
+      
+      if (!rpcData || rpcData.length === 0) {
+        console.log('[VideoManager] Nessun dato RPC trovato, utilizzo dati mock');
+        const mockCategories = getMockCategories();
+        setCategories(mockCategories);
+        setDebugInfo('Visualizzazione dati mock - nessun dato trovato tramite RPC');
+        return;
+      }
+      
+      // Trasformiamo i dati RPC nel formato richiesto
+      const categoriesMap = new Map<string, any>();
+      
+      (rpcData as VideoRPCResult[]).forEach(item => {
+        if (!item.category_id) return;
+        
+        // Se la categoria non esiste ancora nella mappa, la creiamo
+        if (!categoriesMap.has(item.category_id)) {
+          categoriesMap.set(item.category_id, {
+            id: item.category_id,
+            title: item.category_title,
+            icon: item.category_icon || 'video',
+            icon_color: item.category_icon_color || 'blue',
+            publish_date: item.category_publish_date,
+            videos: []
+          });
+        }
+        
+        // Aggiungiamo il video alla categoria se esiste
+        if (item.video_id) {
+          const category = categoriesMap.get(item.category_id);
+          if (category) {
+            category.videos.push({
+              id: item.video_id,
+              category_id: item.category_id,
+              title: item.video_title || '',
+              embed_url: item.video_embed_url || '',
+              publish_date: item.video_publish_date || ''
+            });
+          }
+        }
+      });
+      
+      // Convertiamo la mappa in array
+      const categoriesArray = Array.from(categoriesMap.values());
+      console.log('[VideoManager] Categorie processate da RPC:', categoriesArray.length);
+      
+      // Contiamo il numero totale di video
+      let totalVideosFromRPC = 0;
+      categoriesArray.forEach(category => {
+        totalVideosFromRPC += category.videos.length;
+      });
+      
+      console.log('[VideoManager] Video totali da RPC:', totalVideosFromRPC);
+      
+      setCategories(categoriesArray);
+      setDebugInfo(`Dati caricati tramite RPC: ${categoriesArray.length} categorie, ${totalVideosFromRPC} video`);
+    } catch (error) {
+      console.error('[VideoManager] Errore durante il caricamento tramite RPC:', error);
+      throw error;
     }
   };
 

@@ -83,4 +83,27 @@ yarn build
 
 ## Supporto
 
-Per problemi o domande, contattare il team di sviluppo. 
+Per problemi o domande, contattare il team di sviluppo.
+
+## Funzionalità Principali
+
+- **Gestione Utenti**: Sistema completo di autenticazione e gestione dei ruoli utente
+- **Quiz Interattivi**: Creazione e partecipazione a quiz con domande a risposta multipla
+- **Video Lezioni**: Visualizzazione di video lezioni organizzate per categorie
+- **Dashboard Statistiche**: Monitoraggio delle attività e dei progressi degli utenti
+- **Interfaccia Responsive**: Design adattivo per dispositivi desktop e mobili
+
+## Funzioni RPC Personalizzate
+
+L'applicazione utilizza diverse funzioni RPC personalizzate per migliorare l'accesso ai dati:
+
+- **get_all_users()**: Recupera tutti gli utenti del sistema (solo per amministratori)
+- **get_dashboard_stats()**: Ottiene statistiche aggregate per la dashboard
+- **get_all_videos()**: Recupera tutte le categorie video e i video associati (per amministratori e istruttori)
+- **get_student_videos()**: Recupera solo le categorie e i video pubblici (per studenti)
+
+Queste funzioni RPC sono progettate per bypassare le policy RLS (Row Level Security) quando necessario, garantendo al contempo la sicurezza dei dati.
+
+## Connessione a Supabase
+
+// ... existing code ... 
