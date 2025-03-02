@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Key, Lock, AlertCircle, Loader2, Compass, CheckCircle2 } from 'lucide-react';
+import { Key, Lock, AlertCircle, Loader2, Compass, CheckCircle2, XCircle, RefreshCw, Calendar, CreditCard, Clock } from 'lucide-react';
 import { stripePromise, createCheckoutSession } from '../../services/stripe';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PricingFeatures } from './PricingFeatures';
@@ -38,28 +38,107 @@ const plans: Plan[] = [
   }
 ];
 
+interface SubscriptionStatus {
+  status: 'active' | 'inactive' | 'pending' | 'cancelled';
+  expiresAt: string | null;
+  plan: string | null;
+}
+
 export function PricingPage() {
   const [accessCode, setAccessCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [selectedInterval, setSelectedInterval] = useState<'month' | 'year'>('month');
+  const [verificationStep, setVerificationStep] = useState<'idle' | 'checking' | 'success' | 'error'>('idle');
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
+  const [loadingSubscription, setLoadingSubscription] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    checkSubscriptionStatus();
+  }, []);
+
+  const checkSubscriptionStatus = async () => {
+    try {
+      setLoadingSubscription(true);
+      const userEmail = localStorage.getItem('userEmail');
+      
+      if (!userEmail) {
+        return;
+      }
+
+      // Verifica se l'utente ha un abbonamento attivo
+      const { data: subscriptions, error: subscriptionError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('customer_email', userEmail)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (subscriptionError) throw subscriptionError;
+
+      if (subscriptions && subscriptions.length > 0) {
+        const subscription = subscriptions[0];
+        setSubscriptionStatus({
+          status: subscription.status,
+          expiresAt: subscription.current_period_end,
+          plan: subscription.plan_id
+        });
+      } else {
+        setSubscriptionStatus({
+          status: 'inactive',
+          expiresAt: null,
+          plan: null
+        });
+      }
+    } catch (error) {
+      console.error('Error checking subscription status:', error);
+    } finally {
+      setLoadingSubscription(false);
+    }
+  };
+
+  // Funzione per formattare automaticamente il codice di accesso (XXXXX-XXXXX-XXXXX)
+  const handleAccessCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    
+    // Aggiungi automaticamente i trattini dopo 5 e 10 caratteri
+    if (value.length > 5) {
+      value = value.slice(0, 5) + '-' + value.slice(5);
+    }
+    if (value.length > 11) {
+      value = value.slice(0, 11) + '-' + value.slice(11);
+    }
+    
+    // Limita la lunghezza a 17 caratteri (5+1+5+1+5)
+    if (value.length > 17) {
+      value = value.slice(0, 17);
+    }
+    
+    setAccessCode(value);
+  };
 
   const verifyAccessCode = async () => {
     try {
       setLoading(true);
       setError(null);
       setSuccess(null);
+      setVerificationStep('checking');
 
       if (!accessCode.trim()) {
+        setVerificationStep('error');
         throw new Error('Inserisci un codice di accesso');
       }
 
       const userEmail = localStorage.getItem('userEmail');
       if (!userEmail) {
-        throw new Error('Sessione utente non valida');
+        setVerificationStep('error');
+        throw new Error('Sessione utente non valida. Effettua nuovamente il login.');
       }
+
+      // Mostro un messaggio di verifica in corso
+      setSuccess('Verifica del codice in corso...');
 
       // Check if code exists and is valid
       const { data: codeData, error: codeError } = await supabase
@@ -70,12 +149,14 @@ export function PricingPage() {
         .single();
 
       if (codeError || !codeData) {
-        throw new Error('Codice di accesso non valido');
+        setVerificationStep('error');
+        throw new Error('Codice di accesso non valido o inesistente');
       }
 
       // Check if code is expired
       if (codeData.expiration_date && new Date(codeData.expiration_date) < new Date()) {
-        throw new Error('Codice di accesso scaduto');
+        setVerificationStep('error');
+        throw new Error('Codice di accesso scaduto. Contatta l\'amministratore.');
       }
 
       // For one-time codes, check if already used
@@ -86,9 +167,13 @@ export function PricingPage() {
           .eq('code_id', codeData.id);
 
         if (usageData && usageData.length > 0) {
-          throw new Error('Codice di accesso già utilizzato');
+          setVerificationStep('error');
+          throw new Error('Codice di accesso già utilizzato. Ogni codice può essere usato una sola volta.');
         }
       }
+
+      // Aggiorno il messaggio di successo
+      setSuccess('Codice valido! Attivazione abbonamento in corso...');
 
       // Record code usage
       const { error: usageError } = await supabase
@@ -99,7 +184,10 @@ export function PricingPage() {
           used_at: new Date().toISOString()
         }]);
 
-      if (usageError) throw usageError;
+      if (usageError) {
+        setVerificationStep('error');
+        throw usageError;
+      }
 
       // Create subscription with Premium monthly plan
       const { error: subscriptionError } = await supabase
@@ -115,12 +203,16 @@ export function PricingPage() {
           access_code_id: codeData.id
         }]);
 
-      if (subscriptionError) throw subscriptionError;
+      if (subscriptionError) {
+        setVerificationStep('error');
+        throw subscriptionError;
+      }
       
       // Update local storage
       localStorage.setItem('hasActiveAccess', 'true');
 
-      setSuccess('Codice verificato con successo! Reindirizzamento...');
+      setVerificationStep('success');
+      setSuccess('Codice verificato con successo! Reindirizzamento alla dashboard...');
 
       // Force a window reload after a brief delay to ensure all state is updated
       setTimeout(() => {
@@ -130,6 +222,7 @@ export function PricingPage() {
     } catch (error) {
       console.error('Error verifying code:', error);
       setError(error instanceof Error ? error.message : 'Errore durante la verifica del codice');
+      setVerificationStep('error');
     } finally {
       setLoading(false);
     }
@@ -172,6 +265,14 @@ export function PricingPage() {
     }
   };
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('it-IT', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-900 to-blue-950 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
@@ -183,6 +284,76 @@ export function PricingPage() {
             Scegli il piano più adatto alle tue esigenze o inserisci un codice di accesso
           </p>
         </div>
+
+        {/* Subscription Status */}
+        {subscriptionStatus && (
+          <div className="max-w-md mx-auto mb-8">
+            <div className={`rounded-xl shadow-lg p-6 ${
+              subscriptionStatus.status === 'active' 
+                ? 'bg-green-50 border border-green-200' 
+                : 'bg-white'
+            }`}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`p-3 rounded-lg ${
+                  subscriptionStatus.status === 'active' 
+                    ? 'bg-green-100' 
+                    : 'bg-gray-100'
+                }`}>
+                  <CreditCard className={`w-6 h-6 ${
+                    subscriptionStatus.status === 'active' 
+                      ? 'text-green-600' 
+                      : 'text-gray-600'
+                  }`} />
+                </div>
+                <div>
+                  <h2 className="text-xl text-gray-900 font-bold">Stato Abbonamento</h2>
+                  <p className="text-sm text-gray-600">
+                    {loadingSubscription 
+                      ? 'Verifica in corso...' 
+                      : subscriptionStatus.status === 'active'
+                        ? 'Abbonamento attivo'
+                        : 'Nessun abbonamento attivo'
+                    }
+                  </p>
+                </div>
+              </div>
+
+              {!loadingSubscription && (
+                <div className="space-y-2">
+                  {subscriptionStatus.status === 'active' && (
+                    <>
+                      <div className="flex items-center gap-2 text-gray-700">
+                        <Clock className="w-5 h-5 text-green-600" />
+                        <span>
+                          Scadenza: {subscriptionStatus.expiresAt ? formatDate(subscriptionStatus.expiresAt) : 'Non specificata'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-gray-700">
+                        <Calendar className="w-5 h-5 text-green-600" />
+                        <span>
+                          Piano: {subscriptionStatus.plan === STRIPE_CONFIG.prices.premium.month 
+                            ? 'Premium Mensile' 
+                            : subscriptionStatus.plan === STRIPE_CONFIG.prices.premium.year
+                              ? 'Premium Annuale'
+                              : 'Piano personalizzato'
+                          }
+                        </span>
+                      </div>
+                      <div className="mt-4 text-center">
+                        <button
+                          onClick={() => navigate('/dashboard')}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                          Vai alla Dashboard
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Access Code Section */}
         <div className="max-w-md mx-auto mb-12">
@@ -198,33 +369,59 @@ export function PricingPage() {
             </div>
 
             <div className="space-y-4">
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  value={accessCode}
-                  onChange={(e) => setAccessCode(e.target.value)}
-                  className="text-gray-900 w-full pl-12 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Inserisci il codice di accesso"
-                />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Codice di Accesso
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    value={accessCode}
+                    onChange={handleAccessCodeChange}
+                    className={`text-gray-900 w-full pl-12 pr-10 py-3 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg tracking-wider ${
+                      verificationStep === 'error' 
+                        ? 'border-red-500' 
+                        : verificationStep === 'success'
+                          ? 'border-green-500'
+                          : 'border-gray-300'
+                    }`}
+                    placeholder="XXXXX-XXXXX-XXXXX"
+                    maxLength={17}
+                  />
+                  {verificationStep === 'checking' && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                    </div>
+                  )}
+                  {verificationStep === 'success' && (
+                    <CheckCircle2 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 w-5 h-5" />
+                  )}
+                  {verificationStep === 'error' && (
+                    <XCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500 w-5 h-5" />
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Inserisci il codice nel formato XXXXX-XXXXX-XXXXX
+                </p>
               </div>
 
               <button
                 onClick={verifyAccessCode}
-                disabled={loading}
+                disabled={loading || accessCode.length < 15}
                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Verifica in corso...
-                  </>
+                {verificationStep === 'checking' ? (
+                  <RefreshCw className="w-5 h-5 animate-spin" />
                 ) : (
-                  <>
-                    <Key className="w-5 h-5" />
-                    Verifica Codice
-                  </>
+                  <Key className="w-5 h-5" />
                 )}
+                {loading 
+                  ? 'Verifica in corso...' 
+                  : verificationStep === 'success'
+                    ? 'Attivazione in corso...'
+                    : 'Verifica Codice'
+                }
               </button>
 
               <AnimatePresence>
@@ -233,10 +430,10 @@ export function PricingPage() {
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="p-3 bg-red-50 text-red-700 rounded-lg flex items-center gap-2"
+                    className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-start gap-2"
                   >
-                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                    {error}
+                    <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                    <span>{error}</span>
                   </motion.div>
                 )}
 
@@ -245,10 +442,10 @@ export function PricingPage() {
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="p-3 bg-green-50 text-green-700 rounded-lg flex items-center gap-2"
+                    className="p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg flex items-start gap-2"
                   >
-                    <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-                    {success}
+                    <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                    <span>{success}</span>
                   </motion.div>
                 )}
               </AnimatePresence>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Lock, Save, AlertCircle, CheckCircle, Key, CreditCard } from 'lucide-react';
+import { User, Mail, Lock, Save, AlertCircle, CheckCircle, Key, CreditCard, Info, XCircle, RefreshCw, Clock, Calendar, History } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 import { stripePromise, createCheckoutSession } from '../../services/stripe';
 import { STRIPE_CONFIG } from '../../config/stripe';
@@ -7,6 +7,20 @@ import { STRIPE_CONFIG } from '../../config/stripe';
 interface InstructorProfileProps {
   userEmail: string;
   needsSubscription?: boolean;
+}
+
+interface CodeUsage {
+  code: string;
+  type: 'master' | 'one_time';
+  used_at: string;
+}
+
+interface AccessCodeUsageResponse {
+  used_at: string;
+  access_codes: {
+    code: string;
+    type: 'master' | 'one_time';
+  } | null;
 }
 
 export function InstructorProfile({ userEmail, needsSubscription }: InstructorProfileProps) {
@@ -23,9 +37,15 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
   const [success, setSuccess] = useState<string | null>(null);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'month' | 'year'>('month');
+  const [verificationStep, setVerificationStep] = useState<'idle' | 'checking' | 'success' | 'error'>('idle');
+  const [codeHistory, setCodeHistory] = useState<CodeUsage[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   useEffect(() => {
     loadUserProfile();
+    if (userEmail) {
+      loadCodeHistory();
+    }
   }, [userEmail]);
 
   const loadUserProfile = async () => {
@@ -130,13 +150,18 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
     setError(null);
     setSuccess(null);
     setLoading(true);
+    setVerificationStep('checking');
 
     try {
       // Get password hash from storage
       const passwordHash = localStorage.getItem('passwordHash');
       if (!passwordHash) {
-        throw new Error('Credenziali non valide');
+        setVerificationStep('error');
+        throw new Error('Credenziali non valide. Effettua nuovamente il login.');
       }
+
+      // Mostro un messaggio di verifica in corso
+      setSuccess('Verifica del codice in corso...');
 
       // Verify instructor credentials with master code
       const { data: users, error: verifyError } = await supabase
@@ -146,25 +171,37 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
           p_master_code: formData.masterCode
         });
 
-      if (verifyError) throw verifyError;
+      if (verifyError) {
+        setVerificationStep('error');
+        throw verifyError;
+      }
+      
       if (!users || users.length === 0) {
-        throw new Error('Codice master non valido');
+        setVerificationStep('error');
+        throw new Error('Codice master non valido o non associato al tuo account');
       }
 
       const user = users[0];
       if (user.subscription_status !== 'active') {
-        throw new Error('Codice master non valido');
+        setVerificationStep('error');
+        throw new Error('Il codice master è valido ma non è attivo. Contatta l\'amministratore.');
       }
 
       // Store master code in localStorage
       localStorage.setItem('masterCode', formData.masterCode);
       localStorage.setItem('hasActiveAccess', 'true');
 
-      setSuccess('Codice master verificato con successo!');
-      window.location.reload(); // Reload to update UI
+      setVerificationStep('success');
+      setSuccess('Codice master verificato con successo! Attivazione profilo in corso...');
+      
+      // Aggiungiamo un breve ritardo per mostrare il messaggio di successo prima del reload
+      setTimeout(() => {
+        window.location.reload(); // Reload to update UI
+      }, 1500);
     } catch (error) {
       console.error('Error verifying master code:', error);
       setError(error instanceof Error ? error.message : 'Errore durante la verifica del codice');
+      setVerificationStep('error');
     } finally {
       setLoading(false);
     }
@@ -200,6 +237,50 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       setError(error instanceof Error ? error.message : 'Errore durante l\'avvio dell\'abbonamento');
       setLoading(false);
     }
+  };
+
+  const loadCodeHistory = async () => {
+    try {
+      setLoadingHistory(true);
+      
+      const { data, error } = await supabase
+        .from('access_code_usage')
+        .select(`
+          used_at,
+          access_codes (
+            code,
+            type
+          )
+        `)
+        .eq('student_email', userEmail)
+        .order('used_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const formattedData: CodeUsage[] = (data as any[]).map(item => ({
+          code: item.access_codes?.code || 'Codice non disponibile',
+          type: (item.access_codes?.type as 'master' | 'one_time') || 'one_time',
+          used_at: item.used_at
+        }));
+        
+        setCodeHistory(formattedData);
+      }
+    } catch (error) {
+      console.error('Error loading code history:', error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('it-IT', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   return (
@@ -362,35 +443,94 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       {needsSubscription && (
         <div className="space-y-6">
           {/* Master Code Section */}
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6">
-            <h3 className="text-xl font-bold mb-4 dark:text-slate-100 flex items-center gap-2">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 border-2 border-blue-500">
+            <h3 className="text-xl font-bold mb-2 dark:text-slate-100 flex items-center gap-2">
               <Key className="w-6 h-6 text-blue-600" />
-              Codice Master
+              Attivazione Profilo Istruttore
             </h3>
+            
+            <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-start gap-2 text-blue-700 dark:text-blue-400">
+              <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium">Accesso limitato</p>
+                <p className="text-sm">Per sbloccare tutte le funzionalità dell'app, inserisci il codice di attivazione che hai ricevuto. Questo codice ti permetterà di accedere a:</p>
+                <ul className="list-disc list-inside text-sm mt-2 space-y-1">
+                  <li>Gestione completa dei quiz</li>
+                  <li>Video lezioni</li>
+                  <li>Monitoraggio degli studenti</li>
+                  <li>Tutte le altre funzionalità da istruttore</li>
+                </ul>
+              </div>
+            </div>
+            
             <form onSubmit={handleMasterCodeSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                  Inserisci il codice master
+                  Inserisci il codice di attivazione
                 </label>
                 <div className="relative">
                   <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     type="text"
                     value={formData.masterCode}
-                    onChange={(e) => setFormData({ ...formData, masterCode: e.target.value })}
-                    className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
-                    placeholder="Inserisci il codice master"
+                    onChange={(e) => setFormData({ ...formData, masterCode: e.target.value.toUpperCase() })}
+                    className={`w-full pl-12 pr-4 py-3 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 text-lg tracking-wider ${
+                      verificationStep === 'error' 
+                        ? 'border-red-500 dark:border-red-500' 
+                        : verificationStep === 'success'
+                          ? 'border-green-500 dark:border-green-500'
+                          : 'border-gray-300 dark:border-slate-700'
+                    }`}
+                    placeholder="XXXXX-XXXXX-XXXXX"
                     required
                   />
+                  {verificationStep === 'checking' && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                    </div>
+                  )}
+                  {verificationStep === 'success' && (
+                    <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 w-5 h-5" />
+                  )}
+                  {verificationStep === 'error' && (
+                    <XCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500 w-5 h-5" />
+                  )}
                 </div>
+                <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+                  Se non hai un codice di attivazione, contatta l'amministratore o acquista un abbonamento.
+                </p>
               </div>
+
+              {error && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {success && (
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm flex items-start gap-2">
+                  <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <span>{success}</span>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={loading || !formData.masterCode}
-                className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-lg font-medium"
               >
-                <Key className="w-5 h-5" />
-                {loading ? 'Verifica in corso...' : 'Verifica Codice'}
+                {verificationStep === 'checking' ? (
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Key className="w-5 h-5" />
+                )}
+                {loading 
+                  ? 'Verifica in corso...' 
+                  : verificationStep === 'success'
+                    ? 'Attivazione in corso...'
+                    : 'Attiva Profilo'
+                }
               </button>
             </form>
           </div>
@@ -467,6 +607,56 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
                 {loading ? 'Elaborazione...' : 'Attiva Abbonamento'}
               </button>
             </div>
+          </div>
+
+          {/* Code History Section */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6">
+            <h3 className="text-xl font-bold mb-4 dark:text-slate-100 flex items-center gap-2">
+              <History className="w-6 h-6 text-blue-600" />
+              Cronologia Codici Utilizzati
+            </h3>
+            
+            {loadingHistory ? (
+              <div className="text-center py-4">
+                <RefreshCw className="w-6 h-6 text-blue-600 animate-spin mx-auto mb-2" />
+                <p className="text-gray-500 dark:text-slate-400">Caricamento cronologia...</p>
+              </div>
+            ) : codeHistory.length === 0 ? (
+              <div className="text-center py-4 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                <p className="text-gray-500 dark:text-slate-400">Nessun codice utilizzato finora.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {codeHistory.map((usage, index) => (
+                  <div 
+                    key={index} 
+                    className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg flex items-start justify-between"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded-lg ${
+                        usage.type === 'master' 
+                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400'
+                          : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                      }`}>
+                        <Key className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="font-medium dark:text-slate-100">{usage.code}</p>
+                        <p className="text-sm text-gray-500 dark:text-slate-400">
+                          {usage.type === 'master' ? 'Codice Master' : 'Codice Monouso'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center gap-1 text-gray-500 dark:text-slate-400 text-sm">
+                        <Clock className="w-4 h-4" />
+                        <span>{formatDate(usage.used_at)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

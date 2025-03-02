@@ -66,6 +66,13 @@ L'App Quiz è una piattaforma educativa completa progettata per la formazione ne
 - Notifiche automatiche agli studenti
 - Tracciamento del completamento
 
+### Gestione Codici di Accesso
+- Creazione e gestione di codici di accesso per istruttori
+- Supporto per codici master (riutilizzabili) e monouso
+- Verifica automatica della validità e scadenza dei codici
+- Interfaccia intuitiva con feedback visivo durante la verifica
+- Cronologia dei codici utilizzati per ogni utente
+
 ### Analisi e Statistiche
 - Dashboard con panoramica dei risultati
 - Grafici di performance per studenti e classi
@@ -142,6 +149,23 @@ L'applicazione utilizza le politiche di sicurezza a livello di riga di Supabase 
 5. I risultati vengono salvati automaticamente
 6. L'istruttore può visualizzare statistiche e performance
 
+### Attivazione Profilo Istruttore con Codice di Accesso
+1. L'utente accede alla pagina del profilo istruttore
+2. Inserisce il codice master fornito dall'amministratore
+3. Il sistema verifica la validità del codice in tempo reale
+4. Se valido, il profilo viene attivato come istruttore
+5. L'utente può visualizzare la cronologia dei codici utilizzati
+6. In caso di errore, vengono mostrati messaggi specifici per guidare l'utente
+
+### Utilizzo di Codici di Accesso per Abbonamenti
+1. L'utente accede alla pagina dei prezzi/abbonamenti
+2. Inserisce il codice di accesso nel formato XXXXX-XXXXX-XXXXX
+3. Il sistema formatta automaticamente il codice durante l'inserimento
+4. La verifica avviene in tempo reale con feedback visivo
+5. Se il codice è valido, l'abbonamento viene attivato immediatamente
+6. L'utente viene reindirizzato alla dashboard dopo l'attivazione
+7. Lo stato dell'abbonamento è sempre visibile nella pagina dei prezzi
+
 ## Note Tecniche
 - L'applicazione è sviluppata con React e TypeScript
 - Utilizza Supabase come backend per database e autenticazione
@@ -149,6 +173,8 @@ L'applicazione utilizza le politiche di sicurezza a livello di riga di Supabase 
 - Il design responsive funziona su desktop e dispositivi mobili
 - Utilizza TailwindCSS per lo styling e l'interfaccia utente
 - Chart.js per la visualizzazione dei grafici e delle statistiche
+- Framer Motion per animazioni fluide nell'interfaccia utente
+- Lucide React per icone consistenti e accessibili
 
 ## Flusso di Sviluppo
 - **Repository GitHub**: Il codice sorgente è ospitato su GitHub (https://github.com/stormone4000/globalquiz)
@@ -419,6 +445,10 @@ Eseguire regolarmente i seguenti controlli di sicurezza:
 ## Problemi Noti e Soluzioni
 - **Errore nel salvare i risultati del quiz**: ✅ RISOLTO! Il problema era dovuto alla mancanza della colonna `student_email` nella tabella `results` e all'assenza di politiche RLS. È stata aggiunta la colonna e configurate le politiche appropriate.
 - **Errore nella visualizzazione dei risultati**: ✅ RISOLTO! È stato riscontrato un problema di relazione tra le tabelle `results` e `quiz_templates`. La query in `api.ts` è stata modificata per utilizzare la tabella `quizzes` invece di `quiz_templates`.
+- **Feedback insufficiente durante la verifica dei codici**: ✅ RISOLTO! Sono stati implementati indicatori visivi e messaggi dettagliati durante il processo di verifica dei codici di accesso, migliorando significativamente l'esperienza utente.
+- **Formattazione dei codici di accesso**: ✅ RISOLTO! È stata implementata la formattazione automatica dei codici nel formato XXXXX-XXXXX-XXXXX per facilitare l'inserimento e ridurre gli errori.
+- **Visibilità dello stato dell'abbonamento**: ✅ RISOLTO! È stata aggiunta una sezione che mostra chiaramente lo stato attuale dell'abbonamento, inclusa la data di scadenza e il tipo di piano.
+- **Mancanza di cronologia dei codici utilizzati**: ✅ RISOLTO! Gli utenti possono ora visualizzare la cronologia completa dei codici di accesso che hanno utilizzato, con dettagli sul tipo di codice e la data di utilizzo.
 - **Errore "Failed to save quiz result"**: ⚠️ IN ANALISI! Potrebbe essere causato da un problema di tipo dati nella colonna `quiz_id` della tabella `results`. È stato migliorato il logging degli errori per facilitare il debug. Possibili soluzioni:
   - Verificare che il tipo della colonna `quiz_id` in `results` sia compatibile con il tipo della colonna `id` in `quizzes`
   - Controllare che non ci siano vincoli di foreign key che impediscono l'inserimento
@@ -431,4 +461,4 @@ Eseguire regolarmente i seguenti controlli di sicurezza:
 
 Questo documento verrà aggiornato regolarmente per riflettere le modifiche e le nuove funzionalità dell'applicazione.
 
-Ultimo aggiornamento: 25 febbraio 2024 
+Ultimo aggiornamento: 2 marzo 2024 
