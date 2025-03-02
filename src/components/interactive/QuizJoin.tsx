@@ -402,7 +402,7 @@ export function QuizJoin() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background transition-colors">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background transition-colors">
       {/* Connection Status */}
       <div className={`fixed top-4 right-4 p-2 rounded-lg border transition-colors ${
         isConnected 
@@ -426,276 +426,278 @@ export function QuizJoin() {
         )}
       </div>
 
-      {!userEmail ? (
-        <div className="bg-card text-card-foreground rounded-xl shadow-lg border border-border p-8 max-w-md w-full text-center transition-colors">
-          <AlertCircle className="w-12 h-12 text-red-500 dark:text-red-400 mx-auto mb-4" aria-hidden="true" />
-          <h1 className="text-xl font-bold mb-4">Accesso Richiesto</h1>
-          <p className="text-muted-foreground mb-6">
-            Per partecipare al quiz è necessario effettuare l'accesso al tuo account.
-          </p>
-          <button
-            onClick={() => navigate('/login')}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-background"
-            aria-label="Vai alla pagina di login"
-          >
-            Vai al Login
-          </button>
-        </div>
-      ) : (
-      <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <img
-            src="https://axfqxbthjalzzshdjedm.supabase.co/storage/v1/object/sign/img/logo.svg?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJpbWcvbG9nby5zdmciLCJpYXQiOjE3MzcwNTE0MTEsImV4cCI6MTc2ODU4NzQxMX0.UB0cavGc9Ha_FTkpHQZONaQ0MEGFglY96yl4GPCGZbM"
-            alt="OceanMed Logo"
-            className="h-16 w-auto mx-auto mb-4"
-          />
-          <h1 className="text-2xl font-bold mb-2 text-foreground">
-            {step === 'pin' ? 'Partecipa al Quiz' : 'Un ultimo passo!'}
-          </h1>
-          <p className="text-muted-foreground">
-            {step === 'pin' 
-              ? 'Inserisci il PIN a 6 cifre fornito dal tuo istruttore'
-              : 'Scegli un nickname per iniziare il quiz'
-            }
-          </p>
-        </div>
+      <div className="w-full max-w-screen-xl mx-auto flex flex-col items-center justify-center">
+        {!userEmail ? (
+          <div className="bg-card text-card-foreground rounded-xl shadow-lg border border-border p-8 max-w-md w-full text-center transition-colors">
+            <AlertCircle className="w-12 h-12 text-red-500 dark:text-red-400 mx-auto mb-4" aria-hidden="true" />
+            <h1 className="text-xl font-bold mb-4">Accesso Richiesto</h1>
+            <p className="text-muted-foreground mb-6">
+              Per partecipare al quiz è necessario effettuare l'accesso al tuo account.
+            </p>
+            <button
+              onClick={() => navigate('/login')}
+              className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-background"
+              aria-label="Vai alla pagina di login"
+            >
+              Vai al Login
+            </button>
+          </div>
+        ) : (
+          <div className="w-full max-w-md mx-auto">
+            <div className="text-center mb-8">
+              <img
+                src="https://axfqxbthjalzzshdjedm.supabase.co/storage/v1/object/sign/img/logo.svg?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJpbWcvbG9nby5zdmciLCJpYXQiOjE3MzcwNTE0MTEsImV4cCI6MTc2ODU4NzQxMX0.UB0cavGc9Ha_FTkpHQZONaQ0MEGFglY96yl4GPCGZbM"
+                alt="OceanMed Logo"
+                className="h-16 md:h-20 w-auto mx-auto mb-4"
+              />
+              <h1 className="text-2xl md:text-3xl font-bold mb-2 text-foreground">
+                {step === 'pin' ? 'Partecipa al Quiz' : 'Un ultimo passo!'}
+              </h1>
+              <p className="text-muted-foreground md:text-lg">
+                {step === 'pin' 
+                  ? 'Inserisci il PIN a 6 cifre fornito dal tuo istruttore'
+                  : 'Scegli un nickname per iniziare il quiz'
+                }
+              </p>
+            </div>
 
-        <div className="bg-card text-card-foreground rounded-xl shadow-lg border border-border p-6 md:p-8 transition-colors">
-          <AnimatePresence mode="wait">
-            {error && (
-              <motion.div
-                key="error"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="mb-6 p-3 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-400 rounded-lg flex items-start gap-2"
-                role="alert"
-              >
-                <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" aria-hidden="true" />
-                <span>{error}</span>
-              </motion.div>
-            )}
-            
-            {infoMessage && (
-              <motion.div
-                key="info"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="mb-6 p-3 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 rounded-lg flex items-start gap-2"
-                role="status"
-              >
-                <Info className="w-5 h-5 mt-0.5 flex-shrink-0" aria-hidden="true" />
-                <span>{infoMessage}</span>
-              </motion.div>
-            )}
+            <div className="bg-card text-card-foreground rounded-xl shadow-lg border border-border p-6 md:p-8 transition-colors">
+              <AnimatePresence mode="wait">
+                {error && (
+                  <motion.div
+                    key="error"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="mb-6 p-3 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-400 rounded-lg flex items-start gap-2"
+                    role="alert"
+                  >
+                    <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                    <span>{error}</span>
+                  </motion.div>
+                )}
+                
+                {infoMessage && (
+                  <motion.div
+                    key="info"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="mb-6 p-3 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 rounded-lg flex items-start gap-2"
+                    role="status"
+                  >
+                    <Info className="w-5 h-5 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                    <span>{infoMessage}</span>
+                  </motion.div>
+                )}
 
-            {step === 'pin' ? (
-              <motion.form 
-                key="pin-form"
-                onSubmit={handlePinSubmit} 
-                className="space-y-6" 
-                initial={{ opacity: 0 }} 
-                animate={{ opacity: 1 }} 
-                exit={{ opacity: 0 }}
-              >
-                <div>
-                  <label htmlFor="quiz-pin" className="block text-sm font-medium text-foreground mb-1">
-                    PIN di Gioco
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Key className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                {step === 'pin' ? (
+                  <motion.form 
+                    key="pin-form"
+                    onSubmit={handlePinSubmit} 
+                    className="space-y-6" 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    exit={{ opacity: 0 }}
+                  >
+                    <div>
+                      <label htmlFor="quiz-pin" className="block text-sm font-medium text-foreground mb-1">
+                        PIN di Gioco
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                          <Key className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                        </div>
+                        <input
+                          id="quiz-pin"
+                          type="text"
+                          inputMode="numeric"
+                          value={pin}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                            setPin(value);
+                            setPinValidationStatus(value.length === 6 ? 'validating' : 'idle');
+                          }}
+                          className={`w-full px-12 py-3 text-2xl tracking-widest font-mono rounded-lg border focus:ring-2 focus:outline-none focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-background ${
+                            pinValidationStatus === 'valid' ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950' :
+                            pinValidationStatus === 'invalid' ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950' :
+                            'border-input bg-background'
+                          }`}
+                          placeholder="000000"
+                          required
+                          pattern="\d{6}"
+                          maxLength={6}
+                          aria-label="PIN a 6 cifre per partecipare al quiz"
+                          aria-required="true"
+                          aria-invalid={pinValidationStatus === 'invalid'}
+                          aria-describedby="pin-desc"
+                          autoFocus
+                          disabled={loading}
+                        />
+                        <AnimatePresence>
+                          {pinValidationStatus === 'validating' && (
+                            <motion.div
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                            >
+                              <Loader2 className="w-5 h-5 text-primary animate-spin" aria-hidden="true" />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                      <p id="pin-desc" className="mt-2 text-sm text-muted-foreground text-center">
+                        Il PIN è un codice a 6 cifre fornito dall'istruttore
+                      </p>
                     </div>
-                    <input
-                      id="quiz-pin"
-                      type="text"
-                      inputMode="numeric"
-                      value={pin}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                        setPin(value);
-                        setPinValidationStatus(value.length === 6 ? 'validating' : 'idle');
-                      }}
-                      className={`w-full px-12 py-3 text-2xl tracking-widest font-mono rounded-lg border focus:ring-2 focus:outline-none focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-background ${
-                        pinValidationStatus === 'valid' ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950' :
-                        pinValidationStatus === 'invalid' ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950' :
-                        'border-input bg-background'
-                      }`}
-                      placeholder="000000"
-                      required
-                      pattern="\d{6}"
-                      maxLength={6}
-                      aria-label="PIN a 6 cifre per partecipare al quiz"
-                      aria-required="true"
-                      aria-invalid={pinValidationStatus === 'invalid'}
-                      aria-describedby="pin-desc"
-                      autoFocus
-                      disabled={loading}
-                    />
-                    <AnimatePresence>
-                      {pinValidationStatus === 'validating' && (
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                        >
-                          <Loader2 className="w-5 h-5 text-primary animate-spin" aria-hidden="true" />
-                        </motion.div>
+
+                    <button
+                      type="submit"
+                      disabled={loading || pin.length !== 6}
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90 py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-background"
+                      aria-label="Verifica il PIN e continua"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                          <span>Verifica in corso...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-5 h-5" aria-hidden="true" />
+                          <span>Verifica PIN</span>
+                        </>
                       )}
-                    </AnimatePresence>
-                  </div>
-                  <p id="pin-desc" className="mt-2 text-sm text-muted-foreground text-center">
-                    Il PIN è un codice a 6 cifre fornito dall'istruttore
-                  </p>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading || pin.length !== 6}
-                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-background"
-                  aria-label="Verifica il PIN e continua"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
-                      <span>Verifica in corso...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-5 h-5" aria-hidden="true" />
-                      <span>Verifica PIN</span>
-                    </>
-                  )}
-                </button>
-              </motion.form>
-            ) : (
-              <motion.form 
-                key="nickname-form"
-                onSubmit={handleNicknameSubmit} 
-                className="space-y-6" 
-                initial={{ opacity: 0 }} 
-                animate={{ opacity: 1 }} 
-                exit={{ opacity: 0 }}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStep('pin');
-                    setError(null);
-                    setInfoMessage(null);
-                  }}
-                  className="text-muted-foreground hover:text-foreground flex items-center gap-2 mb-4 transition-colors focus:outline-none focus:ring-2 focus:ring-primary rounded-md p-1"
-                  aria-label="Torna alla schermata del PIN"
-                >
-                  <ArrowLeft className="w-5 h-5" aria-hidden="true" />
-                  <span>Cambia PIN</span>
-                </button>
-
-                <div>
-                  <label htmlFor="nickname" className="block text-sm font-medium text-foreground mb-1">
-                    Nickname
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="nickname"
-                      type="text"
-                      value={nickname}
-                      onChange={async (e) => {
-                        const value = e.target.value.slice(0, 20);
-                        setNickname(value);
-                        const isValid = validateNickname(value);
-                        setNicknameValidationStatus(isValid ? 'valid' : value ? 'invalid' : 'idle');
+                    </button>
+                  </motion.form>
+                ) : (
+                  <motion.form 
+                    key="nickname-form"
+                    onSubmit={handleNicknameSubmit} 
+                    className="space-y-6" 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    exit={{ opacity: 0 }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep('pin');
+                        setError(null);
+                        setInfoMessage(null);
                       }}
-                      className={`w-full px-4 py-3 text-lg rounded-lg border focus:ring-2 focus:outline-none focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-background ${
-                        nicknameValidationStatus === 'valid' ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950' :
-                        nicknameValidationStatus === 'invalid' ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950' :
-                        'border-input bg-background'
-                      }`}
-                      placeholder="Il tuo nickname"
-                      required
-                      maxLength={20}
-                      aria-label="Nickname per partecipare al quiz"
-                      aria-required="true"
-                      aria-invalid={nicknameValidationStatus === 'invalid'}
-                      aria-describedby="nickname-counter nickname-rules"
-                      autoFocus
-                      disabled={loading}
-                    />
-                    <p id="nickname-counter" className="mt-1 text-sm text-muted-foreground">
-                      {20 - nickname.length} caratteri rimanenti
-                    </p>
-                  </div>
-                  
-                  {/* Nickname Rules */}
-                  <div id="nickname-rules" className="mt-4 space-y-2 p-3 border border-border rounded-lg bg-muted/40">
-                    <p className="text-sm font-medium text-foreground">Requisiti per il nickname:</p>
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2 text-sm" role="status">
-                        {nicknameRules.length ? (
-                          <Check className="w-4 h-4 text-green-500 dark:text-green-400" aria-hidden="true" />
-                        ) : (
-                          <X className="w-4 h-4 text-red-500 dark:text-red-400" aria-hidden="true" />
-                        )}
-                        <span className={nicknameRules.length ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}>
-                          Tra 2 e 20 caratteri
-                        </span>
+                      className="text-muted-foreground hover:text-foreground flex items-center gap-2 mb-4 transition-colors focus:outline-none focus:ring-2 focus:ring-primary rounded-md p-1"
+                      aria-label="Torna alla schermata del PIN"
+                    >
+                      <ArrowLeft className="w-5 h-5" aria-hidden="true" />
+                      <span>Cambia PIN</span>
+                    </button>
+
+                    <div>
+                      <label htmlFor="nickname" className="block text-sm font-medium text-foreground mb-1">
+                        Nickname
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="nickname"
+                          type="text"
+                          value={nickname}
+                          onChange={async (e) => {
+                            const value = e.target.value.slice(0, 20);
+                            setNickname(value);
+                            const isValid = validateNickname(value);
+                            setNicknameValidationStatus(isValid ? 'valid' : value ? 'invalid' : 'idle');
+                          }}
+                          className={`w-full px-4 py-3 text-lg rounded-lg border focus:ring-2 focus:outline-none focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-background ${
+                            nicknameValidationStatus === 'valid' ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950' :
+                            nicknameValidationStatus === 'invalid' ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950' :
+                            'border-input bg-background'
+                          }`}
+                          placeholder="Il tuo nickname"
+                          required
+                          maxLength={20}
+                          aria-label="Nickname per partecipare al quiz"
+                          aria-required="true"
+                          aria-invalid={nicknameValidationStatus === 'invalid'}
+                          aria-describedby="nickname-counter nickname-rules"
+                          autoFocus
+                          disabled={loading}
+                        />
+                        <p id="nickname-counter" className="mt-1 text-sm text-muted-foreground">
+                          {20 - nickname.length} caratteri rimanenti
+                        </p>
                       </div>
-                      <div className="flex items-center gap-2 text-sm" role="status">
-                        {nicknameRules.noSpecialChars ? (
-                          <Check className="w-4 h-4 text-green-500 dark:text-green-400" aria-hidden="true" />
-                        ) : (
-                          <X className="w-4 h-4 text-red-500 dark:text-red-400" aria-hidden="true" />
-                        )}
-                        <span className={nicknameRules.noSpecialChars ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}>
-                          Solo lettere, numeri e spazi
-                        </span>
+                      
+                      {/* Nickname Rules */}
+                      <div id="nickname-rules" className="mt-4 space-y-2 p-3 border border-border rounded-lg bg-muted/40">
+                        <p className="text-sm font-medium text-foreground">Requisiti per il nickname:</p>
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2 text-sm" role="status">
+                            {nicknameRules.length ? (
+                              <Check className="w-4 h-4 text-green-500 dark:text-green-400" aria-hidden="true" />
+                            ) : (
+                              <X className="w-4 h-4 text-red-500 dark:text-red-400" aria-hidden="true" />
+                            )}
+                            <span className={nicknameRules.length ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}>
+                              Tra 2 e 20 caratteri
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm" role="status">
+                            {nicknameRules.noSpecialChars ? (
+                              <Check className="w-4 h-4 text-green-500 dark:text-green-400" aria-hidden="true" />
+                            ) : (
+                              <X className="w-4 h-4 text-red-500 dark:text-red-400" aria-hidden="true" />
+                            )}
+                            <span className={nicknameRules.noSpecialChars ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}>
+                              Solo lettere, numeri e spazi
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                <button
-                  type="submit"
-                  disabled={loading || !nickname.trim() || !Object.values(nicknameRules).every(rule => rule)}
-                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-background"
-                  aria-label="Inizia il quiz con questo nickname"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
-                      <span>Accesso in corso...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-5 h-5" aria-hidden="true" />
-                      <span>Inizia Quiz</span>
-                    </>
-                  )}
-                </button>
-              </motion.form>
-            )}
-          </AnimatePresence>
-        </div>
+                    <button
+                      type="submit"
+                      disabled={loading || !nickname.trim() || !Object.values(nicknameRules).every(rule => rule)}
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/90 py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-background"
+                      aria-label="Inizia il quiz con questo nickname"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
+                          <span>Accesso in corso...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-5 h-5" aria-hidden="true" />
+                          <span>Inizia Quiz</span>
+                        </>
+                      )}
+                    </button>
+                  </motion.form>
+                )}
+              </AnimatePresence>
+            </div>
 
-        {/* Help/Instructions Section */}
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="mt-6 p-4 border border-border rounded-lg bg-muted/30"
-        >
-          <h2 className="font-medium mb-2 text-foreground text-sm">Come partecipare al quiz</h2>
-          <ol className="text-sm text-muted-foreground space-y-1.5 list-decimal list-inside">
-            <li>{step === 'pin' ? <strong className="text-primary">Inserisci il PIN</strong> : 'Inserisci il PIN'} fornito dall'istruttore</li>
-            <li>{step === 'nickname' ? <strong className="text-primary">Scegli un nickname</strong> : 'Scegli un nickname'} per identificarti nella sessione</li>
-            <li>Attendi che l'istruttore avvii il quiz oppure inizia subito se già attivo</li>
-            <li>Rispondi alle domande nei tempi indicati per guadagnare punti</li>
-          </ol>
-        </motion.div>
+            {/* Help/Instructions Section */}
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="mt-6 p-4 border border-border rounded-lg bg-muted/30"
+            >
+              <h2 className="font-medium mb-2 text-foreground text-sm">Come partecipare al quiz</h2>
+              <ol className="text-sm text-muted-foreground space-y-1.5 list-decimal list-inside">
+                <li>{step === 'pin' ? <strong className="text-primary">Inserisci il PIN</strong> : 'Inserisci il PIN'} fornito dall'istruttore</li>
+                <li>{step === 'nickname' ? <strong className="text-primary">Scegli un nickname</strong> : 'Scegli un nickname'} per identificarti nella sessione</li>
+                <li>Attendi che l'istruttore avvii il quiz oppure inizia subito se già attivo</li>
+                <li>Rispondi alle domande nei tempi indicati per guadagnare punti</li>
+              </ol>
+            </motion.div>
+          </div>
+        )}
       </div>
-      )}
     </div>
   );
 }
