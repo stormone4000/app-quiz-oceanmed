@@ -185,6 +185,51 @@ L'applicazione utilizza le politiche di sicurezza a livello di riga di Supabase 
   - Tutte le modifiche SQL vengono applicate direttamente al database di produzione
   - Non è necessario effettuare migrazioni separate
 
+## Infrastruttura e Deployment
+
+### Piattaforme Utilizzate
+- **GitHub**: Repository del codice sorgente
+  - URL: https://github.com/stormone4000/globalquiz
+  - Branch principale: main
+  - Ogni push al branch main attiva automaticamente un nuovo deploy su Vercel
+
+- **Vercel**: Piattaforma di hosting e deployment
+  - URL dell'applicazione: https://globalquiz-beta.vercel.app/
+  - Dashboard: https://vercel.com/dashboard
+  - Configurazione automatica del build process basato su Vite
+  - Supporto per variabili d'ambiente e domini personalizzati
+
+- **Supabase**: Database e backend
+  - Dashboard: https://app.supabase.com/
+  - Project ID: uqutbomzymeklyowfewp
+  - Fornisce database PostgreSQL, autenticazione e storage
+
+### Processo di Deployment
+1. **Sviluppo locale** con `npm run dev`
+2. **Test locale** per verificare le funzionalità
+3. **Commit e push** su GitHub:
+   ```bash
+   git add .
+   git commit -m "Descrizione delle modifiche"
+   git push
+   ```
+4. **Deploy automatico** su Vercel:
+   - Vercel rileva automaticamente il push su GitHub
+   - Esegue il build dell'applicazione
+   - Pubblica l'applicazione all'URL https://globalquiz-beta.vercel.app/
+5. **Verifica del deployment** visitando l'URL dell'applicazione
+
+### Monitoraggio e Manutenzione
+- **Logs**: Accessibili dal dashboard di Vercel
+- **Analytics**: Disponibili nel dashboard di Vercel e Supabase
+- **Rollback**: Possibile tramite il dashboard di Vercel in caso di problemi
+- **Aggiornamenti**: Effettuati tramite push su GitHub
+
+### Troubleshooting Comune
+- **Errore 404 "DEPLOYMENT_NOT_FOUND"**: Verificare l'URL corretto (https://globalquiz-beta.vercel.app/)
+- **Problemi di build**: Controllare i logs di build su Vercel
+- **Problemi di connessione al database**: Verificare le variabili d'ambiente su Vercel
+
 ### Processo di Sviluppo Completo
 1. **Sviluppo Locale**
    ```bash
@@ -461,4 +506,4 @@ Eseguire regolarmente i seguenti controlli di sicurezza:
 
 Questo documento verrà aggiornato regolarmente per riflettere le modifiche e le nuove funzionalità dell'applicazione.
 
-Ultimo aggiornamento: 2 marzo 2024 
+Ultimo aggiornamento: 3 marzo 2024 
