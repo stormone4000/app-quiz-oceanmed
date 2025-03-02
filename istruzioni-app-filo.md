@@ -150,6 +150,130 @@ L'applicazione utilizza le politiche di sicurezza a livello di riga di Supabase 
 - Utilizza TailwindCSS per lo styling e l'interfaccia utente
 - Chart.js per la visualizzazione dei grafici e delle statistiche
 
+## Flusso di Sviluppo
+- **Repository GitHub**: Il codice sorgente è ospitato su GitHub (https://github.com/stormone4000/globalquiz)
+- **Deploy Automatico**: Utilizziamo Vercel per il deploy automatico dell'applicazione
+  - Ogni push al branch main attiva automaticamente un nuovo deploy
+  - L'applicazione è accessibile online all'URL fornito da Vercel
+- **Database Remoto**: Utilizziamo un'istanza Supabase remota per il database
+  - Tutte le modifiche SQL vengono applicate direttamente al database di produzione
+  - Non è necessario effettuare migrazioni separate
+
+### Processo di Sviluppo Completo
+1. **Sviluppo Locale**
+   ```bash
+   # Avvia il server di sviluppo locale
+   npm run dev
+   ```
+   - Modifica i file nel tuo editor preferito
+   - Testa l'applicazione all'indirizzo http://localhost:5173
+   - Verifica che le modifiche funzionino correttamente
+
+2. **Caricamento su GitHub**
+   ```bash
+   # Verifica quali file sono stati modificati
+   git status
+   
+   # Aggiungi tutti i file modificati
+   git add .
+   
+   # Crea un commit con un messaggio descrittivo
+   git commit -m "Descrizione delle modifiche effettuate"
+   
+   # Carica le modifiche su GitHub
+   git push
+   ```
+
+3. **Deploy Automatico su Vercel**
+   - Vercel rileva automaticamente le modifiche al branch main
+   - Inizia il processo di build utilizzando la configurazione Vite
+   - Esegue il deploy dell'applicazione aggiornata
+   - L'applicazione è accessibile all'URL: https://globalquiz.vercel.app
+
+4. **Verifica dell'Applicazione Online**
+   - Visita l'URL dell'applicazione su Vercel
+   - Controlla che le modifiche siano state applicate correttamente
+   - Testa le funzionalità in ambiente di produzione
+
+### Configurazione Vercel e Supabase
+
+Per garantire che Vercel utilizzi il database Supabase corretto durante il deploy, abbiamo configurato le seguenti impostazioni:
+
+1. **File `.env.local`**
+   - Questo file contiene le variabili d'ambiente necessarie per la connessione a Supabase
+   - È incluso nel repository (non ignorato da .gitignore) in modo che Vercel possa accedervi
+   - Contiene le credenziali per il database Supabase con ID: `uqutbomzymeklyowfewp`
+
+2. **Variabili d'ambiente su Vercel**
+   - Le stesse variabili sono configurate anche nel pannello di controllo di Vercel:
+     1. Vai su [vercel.com](https://vercel.com) e accedi al tuo account
+     2. Seleziona il progetto "globalquiz"
+     3. Vai su "Settings" > "Environment Variables"
+     4. Verifica che siano presenti le seguenti variabili:
+        - `VITE_SUPABASE_URL`: https://uqutbomzymeklyowfewp.supabase.co
+        - `VITE_SUPABASE_ANON_KEY`: [chiave anonima]
+        - `SUPABASE_SERVICE_KEY`: [chiave di servizio]
+
+3. **Verifica della connessione**
+   - L'applicazione esegue automaticamente un test di connessione a Supabase all'avvio
+   - Puoi verificare nei log di Vercel che la connessione sia stabilita correttamente
+   - In caso di problemi, controlla i log di build e runtime su Vercel
+
+4. **Risoluzione dei problemi**
+   - Se la connessione a Supabase fallisce:
+     1. Verifica che le variabili d'ambiente siano configurate correttamente
+     2. Controlla che il database Supabase sia attivo e accessibile
+     3. Verifica che le politiche RLS permettano le operazioni necessarie
+     4. Controlla i log di Vercel per messaggi di errore specifici
+
+### Comandi Git Utili
+```bash
+# Verifica lo stato delle modifiche
+git status
+
+# Visualizza le differenze tra i file modificati
+git diff
+
+# Scarica eventuali modifiche dal repository remoto
+git pull
+
+# Crea un nuovo branch per sviluppare una nuova funzionalità
+git checkout -b nome-nuova-funzionalita
+
+# Torna al branch principale
+git checkout main
+
+# Unisci le modifiche da un branch al branch principale
+git merge nome-nuova-funzionalita
+```
+
+### Best Practices
+- Effettua commit frequenti con messaggi chiari e descrittivi
+- Testa sempre localmente prima di caricare su GitHub
+- Utilizza branch separati per funzionalità diverse o complesse
+- Controlla sempre il deploy dopo il push per verificare che tutto funzioni
+- Documenta le modifiche importanti nel file di documentazione
+- Fai sempre backup del database prima di modifiche strutturali
+
+### Gestione del Database Supabase
+- Per modifiche al database, applica le query SQL direttamente tramite la console Supabase
+- Documenta tutte le modifiche al database nei messaggi di commit o in file SQL dedicati
+- Testa le query SQL nella console Supabase prima di implementarle nell'applicazione
+- Verifica che le politiche RLS funzionino correttamente dopo ogni modifica
+
+### Vantaggi del Nuovo Flusso
+- Ambiente di test identico a quello di produzione
+- Nessuna necessità di migrazioni separate
+- Facilità di collaborazione tramite GitHub
+- Tracciabilità completa delle modifiche
+- Deploy rapido e automatico
+
+### Precauzioni
+- Effettuare sempre backup del database prima di modifiche importanti
+- Testare accuratamente le modifiche SQL prima di applicarle
+- Utilizzare branch separati per sviluppare nuove funzionalità
+- Documentare tutte le modifiche nei messaggi di commit
+
 ## Funzionalità Future Pianificate
 - Supporto per domande a risposta aperta
 - Funzionalità di importazione/esportazione quiz
@@ -172,4 +296,4 @@ L'applicazione utilizza le politiche di sicurezza a livello di riga di Supabase 
 
 Questo documento verrà aggiornato regolarmente per riflettere le modifiche e le nuove funzionalità dell'applicazione.
 
-Ultimo aggiornamento: 1 marzo 2025 
+Ultimo aggiornamento: 25 febbraio 2024 

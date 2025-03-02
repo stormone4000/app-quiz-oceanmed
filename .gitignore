@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+!.env.local
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +23,17 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Supabase
+.supabase/
+
+# Environment variables
+.env
+.env.development
+.env.test
+.env.production
+
+# Temporary files
+.temp/
+tmp/
+temp/
