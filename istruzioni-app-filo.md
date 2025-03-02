@@ -338,6 +338,64 @@ git merge nome-nuova-funzionalita
 - Testa le query SQL nella console Supabase prima di implementarle nell'applicazione
 - Verifica che le politiche RLS funzionino correttamente dopo ogni modifica
 
+### Sicurezza del Database
+
+#### Avvisi di Sicurezza
+
+1. **Funzioni con Search Path Mutabile**
+   - **Problema**: Molte funzioni SQL non hanno un `search_path` esplicitamente impostato, il che rappresenta un rischio di sicurezza poiché un utente malintenzionato potrebbe manipolare il search path per eseguire codice dannoso.
+   - **Soluzione**: Sono stati creati tre file di migrazione per correggere tutte le funzioni:
+     - `supabase_backup/migrations/20240626_fix_search_path.sql`: Corregge le funzioni principali come `get_dashboard_stats`, `get_all_users`, ecc.
+     - `supabase_backup/migrations/20240626_fix_search_path_additional.sql`: Corregge funzioni aggiuntive come `is_holiday`, `can_manage_holidays`, ecc.
+     - `supabase_backup/migrations/20240626_fix_search_path_final.sql`: Corregge le funzioni rimanenti come `register_attendance_v2`, `get_all_videos`, ecc.
+   - **Implementazione**: Eseguire questi script SQL nella console Supabase per applicare le correzioni.
+
+2. **Protezione Password Debole**
+   - **Problema**: La protezione contro password compromesse è disabilitata.
+   - **Impatto**: Gli utenti potrebbero utilizzare password che sono state compromesse in violazioni di dati precedenti.
+   - **Soluzione**: Abilitare la verifica delle password tramite HaveIBeenPwned.org nelle impostazioni di autenticazione di Supabase.
+   - **Implementazione**: Accedere alla dashboard di Supabase > Authentication > Settings > Password Auth e abilitare "Enable Leaked Password Protection".
+
+3. **Scadenza OTP Lunga**
+   - **Problema**: La scadenza dei codici OTP è impostata a più di un'ora.
+   - **Impatto**: Un codice OTP con una lunga scadenza aumenta il rischio di accessi non autorizzati.
+   - **Soluzione**: Ridurre il tempo di scadenza OTP a meno di un'ora nelle impostazioni di autenticazione.
+   - **Implementazione**: Accedere alla dashboard di Supabase > Authentication > Settings > Email Auth e modificare "OTP Expiry" a un valore inferiore a 3600 secondi (1 ora).
+
+#### Best Practices per le Funzioni SQL
+
+Quando si creano nuove funzioni SQL, seguire sempre queste linee guida:
+
+```sql
+CREATE OR REPLACE FUNCTION nome_funzione(parametri)
+RETURNS tipo_ritorno
+SECURITY DEFINER                 -- Usa SECURITY DEFINER per funzioni che accedono a dati sensibili
+SET search_path = public         -- Imposta SEMPRE il search_path a public
+LANGUAGE plpgsql                 -- O altro linguaggio appropriato
+AS $$
+BEGIN
+  -- Verifica dei permessi dell'utente se necessario
+  IF NOT (condizione_permesso) THEN
+    RAISE EXCEPTION 'Messaggio di errore';
+  END IF;
+  
+  -- Corpo della funzione
+END;
+$$;
+
+-- Concedi i permessi minimi necessari
+GRANT EXECUTE ON FUNCTION nome_funzione(parametri) TO ruolo_appropriato;
+```
+
+#### Audit di Sicurezza Periodici
+
+Eseguire regolarmente i seguenti controlli di sicurezza:
+
+1. Verificare gli avvisi nella dashboard di Supabase
+2. Controllare le politiche RLS per assicurarsi che proteggano adeguatamente i dati
+3. Rivedere i permessi delle funzioni per garantire che seguano il principio del privilegio minimo
+4. Verificare che non ci siano credenziali o chiavi sensibili esposte nel codice
+
 ### Vantaggi del Nuovo Flusso
 - Ambiente di test identico a quello di produzione
 - Nessuna necessità di migrazioni separate

@@ -85,6 +85,34 @@ yarn build
 
 Per problemi o domande, contattare il team di sviluppo.
 
+## Sicurezza del Database
+
+### Avvisi di Sicurezza Supabase
+
+1. **Funzioni con Search Path Mutabile**: Molte funzioni SQL non hanno un `search_path` esplicitamente impostato, il che rappresenta un rischio di sicurezza. Per risolvere questo problema, sono stati creati tre file di migrazione:
+   - `supabase_backup/migrations/20240626_fix_search_path.sql`: Corregge le funzioni principali come `get_dashboard_stats`, `get_all_users`, ecc.
+   - `supabase_backup/migrations/20240626_fix_search_path_additional.sql`: Corregge funzioni aggiuntive come `is_holiday`, `can_manage_holidays`, ecc.
+   - `supabase_backup/migrations/20240626_fix_search_path_final.sql`: Corregge le funzioni rimanenti come `register_attendance_v2`, `get_all_videos`, ecc.
+
+   Questi file aggiungono la direttiva `SET search_path = public` a tutte le funzioni per mitigare il rischio.
+
+2. **Protezione Password Debole**
+   - **Problema**: La protezione contro password compromesse è disabilitata.
+   - **Soluzione**: Abilitare la verifica delle password tramite HaveIBeenPwned.org nelle impostazioni di autenticazione di Supabase.
+
+3. **Scadenza OTP Lunga**
+   - **Problema**: La scadenza dei codici OTP è impostata a più di un'ora.
+   - **Soluzione**: Ridurre il tempo di scadenza OTP a meno di un'ora nelle impostazioni di autenticazione.
+
+### Best Practices di Sicurezza
+
+Per mantenere il database sicuro:
+
+1. Assicurarsi che tutte le funzioni SQL utilizzino `SECURITY DEFINER` e `SET search_path = public`
+2. Implementare politiche RLS (Row Level Security) appropriate per tutte le tabelle
+3. Utilizzare sempre il principio del privilegio minimo nelle funzioni e nelle politiche
+4. Eseguire regolarmente audit di sicurezza sul database
+
 ## Funzionalità Principali
 
 - **Gestione Utenti**: Sistema completo di autenticazione e gestione dei ruoli utente
