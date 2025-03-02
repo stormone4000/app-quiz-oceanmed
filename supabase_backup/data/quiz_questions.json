@@ -1,0 +1,1361 @@
+[
+  {
+    "id": "0042049b-b7fd-4d9c-8bf4-bd829f023438",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "Un natante marcato \"CE\", quante persone può trasportare?",
+    "options": [
+      "dipende dall'ordinanza disciplinante l'utilizzazione dei natanti da diporto.",
+      "quelle indicate nella dichiarazione di potenza del motore per natanti da diporto.",
+      "quelle indicate nel certificato di omologazione."
+    ],
+    "correct_answer": 0,
+    "explanation": "L’omologazione (categoria di progettazione) fissa il numero max persone (Direttiva 2013/53/UE).",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "00f84629-ab42-4a1c-9628-646f505b6fad",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "Il pescatore sportivo giornalmente non può catturare:",
+    "options": [
+      "pesci, molluschi e crostacei in quantità superiore a 8 kg complessivi salvo il caso di pesce singolo di peso superiore e non può catturare giornalmente più di due esemplari di cernia.",
+      "molluschi e crostacei in quantità superiore a 10 kg.",
+      "pesci, molluschi e crostacei in quantità superiore a 5 kg complessivi salvo il caso di pesce singolo di peso superiore e non può catturare giornalmente più di un esemplare di cernia."
+    ],
+    "correct_answer": 2,
+    "explanation": "DM 6/12/2010: max 5 kg a persona (salvo esemplare singolo più grande) e 1 cernia al giorno.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "0171de80-f3c2-40b8-87b8-688073594926",
+    "quiz_id": "d0bfa54e-3dbe-49f9-a25c-7c1d029ecc22",
+    "question_text": "Per le imbarcazioni da diporto, il nome:",
+    "options": [
+      "è imposto, qualora non vi provveda il proprietario entro un certo termine fissato dall'Autorità marittima.",
+      "non è obbligatorio.",
+      "è obbligatorio."
+    ],
+    "correct_answer": 1,
+    "explanation": "Il D.Lgs. 171/2005 non rende obbligatoria l'assegnazione di un nome all'imbarcazione da diporto, a differenza delle navi maggiori.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:19:14.464733+00:00"
+  },
+  {
+    "id": "01d754f7-d17a-495a-bb67-ae71ba5a78e9",
+    "quiz_id": "cca48478-fa9d-425c-8b64-c6c6330e11f7",
+    "question_text": "Quale funzione svolge la sentina di un'unità navale?",
+    "options": [
+      "Contenere il carburante",
+      "Contenere le acque sporche e i residui liquidi",
+      "contenere le acque dolci"
+    ],
+    "correct_answer": 1,
+    "explanation": "La sentina serve a contenere le acque sporche e i residui liquidi",
+    "image_url": null,
+    "created_at": "2025-01-19T23:17:00.004178+00:00"
+  },
+  {
+    "id": "020aeb9f-739e-4b88-bf56-fa4ac77b0fca",
+    "quiz_id": "cca48478-fa9d-425c-8b64-c6c6330e11f7",
+    "question_text": "La parte strutturale della poppa, alla quale si incardina il timone, se esterno, è:",
+    "options": [
+      "il dritto di poppa",
+      "la losca del timone",
+      "il ginocchio di poppa"
+    ],
+    "correct_answer": 2,
+    "explanation": "La parte strutturale della poppa alla quale si incardina il timone è il ginocchio di poppa",
+    "image_url": null,
+    "created_at": "2025-01-19T23:17:00.004178+00:00"
+  },
+  {
+    "id": "022d92bd-cc77-429c-886d-496d294184e8",
+    "quiz_id": "115705ec-74a1-4d4b-9b01-1672d36e1f8a",
+    "question_text": "In navigazione a motore, dov'è ubicato, rispetto al centronave, l'asse di rotazione intorno al quale l'unità accosta?",
+    "options": [
+      "verso prua.",
+      "verso poppa.",
+      "al centro."
+    ],
+    "correct_answer": 0,
+    "explanation": "",
+    "image_url": null,
+    "created_at": "2025-01-19T23:19:06.131061+00:00"
+  },
+  {
+    "id": "034096ea-c6bc-4e75-a3e6-784a9d145d98",
+    "quiz_id": "d0bfa54e-3dbe-49f9-a25c-7c1d029ecc22",
+    "question_text": "Il comandante di un'unità navale che omette di prestare assistenza ovvero tentare il salvataggio nei casi in cui ne ha l'obbligo a norma del Codice della Navigazione:",
+    "options": [
+      "è punito con la reclusione fino a 2 anni.",
+      "è punito con la sanzione pecuniaria di euro 10.000.",
+      "è punito con il ritiro della patente nautica."
+    ],
+    "correct_answer": 0,
+    "explanation": "L'art. 1158 del Codice della Navigazione prevede sanzioni penali (fino a 2 anni di reclusione) per l'omessa assistenza in mare.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:19:14.464733+00:00"
+  },
+  {
+    "id": "04789ae8-7596-4218-8a85-5eef45f02ea8",
+    "quiz_id": "dcd23523-680e-4190-b2f7-f9d6111dc077",
+    "question_text": "Il ferro a grappino è:",
+    "options": [
+      "un gancio per le vele.",
+      "un tipo di ancora di emergenza.",
+      "un ancorotto per piccole imbarcazioni."
+    ],
+    "correct_answer": 2,
+    "explanation": "Il ferro a grappino è un tipo di ancorotto utilizzato prevalentemente per piccole imbarcazioni. Grazie alla sua struttura leggera e compatta, è ideale per fondali rocciosi o per situazioni in cui non è necessario un ancoraggio permanente. È comunemente usato su gommoni, piccole barche a motore o come ancora di supporto.",
+    "image_url": null,
+    "created_at": "2025-02-22T23:03:41.807216+00:00"
+  },
+  {
+    "id": "047924f8-9184-4c50-a665-fafd883439c6",
+    "quiz_id": "dcd23523-680e-4190-b2f7-f9d6111dc077",
+    "question_text": "Quale vantaggio offre l'ancoraggio mediante due ancore afforcate?",
+    "options": [
+      "velocizzare la manovra di ancoraggio dell'unità rispetto all'ancoraggio con una sola ancora.",
+      "garantire l'ancoraggio di un'unità anche su fondali particolarmente rocciosi.",
+      "ridurre il campo di giro dell'unità che così assume una configurazione ellittica a differenza dell'ancoraggio a ruota."
+    ],
+    "correct_answer": 2,
+    "explanation": "Afforcare due ancore a 30-45° riduce il raggio di giro (cfr. letteratura su ormeggio).",
+    "image_url": null,
+    "created_at": "2025-02-22T23:03:41.807216+00:00"
+  },
+  {
+    "id": "05987a49-4718-47ce-b899-b99f3a775483",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "L'obbligo dell'assicurazione sulla responsabilità civile ricade:",
+    "options": [
+      "sui motori di potenza superiore a 10 Cv.",
+      "sui motori di potenza superiore a 40,8 Cv.",
+      "su qualsiasi motore marino, amovibile e non, indipendentemente dalla potenza."
+    ],
+    "correct_answer": 2,
+    "explanation": "Il Codice delle Assicurazioni (D.Lgs. 209/2005) impone la RC per qualsiasi motore marino.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "062cdddc-acea-4904-bce3-b1f71d46384e",
+    "quiz_id": "cca48478-fa9d-425c-8b64-c6c6330e11f7",
+    "question_text": "Quale affermazione, tra le seguenti, è corretta:",
+    "options": [
+      "l'insieme di draglie e candelieri costituisce la battagliola a protezione del camminamento per il passaggio tra poppa e prora",
+      "la stazza esprime la larghezza totale della scafo",
+      "l'opera viva è la parte emersa dello scafo"
+    ],
+    "correct_answer": 0,
+    "explanation": "L'insieme di draglie e candelieri costituisce la battagliola a protezione del camminamento per il passaggio tra poppa e prora",
+    "image_url": null,
+    "created_at": "2025-01-19T23:17:00.004178+00:00"
+  },
+  {
+    "id": "065a3118-e64f-444d-9af7-00a7e98ccc7d",
+    "quiz_id": "f8286742-7cfb-4b4b-b8a3-a72d6c26b859",
+    "question_text": "Se durante la navigazione si rileva che sulla propria rotta è in corso di svolgimento una manifestazione sportiva in un campo di regata; fermo restando le prescrizioni impartite con l'ordinanza di polizia marittima, per proseguire la navigazione sono adottate le seguenti precauzioni:",
+    "options": [
+      "attraversare il campo di regata non appena le unità in gara si siano spostate in altro settore della zona di regata.",
+      "comunicare sul canale 16 VHF l'intenzione di attraversare il campo di gara e attendere istruzioni.",
+      "modificare il proprio percorso di rotta per mantenersi a debita distanza dai limiti del campo di gara."
+    ],
+    "correct_answer": 2,
+    "explanation": "Regola di buona condotta: evitare di attraversare il campo gara, aggirarlo.",
+    "image_url": null,
+    "created_at": "2025-02-23T07:30:52.465544+00:00"
+  },
+  {
+    "id": "066199ab-5fab-4c70-a665-14c028f5cc69",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "Avuto riguardo alla disciplina della pesca subacquea, quale tra queste affermazioni è corretta?",
+    "options": [
+      "il subacqueo ha la facoltà di decidere quando tenere armato il fucile subacqueo prima dell'immersione.",
+      "è consentito tenere il fucile subacqueo in posizione di armamento anche se non in immersione.",
+      "è vietato tenere il fucile subacqueo in posizione di armamento se non in immersione."
+    ],
+    "correct_answer": 2,
+    "explanation": "Il fucile può essere armato solo in immersione (DPR 1639/1968, DM 1/07/1998).",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "06d4a6e0-8cf5-4572-967a-b49eebb2d3b1",
+    "quiz_id": "cca48478-fa9d-425c-8b64-c6c6330e11f7",
+    "question_text": "Cos'è il ponte di coperta?",
+    "options": [
+      "il ponte che si estende longitudinalmente e trasversalmente, in modo continuo, racchiudendo interamente lo scafo",
+      "la superficie orizzontale atta a ricoprire la parte più alta dell'unità",
+      "la struttura che ricopre le cabine"
+    ],
+    "correct_answer": 0,
+    "explanation": "Il ponte di coperta è il ponte che si estende longitudinalmente e trasversalmente, racchiudendo interamente lo scafo",
+    "image_url": null,
+    "created_at": "2025-01-19T23:17:00.004178+00:00"
+  },
+  {
+    "id": "09770254-a9f6-4fb0-8a68-7c7044ee0ad7",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "Le lenze fisse consentite nell'ambito della pesca sportiva sono :",
+    "options": [
+      "solo i bolentini a tre ami.",
+      "solo le canne a non piú di 10 ami.",
+      "canne a non piú di tre ami, lenze morte, bolentini, correntine a non piú di sei ami e lenze per cefalopodi."
+    ],
+    "correct_answer": 2,
+    "explanation": "Il DM 6/12/2010 definisce questi limiti per la lenza costiera sportiva.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "0ae233e1-cf8d-4002-9d33-2ac533df8b20",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "L'utilizzo di un'imbarcazione da diporto per mezzo di contratti di locazione ovvero di noleggio risulta:",
+    "options": [
+      "dall'iscrizione nel registro delle imprese.",
+      "dall'omologazione CE.",
+      "dalla licenza di navigazione."
+    ],
+    "correct_answer": 0,
+    "explanation": "La licenza di navigazione riporta l’eventuale uso commerciale (locazione/noleggio) dell’unità (art. 24 D.Lgs. 171/2005).",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "0b1895ec-ebea-4b4e-9353-3cff3aec94c4",
+    "quiz_id": "dcd23523-680e-4190-b2f7-f9d6111dc077",
+    "question_text": "Con riferimento ai vari tipi di ancore, è possibile affermare che:",
+    "options": [
+      "la Bruce è la tipica ancora delle navi, passante lo scafo attraverso l’occhio di cubia.",
+      "la Danforth è adatta allo scoglio.",
+      "la CQR e la Delta sono tipi di ancora per tutti i fondali."
+    ],
+    "correct_answer": 2,
+    "explanation": "CQR (aratro) e Delta (simile) sono considerate multi-purpose (cfr. manuali di ormeggio).",
+    "image_url": null,
+    "created_at": "2025-02-22T23:03:41.807216+00:00"
+  },
+  {
+    "id": "0b1d348f-db14-4e34-ae7c-379da20021f5",
+    "quiz_id": "f8286742-7cfb-4b4b-b8a3-a72d6c26b859",
+    "question_text": "Entrando in un porto commerciale, privo di attrezzature da diporto, di norma dobbiamo avvisare:",
+    "options": [
+      "non dobbiamo avvisare nessuno.",
+      "il concessionario del servizio di rimorchio.",
+      "l'Autorità marittima."
+    ],
+    "correct_answer": 2,
+    "explanation": "In base al Codice della Navigazione e alle ordinanze locali, occorre avvisare la Capitaneria (Autorità marittima).",
+    "image_url": null,
+    "created_at": "2025-02-23T07:30:52.465544+00:00"
+  },
+  {
+    "id": "0b563a3f-c0f1-4b28-904e-cedbad2da462",
+    "quiz_id": "cca48478-fa9d-425c-8b64-c6c6330e11f7",
+    "question_text": "Le frecce in figura indicano:",
+    "options": [
+      "il baglio massimo",
+      "il mascone di dritta",
+      "la murata di dritta"
+    ],
+    "correct_answer": 2,
+    "explanation": "Le frecce indicano la murata di dritta.",
+    "image_url": null,
+    "created_at": "2025-01-19T23:17:00.004178+00:00"
+  },
+  {
+    "id": "0ba8c181-683f-4ccf-a3d2-345351b97a40",
+    "quiz_id": "f8286742-7cfb-4b4b-b8a3-a72d6c26b859",
+    "question_text": "La tavola a vela può navigare:",
+    "options": [
+      "entro 2 chilometri dalla costa.",
+      "entro mille metri dalla costa.",
+      "entro 1 miglio dalla costa."
+    ],
+    "correct_answer": 0,
+    "explanation": "Secondo DM e norme diporto, tavola a vela spesso è limitata a 1 miglio dalla costa.",
+    "image_url": null,
+    "created_at": "2025-02-23T07:30:52.465544+00:00"
+  },
+  {
+    "id": "0bbec9ee-749f-4ba3-baa9-7da5b7122192",
+    "quiz_id": "dcd23523-680e-4190-b2f7-f9d6111dc077",
+    "question_text": "Un'unità afforcata è quell'unità che:",
+    "options": [
+      "non riesce a spedare le ancore.",
+      "ha dato fondo a 2 ancore con calumi aperti a 180 gradi circa.",
+      "ha dato fondo a 2 ancore con calumi aperti a 45 gradi circa."
+    ],
+    "correct_answer": 2,
+    "explanation": "Nell’uso comune, “afforcare” due ancore a circa 45° di angolo (manuali di ormeggio).",
+    "image_url": null,
+    "created_at": "2025-02-22T23:03:41.807216+00:00"
+  },
+  {
+    "id": "0bdc31ec-4b33-4f1d-9768-8a4760e35297",
+    "quiz_id": "96fa1af7-eadc-422d-b98a-50d2bce8a997",
+    "question_text": "Se, in conseguenza della condotta di un'unità da diporto in stato di ebbrezza, deriva un danno o un pericolo di danno ambientale:",
+    "options": [
+      "è sempre disposta la confisca dell'unità da diporto.",
+      "è disposta la vendita coatta dell'unità da diporto.",
+      "è sempre disposta la revoca della patente nautica."
+    ],
+    "correct_answer": 2,
+    "explanation": "Art. 53-bis D.Lgs. 171/2005: revoca patente se c’è danno / pericolo danno ambientale.",
+    "image_url": null,
+    "created_at": "2025-01-21T09:55:58.335755+00:00"
+  },
+  {
+    "id": "0dbb3a52-6d32-407f-93c7-7e5cb53796fc",
+    "quiz_id": "cca48478-fa9d-425c-8b64-c6c6330e11f7",
+    "question_text": "La linea che separa l'opera viva dall'opera morta è denominata:",
+    "options": [
+      "linea di bordo libero",
+      "linea di galleggiamento",
+      "linea di chiglia"
+    ],
+    "correct_answer": 1,
+    "explanation": "La linea che separa l'opera viva dall'opera morta è la linea di galleggiamento",
+    "image_url": null,
+    "created_at": "2025-01-19T23:17:00.004178+00:00"
+  },
+  {
+    "id": "0dfbf660-5c46-4138-bd8e-f102acd5e7cd",
+    "quiz_id": "dcd23523-680e-4190-b2f7-f9d6111dc077",
+    "question_text": "Nella situazione rappresentata dalla figura a fianco, quale cima di poppa va liberata per prima volendo lasciare la banchina?",
+    "options": [
+      "quella sulla bitta B.",
+      "è indifferente.",
+      "quella sulla bitta A."
+    ],
+    "correct_answer": 2,
+    "explanation": "Anche in questo caso, per lasciare la banchina, si deve liberare prima la cima B, dato che il vento la spinge lateralmente. Così facendo, l’imbarcazione può allontanarsi in sicurezza senza il rischio di collisioni o rotazioni incontrollate.",
+    "image_url": "https://axfqxbthjalzzshdjedm.supabase.co/storage/v1/object/public/quiz-images/quiz-images/1737455865351-5kntrvefs4.jpg",
+    "created_at": "2025-02-22T23:03:41.807216+00:00"
+  },
+  {
+    "id": "0e600a01-f174-43b5-b541-8cd578458435",
+    "quiz_id": "96fa1af7-eadc-422d-b98a-50d2bce8a997",
+    "question_text": "Da cosa è generato un incendio di classe B?",
+    "options": [
+      "da apparecchiature elettriche in tensione.",
+      "da gas infiammabili.",
+      "da liquidi infiammabili."
+    ],
+    "correct_answer": 2,
+    "explanation": "Gli incendi di classe B riguardano liquidi infiammabili (benzina, solventi).",
+    "image_url": null,
+    "created_at": "2025-01-21T09:55:58.335755+00:00"
+  },
+  {
+    "id": "0e959434-703d-43fc-a14a-9ab5f80117ba",
+    "quiz_id": "d0bfa54e-3dbe-49f9-a25c-7c1d029ecc22",
+    "question_text": "Si può immatricolare un'unità avente lunghezza fuori tutto di 9,90 metri?",
+    "options": [
+      "sì, ma subisce il regime giuridico delle imbarcazioni da diporto iscritte.",
+      "no, solo quelle superiori a 10 metri di lunghezza fuori tutto.",
+      "no, non può essere immatricolato."
+    ],
+    "correct_answer": 0,
+    "explanation": "Anche sotto i 10 metri si può procedere all'immatricolazione volontaria come imbarcazione, rientrando nel regime giuridico del diporto.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:19:14.464733+00:00"
+  },
+  {
+    "id": "0ed6975b-0515-41e7-95da-45ab25230537",
+    "quiz_id": "dcd23523-680e-4190-b2f7-f9d6111dc077",
+    "question_text": "L'ancoraggio in baia di più unità a murata è:",
+    "options": [
+      "consigliato solo tra barche a vela.",
+      "consigliato solo tra barche a motore.",
+      "sconsigliato perché si è esposti al moto ondoso."
+    ],
+    "correct_answer": 2,
+    "explanation": "Stessa conclusione: ormeggio affiancato in baia è sconsigliato (rollio e sicurezza).",
+    "image_url": null,
+    "created_at": "2025-02-22T23:03:41.807216+00:00"
+  },
+  {
+    "id": "0f0d97b2-4841-4e94-bc9f-64327eee2fce",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "Generalmente, in zona A delle Aree Marine Protette la navigazione:",
+    "options": [
+      "è consentita.",
+      "è consentita solo previa comunicazione all'Autorità marittima.",
+      "non è consentita."
+    ],
+    "correct_answer": 2,
+    "explanation": "Zona A è di riserva integrale: di norma vietata la navigazione (salvo eccezioni).",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "0f442b98-b7af-44d6-b0d3-2898ad9e7d44",
+    "quiz_id": "f8286742-7cfb-4b4b-b8a3-a72d6c26b859",
+    "question_text": "In uscita dal porto, nel dubbio di non essere visto da altre imbarcazioni, come ci si comporta?",
+    "options": [
+      "emettendo 5 suoni brevi (segnale di pericolo).",
+      "emettendo 2 suoni lunghi e 2 brevi.",
+      "emettendo 1 suono prolungato e ascoltando l’eventuale risposta."
+    ],
+    "correct_answer": 2,
+    "explanation": "Regole di segnalazione fonica (COLREG / ordinanze). Un suono prolungato indica manovra, attendendo risposta.",
+    "image_url": null,
+    "created_at": "2025-02-23T07:30:52.465544+00:00"
+  },
+  {
+    "id": "0fb64422-9ad2-4e0b-86d4-f5b693fa4ce5",
+    "quiz_id": "dcd23523-680e-4190-b2f7-f9d6111dc077",
+    "question_text": "Com'è denominata la parte dell'ancora che fa presa sul fondo?",
+    "options": [
+      "diamante.",
+      "fuso.",
+      "marra."
+    ],
+    "correct_answer": 2,
+    "explanation": "La marra è la parte dell’ancora che penetra il fondale.",
+    "image_url": null,
+    "created_at": "2025-02-22T23:03:41.807216+00:00"
+  },
+  {
+    "id": "1031fd02-4077-4d17-8879-e7b07bce9f67",
+    "quiz_id": "f8286742-7cfb-4b4b-b8a3-a72d6c26b859",
+    "question_text": "La distanza massima intercorrente tra il pescatore subacqueo e la sua boa di segnalazione è pari a:",
+    "options": [
+      "100 metri.",
+      "150 metri.",
+      "50 metri."
+    ],
+    "correct_answer": 2,
+    "explanation": "In molte ordinanze, il sub non può allontanarsi più di 50 m dalla boa di segnalazione.",
+    "image_url": null,
+    "created_at": "2025-02-23T07:30:52.465544+00:00"
+  },
+  {
+    "id": "10b09c2a-0e54-4c36-9334-8e8ed378d0c8",
+    "quiz_id": "cca48478-fa9d-425c-8b64-c6c6330e11f7",
+    "question_text": "La carena viene detta dislocante se è del tipo:",
+    "options": [
+      "non plana e navigando sposta l’’acqua a destra e a sinistra",
+      "plana e si alza sul filo dell'acqua",
+      "presenta due scafi"
+    ],
+    "correct_answer": 0,
+    "explanation": "La carena dislocante è quella che non plana e sposta l’acqua a destra e sinistra.",
+    "image_url": null,
+    "created_at": "2025-01-19T23:17:00.004178+00:00"
+  },
+  {
+    "id": "10d7227f-9913-4a26-827e-7a71cabf76b1",
+    "quiz_id": "96fa1af7-eadc-422d-b98a-50d2bce8a997",
+    "question_text": "Gli effetti dell'alcol:",
+    "options": [
+      "si annullano dopo 2 ore.",
+      "si riducono nel giro di pochi minuti.",
+      "perdurano anche fino a 5 ore."
+    ],
+    "correct_answer": 2,
+    "explanation": "Gli effetti dell’alcol possono permanere per diverse ore (fino a 5, a seconda dell’assunzione).",
+    "image_url": null,
+    "created_at": "2025-01-21T09:55:58.335755+00:00"
+  },
+  {
+    "id": "10fb6ca8-1625-430c-a0ab-bb6c84269013",
+    "quiz_id": "d0bfa54e-3dbe-49f9-a25c-7c1d029ecc22",
+    "question_text": "In mancanza di specifiche disposizioni, alla navigazione delle unità da diporto si applicano:",
+    "options": [
+      "le disposizioni del Codice della navigazione.",
+      "dalle disposizioni del Codice civile.",
+      "le disposizioni della Marina Militare."
+    ],
+    "correct_answer": 0,
+    "explanation": "Come stabilito dall'art. 1 del D.Lgs. 171/2005, in assenza di norme specifiche del Codice della Nautica, si applicano le disposizioni del Codice della Navigazione.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:19:14.464733+00:00"
+  },
+  {
+    "id": "1190c6db-f522-4c5f-9017-43d9a2ea2cc2",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "La licenza e gli altri documenti per le unità da diporto devono essere sempre tenuti a bordo in originale?",
+    "options": [
+      "si, previa autorizzazione rilasciata dall'Autorità marittima.",
+      "no, è sufficiente avere a bordo delle semplici copie fotostatiche.",
+      "no, per la navigazione tra i porti nazionali è sufficiente avere a bordo le copie conformi all'originale."
+    ],
+    "correct_answer": 0,
+    "explanation": "Per navigazione nazionale, si possono avere copie conformi (art. 24 D.Lgs. 171/2005).",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "11fe57a0-8050-4a52-b910-8b9b1aade2d1",
+    "quiz_id": "d0bfa54e-3dbe-49f9-a25c-7c1d029ecc22",
+    "question_text": "Le ordinanze sono delle:",
+    "options": [
+      "prescrizioni indicate sulla licenza di navigazione o sul certificato d'uso motore.",
+      "strutture portanti trasversali della nave in legno.",
+      "prescrizioni che regolamentano la navigazione marittima in ambito locale."
+    ],
+    "correct_answer": 2,
+    "explanation": "Le ordinanze dell'Autorità Marittima (Capitanerie) stabiliscono norme locali di sicurezza e di navigazione, in attuazione del Codice della Navigazione.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:19:14.464733+00:00"
+  },
+  {
+    "id": "129ee7ec-6178-43bd-855b-9d15fc1dec7f",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "Dove devono avvenire partenza e recupero dello sciatore nautico?",
+    "options": [
+      "esclusivamente servendosi dei corridoi di lancio.",
+      "ovunque purché con cautela al fine di prevenire situazioni di pericolo.",
+      "soltanto in acque libere da bagnanti e da imbarcazioni, se non vietato dalle ordinanze locali, ovvero entro gli appositi corridoi di lancio."
+    ],
+    "correct_answer": 2,
+    "explanation": "Le ordinanze locali impongono aree libere da bagnanti o l’utilizzo dei corridoi di lancio.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "13aad92b-b95f-4915-969a-fb6a1b72581f",
+    "quiz_id": "cca48478-fa9d-425c-8b64-c6c6330e11f7",
+    "question_text": "Lo specchio di poppa è:",
+    "options": [
+      "la parte della poppa al di sopra del dritto di poppa",
+      "l'apertura della poppa negli scafi autosvuotanti",
+      "il fondo del pozzetto in cui è alloggiata la barra del timone"
+    ],
+    "correct_answer": 0,
+    "explanation": "Lo specchio di poppa è la parte della poppa al di sopra del dritto di poppa",
+    "image_url": null,
+    "created_at": "2025-01-19T23:17:00.004178+00:00"
+  },
+  {
+    "id": "149fbffa-abeb-48bc-b8bc-9c82c44fa242",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "Durante l'esercizio della pesca sportiva subacquea:",
+    "options": [
+      "è consento esclusivamente l'utilizzo di fonti luminose alogene.",
+      "non è consento l'utilizzo di alcuna fonte luminosa, compresa la torcia.",
+      "è vietato l'utilizzo delle fonti luminose a eccezione della torcia."
+    ],
+    "correct_answer": 2,
+    "explanation": "Il DM pesca subacquea vieta l’uso di fonti luminose (fari, luci) tranne la torcia subacquea.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "14c185d5-75a8-48c0-98af-9371d6bc6909",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "Chiunque navighi a motore all'interno di un'area marina protetta non adeguatamente segnalata dalle previste boe perimetrali, non essendo a conoscenza dei vincoli relativi al tale area è.",
+    "options": [
+      "soggetto ad ammonizione.",
+      "soggetto ad una sanzione penale.",
+      "soggetto a una sanzione amministrativa."
+    ],
+    "correct_answer": 2,
+    "explanation": "Le violazioni nelle AMP prevedono sanzioni amministrative (L. 394/91 e decreti istitutivi).",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "14f9d730-635e-42ba-a018-50110f12605c",
+    "quiz_id": "115705ec-74a1-4d4b-9b01-1672d36e1f8a",
+    "question_text": "In un'unità bielica (con due assi portaelica), per quale motivo l'elica di dritta è destrorsa e l'elica di sinistra  è sinistrorsa?",
+    "options": [
+      "per garantire una costante velocità di crociera.",
+      "per eliminare il fenomeno di cavitazione dell'elica.",
+      "per eliminare l'effetto laterale delle pale."
+    ],
+    "correct_answer": 2,
+    "explanation": "",
+    "image_url": null,
+    "created_at": "2025-01-19T23:19:06.131061+00:00"
+  },
+  {
+    "id": "15ae3dc0-0bae-4447-89f1-9296cf8d5e99",
+    "quiz_id": "115705ec-74a1-4d4b-9b01-1672d36e1f8a",
+    "question_text": "La distanza teorica che un'elica percorrerebbe in un giro completo se l'acqua fosse solida è denominata:",
+    "options": [
+      "passo teorico.",
+      "diametro teorico.",
+      "regresso teorico."
+    ],
+    "correct_answer": 0,
+    "explanation": "",
+    "image_url": null,
+    "created_at": "2025-01-19T23:19:06.131061+00:00"
+  },
+  {
+    "id": "169fb5d3-f14d-44e5-9100-2b03aaf495d3",
+    "quiz_id": "dcd23523-680e-4190-b2f7-f9d6111dc077",
+    "question_text": "Per stare alla fonda con mare calmo su un fondale di 16 metri, quanta cima bisogna filare?",
+    "options": [
+      "almeno 38 metri.",
+      "almeno 40 metri.",
+      "almeno 48 metri."
+    ],
+    "correct_answer": 2,
+    "explanation": "Da 3 a 5 volte il fondale → 16 * 3 = 48 m (rif. manuale ormeggio).",
+    "image_url": null,
+    "created_at": "2025-02-22T23:03:41.807216+00:00"
+  },
+  {
+    "id": "16baa310-a0c8-40c6-b9b2-5ddc6891dca6",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "L'obbligo della patente nautica per condurre un natante da diporto sorge:",
+    "options": [
+      "mai, perché non è necessaria la patente nautica per i natanti da diporto.",
+      "quando la potenza del motore supera i 40,8 Cv, fermo restando la cilindrata, i tempi del motore ed il carburante impiegato.",
+      "quando la potenza del motore supera i 25 Cv, fermo restando la cilindrata, i tempi del motore ed il carburante impiegato."
+    ],
+    "correct_answer": 1,
+    "explanation": "Obbligo di patente se potenza > 30 kW (40,8 cv), ex art. 39 D.Lgs. 171/2005 e norme correlate.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "1821054a-5cff-40b9-892e-9975f3d2ba90",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "In generale il numero minimo dei componenti l'equipaggio di una qualsiasi unità da diporto (purchè non adibita a noleggio) è stabilito:",
+    "options": [
+      "nel certificato di sicurezza per imbarcazioni da diporto.",
+      "con ordinanza dell'Autorità marittima competente, trattandosi di navigazione entro 12 miglia.",
+      "dal comandante in funzione della navigazione da intraprendere in relazione alle condimeteo marine e alla distanza da porti sicuri."
+    ],
+    "correct_answer": 0,
+    "explanation": "Il comandante valuta gli aspetti di sicurezza, purché non si tratti di unità con equipaggio professionale. (Artt. 38-39 Codice della Navig.)",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "18e5253b-58b9-4801-b216-a3ed41721282",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "Chi regge il timone di un'imbarcazione da diporto deve essere necessariamente munito di patente nautica?",
+    "options": [
+      "no, purché abbia delega scritta ed età non inferiore ad anni 14.",
+      "si, sempre perché tenere il timone significa determinare la direzione della navigazione in atto.",
+      "no, purché vi sia a bordo altra persona regolarmente abilitata per il tipo di navigazione in atto che si assuma la responsabilità del comando e della condotta."
+    ],
+    "correct_answer": 2,
+    "explanation": "Se c’è a bordo un comandante abilitato che si assume la responsabilità, non occorre che chi “regge il timone” abbia la patente.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "193bf941-0dea-4924-bd12-b6c95b097c9b",
+    "quiz_id": "96fa1af7-eadc-422d-b98a-50d2bce8a997",
+    "question_text": "Quali sono gli elementi del cosiddetto \"triangolo del fuoco\" che alimentano un incendio?",
+    "options": [
+      "Combustione, estinzione, reazione.",
+      "Estintore, pressione, schiuma.",
+      "Combustibile, comburente, calore."
+    ],
+    "correct_answer": 2,
+    "explanation": "Il triangolo del fuoco comprende combustibile, comburente (ossigeno) e calore (innesco).",
+    "image_url": null,
+    "created_at": "2025-01-21T09:55:58.335755+00:00"
+  },
+  {
+    "id": "1949caf0-09fb-4526-9782-6d5bff40eb31",
+    "quiz_id": "d0bfa54e-3dbe-49f9-a25c-7c1d029ecc22",
+    "question_text": "Le disposizioni della disciplina della navigazione delle unità da diporto contenute nel codice della nautica sono completate:",
+    "options": [
+      "dal Regolamento di attuazione al codice della nautica.",
+      "dal Codice civile.",
+      "dalle disposizioni speciali."
+    ],
+    "correct_answer": 0,
+    "explanation": "Il D.M. 146/2008 è il Regolamento di attuazione del D.Lgs. 171/2005, che ne completa la disciplina.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:19:14.464733+00:00"
+  },
+  {
+    "id": "19c4c7a7-c7ad-4e87-9b0b-cb4eb1d23efb",
+    "quiz_id": "96fa1af7-eadc-422d-b98a-50d2bce8a997",
+    "question_text": "Da cosa è generato un incendio di classe E?",
+    "options": [
+      "da liquidi infiammabili.",
+      "da combustibili solidi.",
+      "da apparecchiature elettriche in tensione."
+    ],
+    "correct_answer": 2,
+    "explanation": "Convenzionalmente la classe E indica apparecchiature elettriche in tensione.",
+    "image_url": null,
+    "created_at": "2025-01-21T09:55:58.335755+00:00"
+  },
+  {
+    "id": "19f48aee-476f-43c0-816a-3e2d82d2e0bc",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "In barca ci sono due persone quando una di queste decide che vuole praticare sci nautico. È possibile?",
+    "options": [
+      "solo se chi conduce sia titolare di patente nautica.",
+      "sì.",
+      "no."
+    ],
+    "correct_answer": 1,
+    "explanation": "Di norma sono necessarie almeno 3 persone: conducente + osservatore + sciatore. Con 2 persone totali è vietato.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "1a53848d-998a-4bc2-a2de-54bdb0fdd6b7",
+    "quiz_id": "cca48478-fa9d-425c-8b64-c6c6330e11f7",
+    "question_text": "La carena viene detta dislocante se è del tipo:",
+    "options": [
+      "piatta",
+      "catamarano",
+      "tonda"
+    ],
+    "correct_answer": 2,
+    "explanation": "La carena viene detta dislocante se è del tipo tonda",
+    "image_url": null,
+    "created_at": "2025-01-19T23:17:00.004178+00:00"
+  },
+  {
+    "id": "1a5caf1e-88d7-42dc-ad67-1ed0e739afd0",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "La pesca sportiva è l'attività esercitata:",
+    "options": [
+      "a scopo ricreativo e propedeutico alla successiva vendita e commercio dei prodotti catturati.",
+      "scopo ricreativo o agonistico. Sono consentiti la vendita ed il commercio dei prodotti di tale tipo di pesca solo per quantitativi inferiori, per ciascuna specie, a 5 Kg.",
+      "a scopo ricreativo o agonistico. Sono vietati, sotto qualsiasi forma, la vendita ed il commercio dei prodotti di tale tipo di pesca."
+    ],
+    "correct_answer": 2,
+    "explanation": "Nella pesca sportiva è vietata la vendita del pescato (DPR 1639/1968, DM 6/12/2010).",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "1b159ae4-514d-4a75-8c5f-aa7ac99d8c92",
+    "quiz_id": "cca48478-fa9d-425c-8b64-c6c6330e11f7",
+    "question_text": "Cosa è la sezione maestra dello scafo?",
+    "options": [
+      "la sezione trasversale centrale che, normalmente, ha maggior larghezza",
+      "la zona in cui si comanda",
+      "la sezione iniziale dello scafo"
+    ],
+    "correct_answer": 0,
+    "explanation": "La sezione maestra dello scafo è la sezione trasversale centrale che, normalmente, ha maggior larghezza",
+    "image_url": null,
+    "created_at": "2025-01-19T23:17:00.004178+00:00"
+  },
+  {
+    "id": "1b62bb86-eed4-4a3b-b68e-3d5864cc90c5",
+    "quiz_id": "96fa1af7-eadc-422d-b98a-50d2bce8a997",
+    "question_text": "Il numero e il posizionamento degli estintori di una unità marcata CE:",
+    "options": [
+      "è fissato dal Codice della navigazione.",
+      "è stabilito dalle ordinanze dell'Autorità marittima.",
+      "è stabilito nel Manuale del proprietario."
+    ],
+    "correct_answer": 2,
+    "explanation": "Per le unità marcate CE, la dotazione è indicata dal costruttore nel Manuale.",
+    "image_url": null,
+    "created_at": "2025-01-21T09:55:58.335755+00:00"
+  },
+  {
+    "id": "1b6797c7-1325-4031-ab5e-641baf4b6734",
+    "quiz_id": "dcd23523-680e-4190-b2f7-f9d6111dc077",
+    "question_text": "Ancorare alla ruota significa:",
+    "options": [
+      "il giro di 360 gradi intorno all’ancora per rendere efficace il grippiale.",
+      "il giro di 360 gradi effettuato intorno all’ancora prima di aver dato fondo.",
+      "la libertà di rotazione di 360 gradi dell’imbarcazione alla fonda."
+    ],
+    "correct_answer": 2,
+    "explanation": "Alla ruota = un’ancora prua, la barca può ruotare interamente col vento/corrente.",
+    "image_url": null,
+    "created_at": "2025-02-22T23:03:41.807216+00:00"
+  },
+  {
+    "id": "1c804b25-7fde-4500-bfc3-ee81fdf8f586",
+    "quiz_id": "cca48478-fa9d-425c-8b64-c6c6330e11f7",
+    "question_text": "Cosa si intende per prua dell'unità?",
+    "options": [
+      "La parte priva di spigoli dello scafo",
+      "La parte estrema posteriore dello scafo",
+      "La porzione anteriore posta all'estremità dell'unità"
+    ],
+    "correct_answer": 2,
+    "explanation": "La prua è la porzione anteriore posta all'estremità dell'unità",
+    "image_url": null,
+    "created_at": "2025-01-19T23:17:00.004178+00:00"
+  },
+  {
+    "id": "1d226292-156c-4316-8575-102ed4c4f65c",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "Generalmente, in zona A delle Aree Marine Protette l'ancoraggio:",
+    "options": [
+      "è consentita.",
+      "è consentito solo previa comunicazione all'Autorità marittima.",
+      "non è consentita."
+    ],
+    "correct_answer": 2,
+    "explanation": "La zona A è di riserva integrale: in genere navigazione e ancoraggio sono vietati.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "1d600b97-7a42-4f8e-ace9-a99a5af9e4e0",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "L'unità trainante lo sciatore nautico deve essere munita di:",
+    "options": [
+      "mezzi che consentano una facile risalita a bordo.",
+      "dispositivi supplementari per il segnalamento acustico.",
+      "cassetta di pronto soccorso, gancio di traino e specchietto retrovisore."
+    ],
+    "correct_answer": 2,
+    "explanation": "Le dotazioni minime per il traino includono gancio idoneo, specchio retrovisore e cassetta di pronto soccorso.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "1ec36a7b-4b4b-4239-9a77-fc4bb0edb6f0",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "La denuncia di evento straordinario è presentata se in corso di:",
+    "options": [
+      "navigazione, le persone a bordo hanno corso un pericolo.",
+      "navigazione, si esegue una variazione di rotta non programmata.",
+      "navigazione, si siano verificati eventi anomali relativi all'unità o alle persone a bordo."
+    ],
+    "correct_answer": 2,
+    "explanation": "Evento straordinario: art. 179 Codice della Navigazione, riguarda fatti anomali o rilevanti per l’unità o chi è a bordo.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "1f30f380-b110-4728-908b-2107f7435dbd",
+    "quiz_id": "96fa1af7-eadc-422d-b98a-50d2bce8a997",
+    "question_text": "Cos'è il comburente?",
+    "options": [
+      "la sostanza che alimenta la combustione mediante ossidazione del combustibile, generalmente l'ossigeno.",
+      "il materiale infiammabile.",
+      "il nome della fiamma."
+    ],
+    "correct_answer": 0,
+    "explanation": "Comburente = sostanza (ossigeno) che permette la reazione.",
+    "image_url": null,
+    "created_at": "2025-01-21T09:55:58.335755+00:00"
+  },
+  {
+    "id": "200d0e31-74b9-46e7-b3b4-b86e14e58ba5",
+    "quiz_id": "dcd23523-680e-4190-b2f7-f9d6111dc077",
+    "question_text": "Con riferimento all'utilizzo dell'ancora in funzione del fondale, è possibile affermare che:",
+    "options": [
+      "lunghezza del cavo-catena deve essere sempre superiore a 6 volte il fondale.",
+      "l'ancora Danforth è consigliata sui fondali rocciosi.",
+      "l'ancora Danforth è ottima su fondali sabbiosi-fangosi."
+    ],
+    "correct_answer": 2,
+    "explanation": "La Danforth (a marre piatte) è ottima su sabbia/fango, meno su scogli.",
+    "image_url": null,
+    "created_at": "2025-02-22T23:03:41.807216+00:00"
+  },
+  {
+    "id": "2011bb7d-5dd1-4cfa-8405-7636ca0b2f7c",
+    "quiz_id": "f8286742-7cfb-4b4b-b8a3-a72d6c26b859",
+    "question_text": "I concessionari delle strutture dedicate alla nautica da diporto devono riservare ormeggi in transito:",
+    "options": [
+      "per la durata di 24 ore",
+      "per la durata di 48 ore",
+      "per la durata di 72 ore"
+    ],
+    "correct_answer": 2,
+    "explanation": "D.Lgs. 171/2005 e regolamenti: la riserva minima di posti transito in porto turistico è almeno 72 ore.",
+    "image_url": null,
+    "created_at": "2025-02-23T07:30:52.465544+00:00"
+  },
+  {
+    "id": "21a53ec1-2e34-4ff0-a6ca-6336e13f6192",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "L'atto di autorizzazione alla navigazione temporanea",
+    "options": [
+      "vale come documento di bordo straordinario ed abilita alla navigazione senza alcun limite dalla costa, nonché in navigazione in acque internazionali.",
+      "non vale come documento di bordo ed abilita esclusivamente alla navigazione da e per il cantiere di costruzione e/o manutenzione.",
+      "vale come documento di bordo e abilita alla navigazione nei limiti consentiti dalle caratteristiche di costruzione dell'unità da diporto, nonché alla navigazione in acque territoriali straniere per il periodo di tempo necessario alla partecipazione a fiere, saloni e altri eventi espositivi."
+    ],
+    "correct_answer": 0,
+    "explanation": "L’atto di autorizzazione temporanea abilita l’unità a navigare per eventi o trasferimenti, rimanendo documento di bordo (art. 28 D.Lgs. 171/2005).",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "22589df9-61f9-44f2-910e-caa7b36c1fa6",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "La pratica dello sci nautico quale dotazione prevede.",
+    "options": [
+      "la boetta di segnalazione di colore arancione munita di sagola galleggiante di lunghezza non inferiore a 180 metri.",
+      "un gavitello di colore arancione munito di apposito dispositivo luminoso lampeggiante di colore blu visibile per tutto l'orizzonte.",
+      "la cassetta di pronto soccorso ed un salvagente per ciascuno degli sciatori trainati."
+    ],
+    "correct_answer": 1,
+    "explanation": "Stesse regole: pronto soccorso + salvagente individuale (norme sci nautico).",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "23747bfa-aabd-4a10-b07e-74b49f91c677",
+    "quiz_id": "cca48478-fa9d-425c-8b64-c6c6330e11f7",
+    "question_text": "La carena viene detta dislocante se:",
+    "options": [
+      "se in un dato momento non plana",
+      "plana e si alza sul filo dell'acqua",
+      "è tonda oppure a V profondo"
+    ],
+    "correct_answer": 2,
+    "explanation": "La carena è dislocante se è tonda oppure a V profondo.",
+    "image_url": null,
+    "created_at": "2025-01-19T23:17:00.004178+00:00"
+  },
+  {
+    "id": "238952aa-ab2a-495c-8f47-54aab7c1181d",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "Come è articolata la validità temporale della patenta nautica?",
+    "options": [
+      "10 anni per tutti.",
+      "10 anni se non si è superato il 50esimo anno di età, 5 anni se si è superato tale limite d'età.",
+      "10 anni se non si è superato il 60esimo anno di età, 5 anni se si è superato tale limite d'età."
+    ],
+    "correct_answer": 2,
+    "explanation": "La patente nautica è rinnovabile ogni 10 anni fino ai 60 anni, poi ogni 5 (art. 37 D.Lgs. 171/2005).",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "247d7ae2-31ad-494b-9ee4-31f7e69791bf",
+    "quiz_id": "cca48478-fa9d-425c-8b64-c6c6330e11f7",
+    "question_text": "Da cosa dipende la coppia di stabilità di forma di un'unità navale?",
+    "options": [
+      "dal peso",
+      "dalla forma della carena",
+      "dalla lunghezza tra le perpendicolari"
+    ],
+    "correct_answer": 1,
+    "explanation": "La coppia di stabilità di forma dipende dalla forma della carena",
+    "image_url": null,
+    "created_at": "2025-01-19T23:17:00.004178+00:00"
+  },
+  {
+    "id": "24c05eb3-cafb-49ba-a87d-f2f6111df50d",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "L'esercizio della pesca subacquea è:",
+    "options": [
+      "consentito a distanza inferiore a 50 metri dagli impianti fissi da pesca e dalle reti da posta.",
+      "consentito entro i 100 metri dagli impianti fissi da pesca e dalle reti da posta.",
+      "vietato a distanza inferiore a 100 metri dagli impianti fissi da pesca e dalle reti da posta."
+    ],
+    "correct_answer": 2,
+    "explanation": "Sempre tenersi a oltre 100 m dalle reti, impianti fissi e navi ancorate.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "250f38a2-195d-4856-aeac-989ec81bada5",
+    "quiz_id": "dcd23523-680e-4190-b2f7-f9d6111dc077",
+    "question_text": "Quando un'ancora fa testa, significa che:",
+    "options": [
+      "si è staccata dalla catena.",
+      "non si riesce a salpare.",
+      "ha fatto presa sul fondo."
+    ],
+    "correct_answer": 2,
+    "explanation": "Ribadito: “fare testa” = ancoraggio agganciato.",
+    "image_url": null,
+    "created_at": "2025-02-22T23:03:41.807216+00:00"
+  },
+  {
+    "id": "2510573b-8064-4ece-b0a5-9e1081e31ebd",
+    "quiz_id": "f8286742-7cfb-4b4b-b8a3-a72d6c26b859",
+    "question_text": "Salvo le ordinanze locali, a che distanza dall’ingresso del porto è buona norma ridurre la velocità di un'imbarcazione da diporto?",
+    "options": [
+      "dipende dalle dimensioni della nostra unità da diporto.",
+      "a 1000 metri.",
+      "a 500 metri."
+    ],
+    "correct_answer": 2,
+    "explanation": "Generalmente si consiglia ridurre velocità a 500 m dal porto, se non diversamente prescritto.",
+    "image_url": null,
+    "created_at": "2025-02-23T07:30:52.465544+00:00"
+  },
+  {
+    "id": "251b7ee3-0a9b-4f89-b445-37e356af0a7b",
+    "quiz_id": "dcd23523-680e-4190-b2f7-f9d6111dc077",
+    "question_text": "Nell'ormeggio con la poppa in banchina, si dispongono le cime di poppa in maniera incrociata:",
+    "options": [
+      "in presenza di risacca, al fine di evitare che la poppa possa muoversi lateralmente.",
+      "per mantenere ferma la prua dell'unità.",
+      "per mantenere costante l'assetto dell'unità.",
+      ""
+    ],
+    "correct_answer": 0,
+    "explanation": "Nell’ormeggio con la poppa in banchina, le cime di poppa vengono disposte in maniera incrociata per ridurre i movimenti laterali dell’imbarcazione, specialmente in presenza di risacca. Questo assicura che l’imbarcazione rimanga stabile e allineata.",
+    "image_url": null,
+    "created_at": "2025-02-22T23:03:41.807216+00:00"
+  },
+  {
+    "id": "259f45d8-4da7-441f-ac23-e0e8157f106a",
+    "quiz_id": "96fa1af7-eadc-422d-b98a-50d2bce8a997",
+    "question_text": "Come può definirsi la combustione?",
+    "options": [
+      "l'improvvisa emissione di gas inerte da parte di un liquido, generata da un'istantanea variazione di temperatura.",
+      "La reazione meccanica che produce una variazione di temperatura e che avviene tra un liquido più caldo e un solido più freddo.",
+      "la reazione chimica che produce calore e che avviene tra il comburente ed il combustibile."
+    ],
+    "correct_answer": 1,
+    "explanation": "La risposta contrassegnata con X è “b)” che recita: “la reazione chimica ...” Stranamente. Vediamo: L’utente segna “X b) la reazione chimica…” => Indice 1.",
+    "image_url": null,
+    "created_at": "2025-01-21T09:55:58.335755+00:00"
+  },
+  {
+    "id": "263fa8f4-1f23-41fc-a4c6-46e5313b01c0",
+    "quiz_id": "41a243d1-9e13-4687-9b42-84a310eb1e92",
+    "question_text": "1",
+    "options": [
+      "1",
+      "1"
+    ],
+    "correct_answer": 0,
+    "explanation": "",
+    "image_url": null,
+    "created_at": "2025-02-07T08:52:54.322655+00:00"
+  },
+  {
+    "id": "28a100ba-acfa-424a-b5c9-bd76525f5a16",
+    "quiz_id": "cca48478-fa9d-425c-8b64-c6c6330e11f7",
+    "question_text": "La freccia verso l'unità rappresentata in figura a fianco indica il:",
+    "options": [
+      "mascone di dritta",
+      "giardinetto di dritta",
+      "dritto di prora"
+    ],
+    "correct_answer": 0,
+    "explanation": "La freccia indica il mascone di dritta",
+    "image_url": null,
+    "created_at": "2025-01-19T23:17:00.004178+00:00"
+  },
+  {
+    "id": "29b0c179-c0b7-40bb-9dc3-82ff4bf26517",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "Nel caso di unità non adibita a noleggio, il certificato di sicurezza è rilasciato?",
+    "options": [
+      "solo ai natanti da diporto adibiti a locazione commerciale.",
+      "a tutte le unità da diporto.",
+      "solo alle navi e le imbarcazioni da diporto."
+    ],
+    "correct_answer": 1,
+    "explanation": "Il certificato di sicurezza si rilascia a navi e imbarcazioni, non ai natanti (art. 30 D.Lgs. 171/2005).",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "2a01d9f8-4326-48f7-b191-b530d2e0b704",
+    "quiz_id": "96fa1af7-eadc-422d-b98a-50d2bce8a997",
+    "question_text": "L'incendio di gas infiammabili è un incendio di:",
+    "options": [
+      "classe A.",
+      "classe B.",
+      "classe C."
+    ],
+    "correct_answer": 2,
+    "explanation": "Classe C = gas infiammabili (metano, propano, ecc.).",
+    "image_url": null,
+    "created_at": "2025-01-21T09:55:58.335755+00:00"
+  },
+  {
+    "id": "2b31ef22-1495-48e1-9734-ef6e08208c3a",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "Al compimento dei 16 anni di età:",
+    "options": [
+      "si può essere ammessi esclusivamente all'esame per il rilascio della patente nautica entro 12 miglia dalla costa.",
+      "si può essere ammessi all'esame per il rilascio della patente nautica anche senza limiti dalla costa.",
+      "si può assumere il comando e la condotta di natanti a motore e natanti a vela con motore ausiliario e motovelieri, purchè non sia prescritto il possesso della patente nautica."
+    ],
+    "correct_answer": 2,
+    "explanation": "A 16 anni si possono condurre natanti senza patente, se non obbligatoria (D.Lgs. 171/2005, art. 39).",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "2c09d947-6959-4667-89ca-417238f409f5",
+    "quiz_id": "d0bfa54e-3dbe-49f9-a25c-7c1d029ecc22",
+    "question_text": "Con contratto di leasing nautico si intende:",
+    "options": [
+      "il finanziamento posto in essere da una banca o intermediario finanziario consistente nella concessione in utilizzo, per un determinato periodo di tempo e dietro il pagamento di un corrispettivo periodico (canone), di una unità da diporto.",
+      "la locazione di una unità da diporto, senza diritto di riscatto.",
+      "il leasing nautico non è applicato alla nautica."
+    ],
+    "correct_answer": 0,
+    "explanation": "Il leasing nautico è un contratto di finanziamento concesso da banche o intermediari, che attribuisce all'utilizzatore il godimento dell'unità dietro pagamento di canoni.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:19:14.464733+00:00"
+  },
+  {
+    "id": "2cb376a3-abe5-4fa3-9d10-3b3e9931da6e",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "A che distanza dalla costa possono navigare le unità a remi (pedalò, sandolini ecc.) ?",
+    "options": [
+      "In base alle condimeteomarine individuate con ordinanza dell'Autorità marittima.",
+      "entro 6 miglia.",
+      "entro 1 miglio dalla costa."
+    ],
+    "correct_answer": 0,
+    "explanation": "Le ordinanze locali e la normativa di sicurezza fissano per i mezzi a remi (pedalò etc.) il limite di 1 miglio dalla costa.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "2dea2730-0916-4791-83a7-536789f389bc",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "Nelle aree marine protette dove l'ormeggio è regolamentato tramite campi boe:",
+    "options": [
+      "nei campi boe l'ancoraggio è consentito dall'alba al tramonto.",
+      "nei campi boe l'ancoraggio è consentito solo se c'è sufficiente spazio di manovra.",
+      "nei campi boe l'ancoraggio non è mai consentito."
+    ],
+    "correct_answer": 2,
+    "explanation": "Se sono presenti campi boe, l’ancoraggio è vietato in quell’area (DM istitutivi AMP).",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "2e4ebaf6-3007-404f-8661-072d6f3e7dba",
+    "quiz_id": "f8286742-7cfb-4b4b-b8a3-a72d6c26b859",
+    "question_text": "Accingendosi all'ingresso in un porto italiano, in navigazione notturna, e rilevando i fanali dell'imboccatura in modo che il verde sia sulla propria sinistra e il rosso sia sulla propria dritta:",
+    "options": [
+      "ci si deve tenere sulla dritta in modo da non ostacolare l'eventuale uscita di altre unità.",
+      "è possibile procedere su questa rotta d'ingresso perché non si rilevano unità in uscita.",
+      "si deve cambiare rotta perché si sta andando contro il molo foraneo."
+    ],
+    "correct_answer": 2,
+    "explanation": "Secondo convenzione, entrando in porto si deve tenere il fanale verde a dritta, rosso a sinistra; se accade il contrario, si va contro il molo.",
+    "image_url": null,
+    "created_at": "2025-02-23T07:30:52.465544+00:00"
+  },
+  {
+    "id": "2e874b98-6921-4276-87ca-14dcc068d4f6",
+    "quiz_id": "dcd23523-680e-4190-b2f7-f9d6111dc077",
+    "question_text": "In figura a fianco è indicata un'unità all'ormeggio \"all'inglese\", come sono denominati i cavi di ormeggio indicati dalle frecce?",
+    "options": [
+      "calumo",
+      "mascone",
+      "spring",
+      ""
+    ],
+    "correct_answer": 2,
+    "explanation": "Nel contesto dell’ormeggio \"all'inglese\", i cavi indicati dalle frecce si chiamano spring. Gli spring servono a impedire i movimenti longitudinali della barca (avanti e indietro) e forniscono stabilità lungo l’asse della banchina.",
+    "image_url": "https://axfqxbthjalzzshdjedm.supabase.co/storage/v1/object/public/quiz-images/quiz-images/1737456505993-iacxxaclatp.jpg",
+    "created_at": "2025-02-22T23:03:41.807216+00:00"
+  },
+  {
+    "id": "2e976981-546c-46ba-ae79-6eb6003998af",
+    "quiz_id": "115705ec-74a1-4d4b-9b01-1672d36e1f8a",
+    "question_text": "Unità da diporto a motore con adritta elica destrorsa; si può ragionevolmente ritenere che quella di sinistra:",
+    "options": [
+      "Non ha importanza, perché può essere indifferentemente sinistrorsa o destrorsa in quanto, in entrambi i casi, l'unità evoluisce sempre allo stesso moto e dalle medesime condizioni.",
+      "è sinistrorsa.",
+      "tende a spostare la prua lateralmente verso sinistra."
+    ],
+    "correct_answer": 1,
+    "explanation": "",
+    "image_url": null,
+    "created_at": "2025-01-19T23:19:06.131061+00:00"
+  },
+  {
+    "id": "2f9e7072-d014-4741-bc06-08ba6612492f",
+    "quiz_id": "d0bfa54e-3dbe-49f9-a25c-7c1d029ecc22",
+    "question_text": "Un'imbarcazione da diporto registrata nell'ATCN (Archivio Telematico Centrale della Nautica da diporto), ha la sigla così composta:",
+    "options": [
+      "il nome della barca seguito dalla lettera D.",
+      "codice alfanumerico composto da 4 lettere e 4 numeri seguiti dalla lettera D.",
+      "sigla provincia + N + numero iscrizione."
+    ],
+    "correct_answer": 1,
+    "explanation": "Il sistema ATCN assegna un codice alfanumerico di 8 caratteri più la lettera \"D\" per identificare un'imbarcazione (D.Lgs. 171/2005).",
+    "image_url": null,
+    "created_at": "2025-01-20T06:19:14.464733+00:00"
+  },
+  {
+    "id": "30530a23-5e92-4c7f-9a5e-ecebc9d9d14b",
+    "quiz_id": "f8286742-7cfb-4b4b-b8a3-a72d6c26b859",
+    "question_text": "Quale affermazione è corretta?",
+    "options": [
+      "è consentita la pesca nell'ambito dei bacini portuali.",
+      "all'interno dei campi boe è consentito l'ancoraggio.",
+      "Un'unità che naviga lungo un canale deve, quando è possibile e non comporta pericolo, mantenersi vicino al limite di destra rispetto alla propria rotta."
+    ],
+    "correct_answer": 2,
+    "explanation": "COLREG e ordinanze locali: in un canale, si deve tenere la destra se sicuro.",
+    "image_url": null,
+    "created_at": "2025-02-23T07:30:52.465544+00:00"
+  },
+  {
+    "id": "30799768-24dd-4716-897d-5bae313cfb93",
+    "quiz_id": "f8286742-7cfb-4b4b-b8a3-a72d6c26b859",
+    "question_text": "I natanti comunemente denominati pattini, jole, pedalò, mosconi, ecc., possono navigare:",
+    "options": [
+      "entro 2 chilometri dalla costa.",
+      "entro 500 metri dalla costa.",
+      "entro 1 miglio dalla costa."
+    ],
+    "correct_answer": 2,
+    "explanation": "Molte ordinanze prevedono max 1 miglio da costa per pattini/pedalò, salvo restrizioni locali.",
+    "image_url": null,
+    "created_at": "2025-02-23T07:30:52.465544+00:00"
+  },
+  {
+    "id": "30a8a435-e57b-471c-ac1e-3a947e369ba5",
+    "quiz_id": "f8286742-7cfb-4b4b-b8a3-a72d6c26b859",
+    "question_text": "L'esercizio della pesca subacquea sportiva è vietato a distanza inferiore a:",
+    "options": [
+      "200 metri dalle spiagge frequentate da bagnanti.",
+      "500 metri dalle navi all'ancora in rada.",
+      "100 metri dagli impianti fissi di pesca."
+    ],
+    "correct_answer": 2,
+    "explanation": "Divieto di pesca sub <100 m da impianti fissi di pesca, reti e navi ancorate (DM e ordinanze).",
+    "image_url": null,
+    "created_at": "2025-02-23T07:30:52.465544+00:00"
+  },
+  {
+    "id": "30b928d3-1ff0-41ae-b6a2-2257f50ced9b",
+    "quiz_id": "cca48478-fa9d-425c-8b64-c6c6330e11f7",
+    "question_text": "La parte sommersa dell'unità è denominata:",
+    "options": [
+      "opera viva",
+      "opera morta",
+      "bordo libero"
+    ],
+    "correct_answer": 0,
+    "explanation": "La parte sommersa dell'unità è denominata opera viva",
+    "image_url": null,
+    "created_at": "2025-01-19T23:17:00.004178+00:00"
+  },
+  {
+    "id": "30e12787-cc4a-458a-8d92-adba018db527",
+    "quiz_id": "96fa1af7-eadc-422d-b98a-50d2bce8a997",
+    "question_text": "Avuto riguardo alla prevenzione sugli incendi, quale tra queste affermazioni è corretta?",
+    "options": [
+      "Determinate sostanze, quali stracciunti di olio abbandonati in coperta, possono raggiungere rapidamente la temperatura di infiammabilità determinando una combustione spontanea, financo l'esplosione.",
+      "Determinate sostanze, quali stracciunti di olio abbandonati in coperta, possono raggiungere  rapidamente la temperatura di ignizione determinando una combustione spontanea.",
+      "Determinate sostanze, quali stracciunti di olio abbandonati nel vano motore o in gavoni scarsamente ventilati, possono riscaldarsi lentamente determinando una combustione spontanea."
+    ],
+    "correct_answer": 2,
+    "explanation": "Stracciunti di olio in ambienti chiusi/ poco ventilati possono provocare autocombustione.",
+    "image_url": null,
+    "created_at": "2025-01-21T09:55:58.335755+00:00"
+  },
+  {
+    "id": "31382c2b-1f13-4a9c-b1ee-3337284b17f9",
+    "quiz_id": "18228cd1-a6d3-4fb9-805f-f61f7e563c91",
+    "question_text": "doma",
+    "options": [
+      "ok",
+      "w",
+      "q"
+    ],
+    "correct_answer": 0,
+    "explanation": "",
+    "image_url": null,
+    "created_at": "2025-02-09T01:06:11.020078+00:00"
+  },
+  {
+    "id": "317cb3cf-35be-478b-9569-86814fc23acf",
+    "quiz_id": "f8286742-7cfb-4b4b-b8a3-a72d6c26b859",
+    "question_text": "Qual è, di massima, la distanza minima dalle spiagge oltre la quale è possibile circolare, sostare o ancorarsi da parte di un'unità navale?",
+    "options": [
+      "di massima 500 metri.",
+      "di massima 1.000 metri.",
+      "di massima 250 metri."
+    ],
+    "correct_answer": 2,
+    "explanation": "Mediamente, le ordinanze stabiliscono 200-300 m come fascia di balneazione e divieto di transito.",
+    "image_url": null,
+    "created_at": "2025-02-23T07:30:52.465544+00:00"
+  },
+  {
+    "id": "32297225-db9d-45d7-9e55-a530793ac142",
+    "quiz_id": "f8286742-7cfb-4b4b-b8a3-a72d6c26b859",
+    "question_text": "Oltre ai segnalamenti marittimi previsti dalle norme in vigore, quali segnalamenti marittimi contraddistinguono un'unità navale impiegata in attività subacquee durante le ore diurne?",
+    "options": [
+      "un pallone bianco sul quale è posta una bandiera di colore arancione.",
+      "una bandiera di colore bianco con diagonale rossa.",
+      "un pallone rosso sul quale è posta una bandiera di colore rosso con diagonale bianca."
+    ],
+    "correct_answer": 2,
+    "explanation": "Unità subacquee di giorno: pallone rosso con bandiera rossa/striscia diagonale bianca (ispirato al segnale “Diver down”).",
+    "image_url": null,
+    "created_at": "2025-02-23T07:30:52.465544+00:00"
+  },
+  {
+    "id": "32d75cd1-3101-48f1-94b7-4d7ac7652a5f",
+    "quiz_id": "d0bfa54e-3dbe-49f9-a25c-7c1d029ecc22",
+    "question_text": "Cosa si intende per navigazione interna?",
+    "options": [
+      "quella effettuata tra la costa e le linee di base.",
+      "quella effettuata su laghi di confine.",
+      "quella effettuata sui laghi, fiumi, canali e altre acque interne."
+    ],
+    "correct_answer": 2,
+    "explanation": "La navigazione interna è quella su fiumi, laghi e canali, distinta da quella marittima (R.D. 204/1907 e norme successive).",
+    "image_url": null,
+    "created_at": "2025-01-20T06:19:14.464733+00:00"
+  },
+  {
+    "id": "32e299e6-b6d3-4ce8-b7e8-616b5ff634de",
+    "quiz_id": "115705ec-74a1-4d4b-9b01-1672d36e1f8a",
+    "question_text": "Com'è definita la differenza tra la distanza teorica e quella effettiva percorsa da un'elica in un giro completo?",
+    "options": [
+      "passo.",
+      "diametro.",
+      "regresso."
+    ],
+    "correct_answer": 2,
+    "explanation": "",
+    "image_url": null,
+    "created_at": "2025-01-19T23:19:06.131061+00:00"
+  },
+  {
+    "id": "334c1f05-6dba-4446-b307-0622949fcf87",
+    "quiz_id": "cca48478-fa9d-425c-8b64-c6c6330e11f7",
+    "question_text": "Come si chiama la superficie del timone su cui agisce la pressione dell'acqua?",
+    "options": [
+      "asse",
+      "pala",
+      "ruota"
+    ],
+    "correct_answer": 1,
+    "explanation": "La superficie del timone su cui agisce la pressione dell'acqua è chiamata pala.",
+    "image_url": null,
+    "created_at": "2025-01-19T23:17:00.004178+00:00"
+  },
+  {
+    "id": "3373548c-da15-4216-a85b-0083fb9d594e",
+    "quiz_id": "3fed7241-a873-4973-a107-747e8e3e6ef6",
+    "question_text": "La bandiera nazionale deve essere esposta:",
+    "options": [
+      "tutte le unità da diporto.",
+      "soltanto dalle navi e dalle imbarcazioni da diporto se abilitate alla navigazione oltre le 12 miglia.",
+      "dalle navi e dalle imbarcazioni da diporto."
+    ],
+    "correct_answer": 0,
+    "explanation": "Navi e imbarcazioni immatricolate espongono la bandiera (art. 23 D.Lgs. 171/2005). I natanti non ne hanno obbligo.",
+    "image_url": null,
+    "created_at": "2025-01-20T06:27:57.920553+00:00"
+  },
+  {
+    "id": "33ce76bd-b655-4d52-8688-ccec2ec84950",
+    "quiz_id": "cca48478-fa9d-425c-8b64-c6c6330e11f7",
+    "question_text": "La \"galloccia\" è:",
+    "options": [
+      "un foro per l'uscita dell'acqua dal pozzetto",
+      "un sistema per tendere le draglie",
+      "un appiglio per rinviare e/o dare volta al cavo di ormeggio oppure ad una cima di bordo (come drizze/scotte)"
+    ],
+    "correct_answer": 2,
+    "explanation": "La \"galloccia\" è un appiglio per rinviare e/o dare volta al cavo di ormeggio oppure ad una cima di bordo",
+    "image_url": null,
+    "created_at": "2025-01-19T23:17:00.004178+00:00"
+  }
+]

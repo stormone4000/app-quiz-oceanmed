@@ -1,0 +1,14 @@
+[
+  {
+    "id": "ec6aff76-cdc9-4ae5-abdc-110cb3c59bb7",
+    "name": "Modulo di Apprendimento",
+    "description": "Quiz formativi su argomenti specifici con durata flessibile",
+    "created_at": "2025-01-16T16:29:37.118059+00:00"
+  },
+  {
+    "id": "f7d87e26-0163-46ae-b235-5f635f4c1a8d",
+    "name": "Esame Standardizzato",
+    "description": "Quiz di simulazione esame patente nautica con 20 domande e tempo limite di 30 minuti",
+    "created_at": "2025-01-16T16:29:37.118059+00:00"
+  }
+]

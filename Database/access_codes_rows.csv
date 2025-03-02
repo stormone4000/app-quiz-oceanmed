@@ -1,0 +1,8 @@
+id,code,type,created_by,expiration_date,is_active,created_at,duration_months,duration_type
+2ed2d3de-c411-4c60-924a-7c1f7a6f809b,988011,one_time,,2025-03-25 14:55:09.312+00,false,2025-02-23 14:49:54.832472+00,1,fixed
+43fbdfd5-6a68-417f-ab0f-89ffd47a12eb,951757,one_time,,,true,2025-02-23 23:21:23.455063+00,,unlimited
+658a7d62-fd4a-4525-952b-11a730332fe3,339245,one_time,,2025-03-25 21:53:31.61+00,false,2025-02-23 21:53:12.458673+00,1,fixed
+adc4b21a-82fa-4ed0-abb4-be3a0fbb7278,223739,one_time,,2025-03-25 22:10:57.459+00,false,2025-02-23 22:10:41.278624+00,1,fixed
+defcff0a-88e9-4e32-a4d0-0483f804a581,587237,one_time,,,true,2025-02-23 22:31:18.386951+00,,unlimited
+fee4fc3f-0fcf-45cc-8aa9-3319bb84f684,625718,one_time,,2025-03-25 15:20:43.324+00,false,2025-02-23 15:20:30.377081+00,1,fixed
+ffa36464-16fe-4398-ae0f-4a4048dedeb7,55555,master,,,true,2025-01-18 01:47:13.954026+00,,unlimited

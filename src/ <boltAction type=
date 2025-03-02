@@ -1,0 +1,156 @@
+import React from 'react';
+import { BarChart, Book, GraduationCap, Menu, X, ChevronLeft, ChevronRight, LogOut, Key, UserCircle, Video, Target, Bell, CreditCard, Users } from 'lucide-react';
+import { NotificationBell } from '../notifications/NotificationBell';
+
+interface SidebarProps {
+  activeTab: 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students';
+  onTabChange: (tab: 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students') => void;
+  isSidebarOpen: boolean;
+  onToggleSidebar: () => void;
+  onLogout: () => void;
+  studentEmail?: string;
+}
+
+export function Sidebar({ activeTab, onTabChange, isSidebarOpen, onToggleSidebar, onLogout, studentEmail }: SidebarProps) {
+  const menuItems = [
+    { id: 'stats', icon: BarChart, label: 'Statistiche' },
+    { id: 'quizzes', icon: Book, label: 'Tutti i Quiz' },
+    { id: 'quiz-studenti', icon: Target, label: 'Quiz Studenti' },
+    { id: 'videos', icon: Video, label: 'Video Lezioni' },
+    { id: 'students', icon: Users, label: 'Gestione Studenti' },
+    { id: 'access-codes', icon: Key, label: 'Codici di Accesso' },
+    { id: 'subscriptions', icon: CreditCard, label: 'Abbonamenti' },
+    { id: 'notifications', icon: Bell, label: 'Notifiche' },
+    { id: 'profile', icon: UserCircle, label: 'Profilo' }
+  ];
+
+  return (
+    <>
+      {/* Mobile Menu Button */}
+      <div className="fixed top-4 left-4 z-50 lg:hidden flex items-center gap-4">
+        <button
+          onClick={onToggleSidebar}
+          className="bg-white p-3 rounded-lg shadow-lg hover:bg-gray-50 transition-colors"
+          aria-label={isSidebarOpen ? 'Chiudi menu' : 'Apri menu'}
+        >
+          {isSidebarOpen ? (
+            <X className="w-6 h-6 text-blue-600" />
+          ) : (
+            <Menu className="w-6 h-6 text-blue-600" />
+          )}
+        </button>
+        {studentEmail && (
+          <div className="bg-white p-2 rounded-lg shadow-lg">
+            <NotificationBell 
+              studentEmail={studentEmail} 
+              onViewAll={() => onTabChange('notifications')}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Overlay for mobile */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={onToggleSidebar}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed top-0 left-0 h-full bg-gradient-to-b from-blue-900 to-blue-900 shadow-xl z-40 transition-all duration-300 ${
+          isSidebarOpen ? 'w-64' : 'w-0 lg:w-20'
+        } transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+      >
+        <div className="flex flex-col h-full">
+          {/* Logo */}
+          <div className="p-4 mb-6">
+            <img
+              src={isSidebarOpen 
+                ? "https://axfqxbthjalzzshdjedm.supabase.co/storage/v1/object/sign/img/logo-white.svg?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJpbWcvbG9nby13aGl0ZS5zdmciLCJpYXQiOjE3Mzc0MDA2MTAsImV4cCI6MTczODI2NDYxMH0.GpsWjGpbuwade42N9HqhBR7oTgN9avzEJW_ar89y12E&t=2025-01-20T19%3A16%3A50.557Z"
+                : "https://axfqxbthjalzzshdjedm.supabase.co/storage/v1/object/sign/img/pittogramma-white.svg?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJpbWcvcGl0dG9ncmFtbWEtd2hpdGUuc3ZnIiwiaWF0IjoxNzM3NDAwNTg1LCJleHAiOjIwNTI3NjA1ODV9.H92CcJEl_Tjisgtl6mf2ERk5ICQA3Wa_3dJ3eJQexeQ&t=2025-01-20T19%3A16%3A25.251Z"
+              }
+              alt="OceanMed Logo"
+              className={`h-12 w-auto mx-auto transition-all duration-300 ${
+                !isSidebarOpen ? 'lg:h-10' : ''
+              }`}
+            />
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1">
+            <div className={`${isSidebarOpen ? 'block' : 'hidden lg:block'}`}>
+              {menuItems.map(({ id, icon: Icon, label }) => (
+                <button
+                  key={id}
+                  onClick={() => {
+                    onTabChange(id as any);
+                    if (window.innerWidth < 1024) onToggleSidebar();
+                  }}
+                  className={`w-full p-4 flex items-center gap-3 transition-colors ${
+                    activeTab === id
+                      ? 'bg-blue-50 text-blue-600'
+                      : 'text-white hover:bg-blue-800'
+                  }`}
+                >
+                  {id === 'notifications' && studentEmail ? (
+                    <div className={`${!isSidebarOpen ? 'lg:mx-auto' : ''}`}>
+                      <NotificationBell 
+                        studentEmail={studentEmail} 
+                        className={activeTab === id ? 'text-blue-600' : 'text-white'} 
+                        onViewAll={() => onTabChange('notifications')}
+                      />
+                    </div>
+                  ) : (
+                    <Icon className={`w-6 h-6 flex-shrink-0 ${
+                      !isSidebarOpen ? 'lg:mx-auto' : ''
+                    }`} />
+                  )}
+                  <span className={`whitespace-nowrap transition-opacity duration-300 ${
+                    !isSidebarOpen ? 'lg:hidden' : ''
+                  }`}>
+                    {label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </nav>
+
+          {/* Bottom Actions */}
+          <div className="mt-auto border-t border-gray-200">
+            {/* Logout Button */}
+            <button
+              onClick={onLogout}
+              className="w-full p-4 text-white hover:bg-blue-800 transition-colors flex items-center gap-3"
+            >
+              <LogOut className={`w-6 h-6 flex-shrink-0 ${
+                !isSidebarOpen ? 'lg:mx-auto' : ''
+              }`} />
+              <span className={`whitespace-nowrap transition-opacity duration-300 ${
+                !isSidebarOpen ? 'lg:hidden' : ''
+              }`}>
+                Esci
+              </span>
+            </button>
+
+            {/* Toggle Button for Desktop */}
+            <div className="hidden lg:block border-t border-gray-200">
+              <button
+                onClick={onToggleSidebar}
+                className="w-full p-4 text-white hover:bg-blue-800 transition-colors flex items-center justify-center"
+                aria-label={isSidebarOpen ? 'Comprimi menu' : 'Espandi menu'}
+              >
+                {isSidebarOpen ? (
+                  <ChevronLeft className="w-5 h-5" />
+                ) : (
+                  <ChevronRight className="w-5 h-5" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </>
+  );
+}

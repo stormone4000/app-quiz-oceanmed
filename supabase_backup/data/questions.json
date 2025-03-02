@@ -1,0 +1,83 @@
+[
+  {
+    "id": "7584423c-8625-4d1d-88b4-7249f2ec87bf",
+    "quiz_id": "90a71190-12d9-43cd-9315-b80e03447d94",
+    "text": "What is the front of a boat called?",
+    "options": [
+      "Bow",
+      "Stern",
+      "Port",
+      "Starboard"
+    ],
+    "correct_answer": 0,
+    "time_limit": 30,
+    "created_at": "2025-01-16T14:35:57.005211+00:00"
+  },
+  {
+    "id": "e0bc4a51-d639-49c1-99b0-235d5d278fe6",
+    "quiz_id": "90a71190-12d9-43cd-9315-b80e03447d94",
+    "text": "Which side of a boat is 'starboard'?",
+    "options": [
+      "Left",
+      "Right",
+      "Front",
+      "Back"
+    ],
+    "correct_answer": 1,
+    "time_limit": 30,
+    "created_at": "2025-01-16T14:35:57.005211+00:00"
+  },
+  {
+    "id": "6d0d0399-82c8-43c3-99ed-4fc3dddb1633",
+    "quiz_id": "5207f746-bf87-46d0-ad7c-7b578aa296bb",
+    "text": "What color is the port navigation light?",
+    "options": [
+      "Green",
+      "White",
+      "Red",
+      "Blue"
+    ],
+    "correct_answer": 2,
+    "time_limit": 25,
+    "created_at": "2025-01-16T14:35:57.005211+00:00"
+  },
+  {
+    "id": "926ddd57-fba7-4799-b8e1-def648501cd8",
+    "quiz_id": "36fba1e9-c62e-4d24-8889-63f991ffdbe7",
+    "text": "What weather condition is indicated by a rapidly falling barometer?",
+    "options": [
+      "Approaching storm",
+      "Clear skies",
+      "Stable conditions"
+    ],
+    "correct_answer": 0,
+    "time_limit": 30,
+    "created_at": "2025-01-16T14:37:09.025449+00:00"
+  },
+  {
+    "id": "c20b3bc2-c98f-4718-aebf-3b74f14377d1",
+    "quiz_id": "36fba1e9-c62e-4d24-8889-63f991ffdbe7",
+    "text": "Which instrument is used to measure wind speed?",
+    "options": [
+      "Anemometer",
+      "Barometer",
+      "Hygrometer"
+    ],
+    "correct_answer": 0,
+    "time_limit": 30,
+    "created_at": "2025-01-16T14:37:09.025449+00:00"
+  },
+  {
+    "id": "9851f15d-6006-49a2-bf33-397533e6c370",
+    "quiz_id": "36fba1e9-c62e-4d24-8889-63f991ffdbe7",
+    "text": "What is the primary purpose of a nautical almanac?",
+    "options": [
+      "Celestial navigation",
+      "Weather forecasting",
+      "Tide prediction"
+    ],
+    "correct_answer": 0,
+    "time_limit": 30,
+    "created_at": "2025-01-16T14:37:09.025449+00:00"
+  }
+]
