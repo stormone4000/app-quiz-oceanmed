@@ -153,6 +153,18 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
     setVerificationStep('checking');
 
     try {
+      // Verifico che l'email dell'utente sia presente
+      if (!userEmail) {
+        setVerificationStep('error');
+        throw new Error('Email utente non trovata. Effettua nuovamente il login.');
+      }
+
+      // Verifico che il codice master sia stato inserito
+      if (!formData.masterCode || formData.masterCode.trim() === '') {
+        setVerificationStep('error');
+        throw new Error('Inserisci un codice master valido.');
+      }
+
       // Get password hash from storage
       const passwordHash = localStorage.getItem('passwordHash');
       if (!passwordHash) {
@@ -163,6 +175,12 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       // Mostro un messaggio di verifica in corso
       setSuccess('Verifica del codice in corso...');
 
+      console.log('Verifica credenziali con:', {
+        email: userEmail,
+        passwordHash: '***', // Non logghiamo la password per sicurezza
+        masterCode: formData.masterCode
+      });
+
       // Verify instructor credentials with master code
       const { data: users, error: verifyError } = await supabase
         .rpc('verify_instructor_credentials', {
@@ -172,9 +190,12 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
         });
 
       if (verifyError) {
+        console.error('Errore RPC:', verifyError);
         setVerificationStep('error');
-        throw verifyError;
+        throw new Error(`Errore durante la verifica: ${verifyError.message}`);
       }
+      
+      console.log('Risposta verifica:', users);
       
       if (!users || users.length === 0) {
         setVerificationStep('error');
@@ -190,6 +211,7 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       // Store master code in localStorage
       localStorage.setItem('masterCode', formData.masterCode);
       localStorage.setItem('hasActiveAccess', 'true');
+      localStorage.setItem('isProfessor', 'true');
 
       setVerificationStep('success');
       setSuccess('Codice master verificato con successo! Attivazione profilo in corso...');
