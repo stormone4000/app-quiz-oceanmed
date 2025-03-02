@@ -321,6 +321,8 @@ function App() {
                 <ProfessorDashboard 
                   results={results} 
                   onLogout={handleLogout} 
+                  needsSubscription={userRole.needsSubscription}
+                  hostEmail={userRole.email}
                 />
               ) : (
                 <Navigate to="/login" replace />

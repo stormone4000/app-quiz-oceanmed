@@ -49,21 +49,36 @@ export function AccessCodeManager() {
       setLoading(true);
       setError(null);
 
+      // Prima query: carica tutti i codici di accesso
       const { data: accessCodes, error: codesError } = await supabase
         .from('access_codes')
-        .select(`
-          *,
-          usage:access_code_usage(
-            student_email,
-            first_name,
-            last_name,
-            used_at
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (codesError) throw codesError;
-      setCodes(accessCodes || []);
+      
+      if (accessCodes && accessCodes.length > 0) {
+        // Seconda query: carica gli utilizzi dei codici
+        const { data: usageData, error: usageError } = await supabase
+          .from('access_code_usage')
+          .select('*')
+          .in('code_id', accessCodes.map(code => code.id));
+          
+        if (usageError) {
+          console.warn('Errore nel caricamento degli utilizzi dei codici:', usageError);
+          // Continuiamo comunque con i codici senza utilizzi
+        }
+        
+        // Associa gli utilizzi ai rispettivi codici
+        const codesWithUsage = accessCodes.map(code => ({
+          ...code,
+          usage: usageData ? usageData.filter(usage => usage.code_id === code.id) : []
+        }));
+        
+        setCodes(codesWithUsage);
+      } else {
+        setCodes([]);
+      }
     } catch (error) {
       console.error('Error loading access codes:', error);
       setError('Errore durante il caricamento dei codici di accesso');
