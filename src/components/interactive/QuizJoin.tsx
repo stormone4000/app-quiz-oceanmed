@@ -402,7 +402,7 @@ export function QuizJoin() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background transition-colors">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background transition-colors">
       {/* Connection Status */}
       <div className={`fixed top-4 right-4 p-2 rounded-lg border transition-colors ${
         isConnected 
@@ -426,9 +426,10 @@ export function QuizJoin() {
         )}
       </div>
 
-      <div className="w-full max-w-screen-xl mx-auto flex flex-col items-center justify-center">
+      {/* Main Content */}
+      <div className="w-full max-w-md mx-auto">
         {!userEmail ? (
-          <div className="bg-card text-card-foreground rounded-xl shadow-lg border border-border p-8 max-w-md w-full text-center transition-colors">
+          <div className="bg-card text-card-foreground rounded-xl shadow-lg border border-border p-8 w-full text-center transition-colors">
             <AlertCircle className="w-12 h-12 text-red-500 dark:text-red-400 mx-auto mb-4" aria-hidden="true" />
             <h1 className="text-xl font-bold mb-4">Accesso Richiesto</h1>
             <p className="text-muted-foreground mb-6">
@@ -443,7 +444,7 @@ export function QuizJoin() {
             </button>
           </div>
         ) : (
-          <div className="w-full max-w-md mx-auto">
+          <>
             <div className="text-center mb-8">
               <img
                 src="https://axfqxbthjalzzshdjedm.supabase.co/storage/v1/object/sign/img/logo.svg?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJpbWcvbG9nby5zdmciLCJpYXQiOjE3MzcwNTE0MTEsImV4cCI6MTc2ODU4NzQxMX0.UB0cavGc9Ha_FTkpHQZONaQ0MEGFglY96yl4GPCGZbM"
@@ -695,7 +696,7 @@ export function QuizJoin() {
                 <li>Rispondi alle domande nei tempi indicati per guadagnare punti</li>
               </ol>
             </motion.div>
-          </div>
+          </>
         )}
       </div>
     </div>
