@@ -13,18 +13,18 @@ export async function getQuestions(): Promise<Question[]> {
         time_limit,
         quiz_id,
         quizzes (
-          category
+          type_id
         )
       `);
 
     if (error) throw error;
 
-    return questions.map(q => ({
+    return (questions || []).map(q => ({
       id: q.id,
       question: q.text,
       options: q.options,
       correctAnswer: q.correct_answer,
-      category: q.quizzes.category,
+      category: q.quizzes && typeof q.quizzes.type_id !== 'undefined' ? String(q.quizzes.type_id) : '',
       timeLimit: q.time_limit
     }));
   } catch (error) {
@@ -127,10 +127,10 @@ export async function getQuizResults(): Promise<QuizResult[]> {
         quiz:quizzes(
           title,
           description,
-          category
+          type_id
         )
       `)
-      .order('date', { ascending: false });
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching results:', error);
@@ -143,11 +143,11 @@ export async function getQuizResults(): Promise<QuizResult[]> {
       lastName: r.last_name || '',
       email: r.student_email,
       score: r.score,
-      totalTime: r.total_time,
-      answers: r.answers,
-      questionTimes: r.question_times,
-      date: r.date,
-      category: r.quiz?.category || '',
+      totalTime: r.total_time || 0,
+      answers: r.answers || [],
+      questionTimes: r.question_times || [],
+      date: r.created_at || new Date().toISOString(),
+      category: r.quiz?.type_id ? String(r.quiz.type_id) : '',
       quizId: r.quiz_id
     }));
   } catch (error) {

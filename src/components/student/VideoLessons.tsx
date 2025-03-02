@@ -110,6 +110,7 @@ export function VideoLessons() {
         setCategories(mockCategories);
         setDebugInfo(`Visualizzazione dati mock - nessun dato trovato nel database. Totale video nel DB: ${videoCount || 0}`);
       } else {
+        console.log('[VideoLessons] Dati caricati con successo:', categoriesData);
         setCategories(categoriesData);
         setDebugInfo(`Dati caricati dal database: ${categoriesData.length} categorie, ${retrievedVideosCount}/${videoCount || 0} video`);
       }
@@ -211,6 +212,7 @@ export function VideoLessons() {
       });
       
       console.log('[VideoLessons] Video totali da RPC:', totalVideosFromRPC);
+      console.log('[VideoLessons] Dettaglio categorie:', categoriesArray);
       
       setCategories(categoriesArray);
       setDebugInfo(`Dati caricati tramite RPC: ${categoriesArray.length} categorie, ${totalVideosFromRPC} video`);
@@ -303,6 +305,11 @@ export function VideoLessons() {
     )
   );
 
+  const handleVideoClick = (video: VideoItem) => {
+    console.log('[VideoLessons] Video cliccato:', video);
+    setSelectedVideo(video);
+  };
+
   if (selectedVideo) {
     return (
       <div className="space-y-6">
@@ -391,25 +398,31 @@ export function VideoLessons() {
                     <div>
                       <h3 className="font-bold text-lg dark:text-slate-100">{category.title}</h3>
                       <p className="text-sm text-gray-600 dark:text-slate-400">
-                        {category.videos.length} video
+                        {category.videos?.length || 0} video
                       </p>
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    {category.videos.map(video => (
-                      <button
-                        key={video.id}
-                        onClick={() => setSelectedVideo(video)}
-                        className="w-full text-left p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
-                      >
-                        <h4 className="font-medium mb-1 text-blue-600 dark:text-blue-400">{video.title}</h4>
-                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400">
-                          <Calendar className="w-4 h-4" />
-                          <span>{formatDate(video.publish_date)}</span>
-                        </div>
-                      </button>
-                    ))}
+                    {category.videos && category.videos.length > 0 ? (
+                      category.videos.map(video => (
+                        <button
+                          key={video.id}
+                          onClick={() => handleVideoClick(video)}
+                          className="w-full text-left p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+                        >
+                          <h4 className="font-medium mb-1 text-blue-600 dark:text-blue-400">{video.title}</h4>
+                          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400">
+                            <Calendar className="w-4 h-4" />
+                            <span>{formatDate(video.publish_date)}</span>
+                          </div>
+                        </button>
+                      ))
+                    ) : (
+                      <p className="text-center text-gray-500 dark:text-slate-400 p-4">
+                        Nessun video in questa categoria
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

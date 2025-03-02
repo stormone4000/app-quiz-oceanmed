@@ -424,6 +424,43 @@ export function VideoManager() {
     )
   );
 
+  const handleVideoClick = (video: VideoItem) => {
+    console.log('[VideoManager] Video cliccato:', video);
+    setSelectedVideo(video);
+  };
+
+  if (selectedVideo) {
+    return (
+      <div className="space-y-6">
+        <button
+          onClick={() => setSelectedVideo(null)}
+          className="text-white hover:text-blue-100 flex items-center gap-2"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Torna all'elenco
+        </button>
+
+        <div className="bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-slate-700/30 rounded-xl shadow-md overflow-hidden">
+          <div className="p-6 border-b border-white/20 dark:border-slate-700/30">
+            <h3 className="text-xl font-bold mb-2 text-white">{selectedVideo.title}</h3>
+            <p className="text-gray-300">
+              Pubblicato il {formatDate(selectedVideo.publish_date)}
+            </p>
+          </div>
+
+          <div className="aspect-video">
+            <iframe
+              src={selectedVideo.embed_url}
+              className="w-full h-full"
+              frameBorder="0"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center gap-4 flex-wrap">
@@ -512,17 +549,28 @@ export function VideoManager() {
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    {category.videos.map(video => (
-                      <div
-                        key={video.id}
-                        className="p-3 rounded-lg bg-white/10 dark:bg-slate-800/30 hover:bg-white/20 dark:hover:bg-slate-800/40 transition-colors group"
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className="font-medium text-blue-300 dark:text-blue-400 group-hover:text-blue-200 dark:group-hover:text-blue-300 transition-colors">
-                            {video.title}
-                          </h4>
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="space-y-4">
+                    {category.videos && category.videos.length > 0 ? (
+                      category.videos.map(video => (
+                        <div
+                          key={video.id}
+                          className="flex items-center justify-between p-4 rounded-lg hover:bg-white/10 transition-colors"
+                        >
+                          <div>
+                            <h4 className="font-medium mb-1 text-white">{video.title}</h4>
+                            <div className="flex items-center gap-2 text-sm text-white/70">
+                              <Calendar className="w-4 h-4" />
+                              <span>{formatDate(video.publish_date)}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleVideoClick(video)}
+                              className="p-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
+                              aria-label="Visualizza video"
+                            >
+                              <Video className="w-4 h-4" />
+                            </button>
                             <button
                               onClick={() => {
                                 setEditingVideo(video);
@@ -534,8 +582,8 @@ export function VideoManager() {
                                 });
                                 setShowVideoModal(true);
                               }}
-                              className="text-white/70 hover:text-white dark:text-slate-400 dark:hover:text-white p-1"
-                              title="Modifica video"
+                              className="p-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white"
+                              aria-label="Modifica video"
                             >
                               <Edit className="w-4 h-4" />
                             </button>
@@ -545,19 +593,19 @@ export function VideoManager() {
                                 id: video.id,
                                 title: video.title
                               })}
-                              className="text-white/70 hover:text-red-400 dark:text-slate-400 dark:hover:text-red-400 p-1"
-                              title="Elimina video"
+                              className="p-2 rounded-lg bg-red-600 hover:bg-red-700 text-white"
+                              aria-label="Elimina video"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-300 dark:text-slate-500">
-                          <Calendar className="w-4 h-4" />
-                          <span>{formatDate(video.publish_date)}</span>
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="text-center text-white/70 p-4">
+                        Nessun video in questa categoria
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -657,6 +705,103 @@ export function VideoManager() {
           onCancel={() => setDeleteModal(null)}
           isLoading={loading}
         />
+      )}
+
+      {/* Video Modal */}
+      {showVideoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-lg rounded-xl shadow-xl max-w-lg w-full border border-white/30 dark:border-slate-700/30">
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
+                {editingVideo ? 'Modifica Video' : 'Nuovo Video'}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowVideoModal(false);
+                  setEditingVideo(null);
+                  setVideoForm({
+                    title: '',
+                    embed_url: '',
+                    category_id: videoForm.category_id,
+                    publish_date: new Date().toISOString().split('T')[0]
+                  });
+                }}
+                className="text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                  Titolo *
+                </label>
+                <input
+                  type="text"
+                  value={videoForm.title}
+                  onChange={(e) => setVideoForm({ ...videoForm, title: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                  placeholder="Inserisci il titolo del video"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                  URL Embed *
+                </label>
+                <input
+                  type="text"
+                  value={videoForm.embed_url}
+                  onChange={(e) => setVideoForm({ ...videoForm, embed_url: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                  placeholder="Inserisci l'URL di embed del video"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                  Categoria *
+                </label>
+                <select
+                  value={videoForm.category_id}
+                  onChange={(e) => setVideoForm({ ...videoForm, category_id: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                >
+                  <option value="">Seleziona una categoria</option>
+                  {categories.map(category => (
+                    <option key={category.id} value={category.id}>
+                      {category.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                  Data di Pubblicazione *
+                </label>
+                <input
+                  type="date"
+                  value={videoForm.publish_date}
+                  onChange={(e) => setVideoForm({ ...videoForm, publish_date: e.target.value })}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={handleSaveVideo}
+                disabled={loading}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-all transform hover:scale-105 flex items-center gap-2 disabled:opacity-50"
+              >
+                <Save className="w-5 h-5" />
+                {loading ? 'Salvataggio...' : 'Salva Video'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
