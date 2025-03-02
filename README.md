@@ -1,84 +1,86 @@
-# GlobalQuiz - App Quiz OceanMed Sailing
+# App Quiz - Patente Nautica
 
-Un'applicazione educativa completa per la formazione nel settore della navigazione, che consente la creazione, gestione e somministrazione di diversi tipi di quiz e moduli di apprendimento.
+Applicazione per la gestione di quiz per la patente nautica.
 
-## 🚀 Tecnologie Utilizzate
+## Configurazione
 
-- **Frontend**: React, TypeScript, Vite, TailwindCSS
-- **Backend**: Supabase (PostgreSQL, Autenticazione, Storage)
-- **Deployment**: Vercel
-- **Gestione Versioni**: GitHub
-
-## 📋 Prerequisiti
-
-- Node.js (v16 o superiore)
+### Prerequisiti
+- Node.js (versione 16 o superiore)
 - npm o yarn
-- Git
 
-## 🔧 Installazione e Setup
+### Installazione
+1. Clona il repository
+2. Installa le dipendenze:
+```bash
+npm install
+# oppure
+yarn install
+```
 
-1. **Clona il repository**
-   ```bash
-   git clone https://github.com/stormone4000/globalquiz.git
-   cd globalquiz
-   ```
+### Configurazione delle variabili d'ambiente
+Crea un file `.env` nella root del progetto con le seguenti variabili:
 
-2. **Installa le dipendenze**
-   ```bash
-   npm install
-   ```
+```
+DOMAIN=https://patente.oceanmedsailing.com
+STRIPE_SECRET_KEY=your_stripe_secret_key
+STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
+PORT=3333
 
-3. **Configura le variabili d'ambiente**
-   - Il file `.env.local` è già configurato per la connessione a Supabase
-   - Per lo sviluppo locale, puoi utilizzare le stesse variabili
+# Supabase Remote
+VITE_SUPABASE_URL=https://uqutbomzymeklyowfewp.supabase.co
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
-4. **Avvia il server di sviluppo**
-   ```bash
-   npm run dev
-   ```
+# Chiave di servizio per operazioni amministrative
+SUPABASE_SERVICE_KEY=your_supabase_service_key
+```
 
-5. **Accedi all'applicazione**
-   - Apri il browser e vai a `http://localhost:5173`
+## Utilizzo del database remoto
 
-## 🔌 Connessione a Supabase
+L'applicazione è configurata per utilizzare il database remoto Supabase. Non è necessario importare i dati localmente.
 
-L'applicazione è configurata per connettersi al database Supabase con ID `uqutbomzymeklyowfewp`. La connessione viene gestita automaticamente utilizzando le variabili d'ambiente nel file `.env.local`.
+### Test della connessione al database remoto
 
-### Test della Connessione
+Per verificare che la connessione al database remoto funzioni correttamente, esegui:
 
-L'applicazione esegue automaticamente un test di connessione a Supabase all'avvio. Puoi verificare nei log della console che la connessione sia stabilita correttamente.
+```bash
+node src/scripts/testRemoteConnection.js
+```
 
-### Risoluzione dei Problemi
+Questo script verificherà la connessione al database remoto e mostrerà alcune informazioni di base sulle tabelle presenti.
 
-Se la connessione a Supabase fallisce:
-1. Verifica che le variabili d'ambiente siano configurate correttamente
-2. Controlla che il database Supabase sia attivo e accessibile
-3. Verifica che le politiche RLS permettano le operazioni necessarie
+## Struttura del database
 
-## 🚢 Deployment
+Il database contiene le seguenti tabelle principali:
 
-L'applicazione è configurata per il deploy automatico su Vercel. Ogni push al branch `main` attiva automaticamente un nuovo deploy.
+- **quiz_types**: Tipi di quiz disponibili (es. Modulo di Apprendimento, Esame Standardizzato)
+- **quiz_templates**: Modelli di quiz configurati nel sistema
+- **questions**: Domande disponibili per i quiz
+- **quiz_questions**: Associazioni tra domande e quiz
+- **subscriptions**: Abbonamenti degli utenti
 
-### Configurazione Vercel
+## Avvio dell'applicazione
 
-Le variabili d'ambiente necessarie sono già configurate nel file `.env.local` e vengono automaticamente utilizzate da Vercel durante il deploy.
+Per avviare l'applicazione in modalità sviluppo:
 
-## 📚 Documentazione
+```bash
+npm run dev
+# oppure
+yarn dev
+```
 
-Per una documentazione più dettagliata, consulta il file `istruzioni-app-filo.md` nel repository.
+Per compilare l'applicazione per la produzione:
 
-## 👥 Contribuire
+```bash
+npm run build
+# oppure
+yarn build
+```
 
-1. Fai un fork del repository
-2. Crea un branch per la tua feature (`git checkout -b feature/nome-feature`)
-3. Fai commit delle tue modifiche (`git commit -m 'Aggiungi una nuova feature'`)
-4. Fai push al branch (`git push origin feature/nome-feature`)
-5. Apri una Pull Request
+## Script di utilità
 
-## 📄 Licenza
+- `src/scripts/testRemoteConnection.js`: Verifica la connessione al database remoto
+- `src/scripts/importQuizQuestions.js`: Importa domande dei quiz nel database
 
-Questo progetto è proprietario e riservato. Tutti i diritti sono riservati.
+## Supporto
 
-## 📞 Contatti
-
-Per domande o supporto, contatta il team di sviluppo. 
+Per problemi o domande, contattare il team di sviluppo. 
