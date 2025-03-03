@@ -77,20 +77,38 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
 
   const loadUserProfile = async () => {
     try {
-      const { data: userData, error: userError } = await supabase
-        .from('auth_users')
-        .select('*')
-        .eq('email', userEmail)
-        .single();
+      // Prima controlliamo se i dati sono disponibili nel localStorage
+      const firstName = localStorage.getItem('firstName') || '';
+      const lastName = localStorage.getItem('lastName') || '';
+      
+      if (firstName || lastName) {
+        // Se abbiamo dati nel localStorage, li utilizziamo
+        setFormData(prev => ({
+          ...prev,
+          firstName,
+          lastName
+        }));
+      } else {
+        // Altrimenti, carichiamo i dati dal database
+        const { data: userData, error: userError } = await supabase
+          .from('auth_users')
+          .select('*')
+          .eq('email', userEmail)
+          .single();
 
-      if (userError) throw userError;
-      if (!userData) throw new Error('Utente non trovato');
+        if (userError) throw userError;
+        if (!userData) throw new Error('Utente non trovato');
 
-      setFormData(prev => ({
-        ...prev,
-        firstName: userData.first_name || '',
-        lastName: userData.last_name || ''
-      }));
+        // Salviamo i dati nel localStorage per usi futuri
+        localStorage.setItem('firstName', userData.first_name || '');
+        localStorage.setItem('lastName', userData.last_name || '');
+
+        setFormData(prev => ({
+          ...prev,
+          firstName: userData.first_name || '',
+          lastName: userData.last_name || ''
+        }));
+      }
     } catch (error) {
       console.error('Error loading user profile:', error);
       setError('Errore durante il caricamento del profilo');
@@ -155,6 +173,10 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
         .eq('email', userEmail);
 
       if (updateError) throw updateError;
+
+      // Aggiorniamo i dati nel localStorage
+      localStorage.setItem('firstName', formData.firstName);
+      localStorage.setItem('lastName', formData.lastName);
 
       setSuccess('Profilo aggiornato con successo');
       setIsEditingPassword(false);

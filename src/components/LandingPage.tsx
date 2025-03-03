@@ -18,9 +18,16 @@ export function LandingPage() {
   }
 
   const handleNavigation = (path: string) => {
-    // Clear all auth-related storage
-    localStorage.clear();
-    sessionStorage.clear();
+    // Rimuovo esplicitamente il flag di autenticazione per garantire che l'utente non venga considerato autenticato
+    localStorage.removeItem('isAuthenticated');
+    
+    // Rimuovo anche altri dati di autenticazione per sicurezza
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('isProfessor');
+    localStorage.removeItem('isMasterAdmin');
+    localStorage.removeItem('hasActiveAccess');
+    
+    // Procediamo con la navigazione
     navigate(path, { replace: true });
   };
 
@@ -33,7 +40,7 @@ export function LandingPage() {
           gradientBackgroundEnd="rgb(0, 68, 102)"     // Blu un po' più chiaro, che richiama le acque in superficie
           firstColor="0, 70, 140"                       // Blu navy per un accento deciso
           secondColor="0, 120, 180"                     // Blu medio, fresco e pulito
-          thirdColor="0, 150, 136"                      // Teal, che ricorda il colore dell’acqua trasparente
+          thirdColor="0, 150, 136"                      // Teal, che ricorda il colore dell'acqua trasparente
           fourthColor="255, 255, 255"                   // Bianco, per evocare la schiuma delle onde
           fifthColor="220, 20, 60"                      // Rosso nautico, classico richiamo al mondo marino
         />

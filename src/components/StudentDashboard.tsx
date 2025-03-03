@@ -126,7 +126,7 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
         <Quiz
           quizId={selectedCategory}
           onBack={() => setSelectedCategory(null)}
-          studentEmail={studentEmail}
+          studentEmail={studentEmail || localStorage.getItem('userEmail') || ''}
         />
       );
     }
@@ -174,7 +174,7 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
         <Quiz
           quizId={selectedCategory}
           onBack={() => setSelectedCategory(null)}
-          studentEmail={studentEmail}
+          studentEmail={studentEmail || localStorage.getItem('userEmail') || ''}
         />
       );
     }

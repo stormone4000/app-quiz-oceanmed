@@ -501,6 +501,12 @@ Eseguire regolarmente i seguenti controlli di sicurezza:
   - Implementazione di un controllo automatico all'avvio che verifica e corregge i flag se necessario.
   - Miglioramento del meccanismo di persistenza dei dati nel localStorage per evitare la perdita dei flag di accesso.
   - Registrazione automatica dell'utilizzo del codice "392673" per garantire che appaia nella cronologia.
+- **Problema con i pulsanti CTA nella landing page**: ✅ RISOLTO! I pulsanti CTA (call-to-action) nella landing page reindirizzavano erroneamente al profilo studente invece delle rispettive pagine di login o registrazione. Le modifiche includono:
+  - Modifica della funzione `handleNavigation` in `LandingPage.tsx` per rimuovere esplicitamente tutti i dati di autenticazione (`isAuthenticated`, `userEmail`, `isProfessor`, ecc.) prima di navigare alle pagine di login/registrazione.
+  - Miglioramento della funzione `handleLogout` in `App.tsx` per garantire una pulizia completa dei dati utente e un hard refresh della pagina.
+  - Aggiunta di un controllo di autenticazione all'avvio dell'app che verifica e pulisce i dati utente se l'utente non è autenticato.
+  - Miglioramento della funzione `handleSubmit` in `AuthScreen.tsx` per rimuovere tutti i dati di autenticazione prima di tentare un nuovo login.
+  - Aggiunta di un controllo più rigoroso per le route protette, verificando esplicitamente il flag `isAuthenticated` prima di renderizzare la dashboard.
 - **Errore "Failed to save quiz result"**: ⚠️ IN ANALISI! Potrebbe essere causato da un problema di tipo dati nella colonna `quiz_id` della tabella `results`. È stato migliorato il logging degli errori per facilitare il debug. Possibili soluzioni:
   - Verificare che il tipo della colonna `quiz_id` in `results` sia compatibile con il tipo della colonna `id` in `quizzes`
   - Controllare che non ci siano vincoli di foreign key che impediscono l'inserimento
@@ -513,4 +519,4 @@ Eseguire regolarmente i seguenti controlli di sicurezza:
 
 Questo documento verrà aggiornato regolarmente per riflettere le modifiche e le nuove funzionalità dell'applicazione.
 
-Ultimo aggiornamento: 4 maggio 2024 
+Ultimo aggiornamento: 3 marzo 2025 

@@ -44,6 +44,14 @@ export function Quiz({ quizId, onBack, studentEmail }: QuizProps) {
   const [result, setResult] = useState<any>(null);
   const [isInitializing, setIsInitializing] = useState(true);
 
+  // Verifica che studentEmail sia definito all'inizio
+  useEffect(() => {
+    if (!studentEmail) {
+      console.error('Student email is missing in Quiz component');
+      setError('Email dello studente mancante. Impossibile iniziare il quiz.');
+    }
+  }, [studentEmail]);
+
   useEffect(() => {
     loadQuiz();
   }, [quizId]);
@@ -177,12 +185,22 @@ export function Quiz({ quizId, onBack, studentEmail }: QuizProps) {
     if (!quiz || !startTime) return;
 
     try {
+      console.log("Iniziando finishQuiz...");
       const endTime = new Date();
       const totalTime = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
       
       // Calculate score and ensure it's a valid number between 0 and 1
       const correctAnswers = answers.filter(Boolean).length;
       const score = Math.max(0, Math.min(1, correctAnswers / answers.length));
+      console.log("Punteggio calcolato:", score, "Risposte corrette:", correctAnswers, "su", answers.length);
+
+      // Verifica che studentEmail sia definito e non vuoto
+      if (!studentEmail) {
+        console.error('Student email is missing');
+        setError('Email dello studente mancante. Impossibile salvare i risultati.');
+        return;
+      }
+      console.log("Email studente verificata:", studentEmail);
 
       const quizResult = {
         email: studentEmail,
@@ -196,13 +214,43 @@ export function Quiz({ quizId, onBack, studentEmail }: QuizProps) {
         firstName: '',
         lastName: ''
       };
+      console.log("Oggetto quizResult creato:", JSON.stringify(quizResult));
 
-      await saveQuizResult(quizResult);
-      setResult(quizResult);
-      setShowResults(true);
+      try {
+        console.log("Tentativo di salvare il risultato...");
+        await saveQuizResult(quizResult);
+        console.log("Risultato salvato con successo!");
+        setResult(quizResult);
+        setShowResults(true);
+      } catch (saveError) {
+        console.error('Errore specifico durante il salvataggio:', saveError);
+        
+        // Tentativo di recupero in caso di errore RLS
+        try {
+          console.log("Tentativo di recupero: salvataggio risultato senza RLS...");
+          // Salva solo i dati essenziali in localStorage come backup
+          const backupResult = {
+            date: new Date().toISOString(),
+            score: score,
+            totalQuestions: answers.length,
+            correctAnswers: correctAnswers,
+            quizTitle: quiz.title
+          };
+          localStorage.setItem('lastQuizResult', JSON.stringify(backupResult));
+          console.log("Backup del risultato salvato in localStorage");
+          
+          // Mostra comunque i risultati all'utente
+          setResult(quizResult);
+          setShowResults(true);
+          setError('I risultati sono visualizzati ma potrebbero non essere stati salvati nel database. Un backup è stato creato localmente.');
+        } catch (backupError) {
+          console.error('Errore anche nel backup:', backupError);
+          setError('Errore durante il salvataggio dei risultati. Per favore riprova o contatta l\'assistenza.');
+        }
+      }
     } catch (error) {
-      console.error('Error saving quiz result:', error);
-      setError('Errore durante il salvataggio dei risultati. Per favore riprova.');
+      console.error('Errore generale in finishQuiz:', error);
+      setError('Errore durante la finalizzazione del quiz. Per favore riprova.');
     }
   };
 

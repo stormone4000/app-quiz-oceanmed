@@ -44,14 +44,40 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
 
   const loadLeaderboardData = async () => {
     try {
-      // Get user details first
-      const { data: userData, error: userError } = await supabase
-        .from('auth_users')
-        .select('first_name, last_name')
-        .eq('email', studentEmail)
-        .single();
+      console.log("Caricamento dati leaderboard per email:", studentEmail);
+      
+      // Otteniamo i dati dell'utente dal localStorage
+      const firstName = localStorage.getItem('firstName') || '';
+      const lastName = localStorage.getItem('lastName') || '';
+      
+      let userData = { first_name: firstName, last_name: lastName };
+      
+      // Se non abbiamo i dati nel localStorage, proviamo a ottenerli dal database
+      if (!firstName && !lastName) {
+        // Get user details first
+        const { data: dbUserData, error: userError } = await supabase
+          .from('auth_users')
+          .select('first_name, last_name')
+          .eq('email', studentEmail)
+          .maybeSingle();
 
-      if (userError) throw userError;
+        if (userError) {
+          console.warn('Errore nel recupero dei dettagli utente:', userError);
+          // Continuiamo senza dettagli utente
+        } else if (!dbUserData) {
+          console.log('Nessun dettaglio utente trovato per email:', studentEmail);
+          // Continuiamo senza dettagli utente
+        } else {
+          console.log('Dettagli utente trovati:', dbUserData);
+          userData = dbUserData;
+          
+          // Salviamo i dati nel localStorage per usi futuri
+          if (dbUserData.first_name) localStorage.setItem('firstName', dbUserData.first_name);
+          if (dbUserData.last_name) localStorage.setItem('lastName', dbUserData.last_name);
+        }
+      } else {
+        console.log('Dettagli utente trovati nel localStorage:', { firstName, lastName });
+      }
 
       // Get total XP for each student
       const { data: xpData, error: xpError } = await supabase
@@ -61,13 +87,48 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
           score,
           first_name,
           last_name
-        `)
-        .eq('is_instructor_attempt', false);
+        `);
 
-      if (xpError) throw xpError;
+      if (xpError) {
+        console.error('Errore nel recupero dei risultati:', xpError);
+        // Impostiamo uno stato predefinito in caso di errore
+        setLeaderboard([]);
+        setUserStats({
+          rank: 0,
+          totalParticipants: 0,
+          xp: 0,
+          level: 1,
+          xpToNextLevel: 1000,
+          previousRank: 0,
+          firstName: userData.first_name || '',
+          lastName: userData.last_name || ''
+        });
+        return; // Usciamo dalla funzione se non possiamo recuperare i risultati
+      }
+
+      console.log('Risultati recuperati:', xpData?.length || 0);
+
+      // Se non ci sono risultati, impostiamo uno stato predefinito
+      if (!xpData || xpData.length === 0) {
+        console.log('Nessun risultato trovato nella tabella results');
+        setLeaderboard([]);
+        setUserStats({
+          rank: 0,
+          totalParticipants: 0,
+          xp: 0,
+          level: 1,
+          xpToNextLevel: 1000,
+          previousRank: 0,
+          firstName: userData.first_name || '',
+          lastName: userData.last_name || ''
+        });
+        return;
+      }
 
       // Calculate XP and rankings
       const xpMap = xpData.reduce((acc: { [key: string]: any }, curr) => {
+        if (!curr.student_email) return acc; // Ignoriamo record senza email
+        
         const xp = Math.round(curr.score * 1000);
         if (!acc[curr.student_email]) {
           acc[curr.student_email] = {
@@ -79,6 +140,23 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
         acc[curr.student_email].xp += xp;
         return acc;
       }, {});
+
+      // Se non ci sono dati validi dopo il filtraggio
+      if (Object.keys(xpMap).length === 0) {
+        console.log('Nessun dato valido dopo il filtraggio');
+        setLeaderboard([]);
+        setUserStats({
+          rank: 0,
+          totalParticipants: 0,
+          xp: 0,
+          level: 1,
+          xpToNextLevel: 1000,
+          previousRank: 0,
+          firstName: userData.first_name || '',
+          lastName: userData.last_name || ''
+        });
+        return;
+      }
 
       // Convert to array and sort by XP
       const rankings = Object.entries(xpMap)
@@ -124,14 +202,45 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
           level: userRanking.level,
           xpToNextLevel: (userRanking.level + 1) * 1000 - userRanking.xp,
           previousRank: oldRank || newRank,
-          firstName: userData?.first_name,
-          lastName: userData?.last_name
+          firstName: userData.first_name || '',
+          lastName: userData.last_name || ''
+        });
+      } else {
+        // L'utente non ha ancora risultati
+        console.log('Utente non trovato nella leaderboard:', studentEmail);
+        setUserStats({
+          rank: 0,
+          totalParticipants: rankings.length,
+          xp: 0,
+          level: 1,
+          xpToNextLevel: 1000,
+          previousRank: 0,
+          firstName: userData.first_name || '',
+          lastName: userData.last_name || ''
         });
       }
 
+      // Anche se l'utente non ha risultati, mostriamo comunque la leaderboard
       setLeaderboard(rankings.slice(0, 10));
     } catch (error) {
       console.error('Error loading leaderboard:', error);
+      // In caso di errore, impostiamo stati predefiniti
+      setLeaderboard([]);
+      
+      // Otteniamo i dati dell'utente dal localStorage per il fallback
+      const firstName = localStorage.getItem('firstName') || '';
+      const lastName = localStorage.getItem('lastName') || '';
+      
+      setUserStats({
+        rank: 0,
+        totalParticipants: 0,
+        xp: 0,
+        level: 1,
+        xpToNextLevel: 1000,
+        previousRank: 0,
+        firstName: firstName,
+        lastName: lastName
+      });
     }
   };
 

@@ -92,7 +92,7 @@ export function QuizSelection({ onSelectQuizType, onShowDashboard }: QuizSelecti
             <h2 className="text-2xl font-light text-white dark:text-slate-100">Quiz Studenti</h2>
           </div>
           <p className="text-gray-200 dark:text-slate-300 mb-6">
-            Quiz interattivi creati da altri studenti. Partecipa e metti alla prova le tue conoscenze in modo divertente.
+            Quiz interattivi creati da altri istruttori. Partecipa e metti alla prova le tue conoscenze in modo divertente. Qui troverai anche i quiz aggiunti tramite codice fornito dall'istruttore.
           </p>
           <button
             onClick={() => handleSelectQuizType('interactive')}

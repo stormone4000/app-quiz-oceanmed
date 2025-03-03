@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Mail, Lock, Save, AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 
@@ -18,6 +18,125 @@ export function StudentProfile({ userEmail }: StudentProfileProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
+
+  // Funzione per caricare i dati del profilo utente
+  const loadUserProfile = async () => {
+    if (!userEmail) {
+      console.log('Nessuna email utente fornita');
+      return;
+    }
+    
+    console.log('Caricamento profilo per email:', userEmail);
+    
+    try {
+      setLoading(true);
+      
+      // Prima controlliamo se i dati sono disponibili nel localStorage
+      const firstName = localStorage.getItem('firstName') || '';
+      const lastName = localStorage.getItem('lastName') || '';
+      
+      console.log('Dati dal localStorage:', { firstName, lastName });
+      
+      if (firstName || lastName) {
+        // Se abbiamo dati nel localStorage, li utilizziamo
+        console.log('Utilizzo dati dal localStorage');
+        setFormData(prev => ({
+          ...prev,
+          firstName,
+          lastName
+        }));
+      } else {
+        // Altrimenti, carichiamo i dati dal database
+        console.log('Tentativo di caricamento dati dal database');
+        
+        // Utilizziamo una query RPC diretta per bypassare l'RLS
+        try {
+          const { data: userData, error: rpcError } = await supabase
+            .rpc('get_user_profile', { user_email: userEmail });
+          
+          if (!rpcError && userData) {
+            console.log('Dati ottenuti tramite RPC:', userData);
+            
+            // Salviamo i dati nel localStorage per usi futuri
+            localStorage.setItem('firstName', userData.first_name || '');
+            localStorage.setItem('lastName', userData.last_name || '');
+            
+            setFormData(prev => ({
+              ...prev,
+              firstName: userData.first_name || '',
+              lastName: userData.last_name || ''
+            }));
+            return;
+          } else {
+            console.log('Errore RPC o nessun dato:', rpcError);
+          }
+        } catch (rpcErr) {
+          console.error('Errore nella chiamata RPC:', rpcErr);
+        }
+        
+        // Se la RPC fallisce, proviamo con una query diretta
+        console.log('Tentativo con query diretta');
+        const { data, error } = await supabase
+          .from('auth_users')
+          .select('first_name, last_name')
+          .eq('email', userEmail)
+          .maybeSingle();
+        
+        if (error) {
+          console.error('Errore nella query diretta:', error);
+          throw error;
+        }
+        
+        if (data) {
+          console.log('Dati ottenuti tramite query diretta:', data);
+          
+          // Salviamo i dati nel localStorage per usi futuri
+          localStorage.setItem('firstName', data.first_name || '');
+          localStorage.setItem('lastName', data.last_name || '');
+          
+          setFormData(prev => ({
+            ...prev,
+            firstName: data.first_name || '',
+            lastName: data.last_name || ''
+          }));
+        } else {
+          console.log('Nessun dato trovato per l\'email:', userEmail);
+          
+          // Come ultima risorsa, proviamo a ottenere i dati dalla sessione
+          const { data: { user } } = await supabase.auth.getUser();
+          console.log('Dati utente dalla sessione:', user);
+          
+          if (user && user.email === userEmail) {
+            const userMetadata = user.user_metadata || {};
+            const firstName = userMetadata.first_name || '';
+            const lastName = userMetadata.last_name || '';
+            
+            console.log('Dati ottenuti dalla sessione:', { firstName, lastName });
+            
+            // Salviamo i dati nel localStorage
+            localStorage.setItem('firstName', firstName);
+            localStorage.setItem('lastName', lastName);
+            
+            setFormData(prev => ({
+              ...prev,
+              firstName,
+              lastName
+            }));
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Errore nel caricamento del profilo:', error);
+      setError('Impossibile caricare i dati del profilo. Riprova più tardi.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Carica i dati del profilo all'inizializzazione
+  useEffect(() => {
+    loadUserProfile();
+  }, [userEmail]);
 
   const hashPassword = async (password: string): Promise<string> => {
     const encoder = new TextEncoder();
@@ -77,6 +196,10 @@ export function StudentProfile({ userEmail }: StudentProfileProps) {
         .eq('email', userEmail);
 
       if (updateError) throw updateError;
+
+      // Aggiorniamo i dati nel localStorage
+      localStorage.setItem('firstName', formData.firstName);
+      localStorage.setItem('lastName', formData.lastName);
 
       setSuccess('Profilo aggiornato con successo');
       setIsEditingPassword(false);

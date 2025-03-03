@@ -28,6 +28,9 @@ export function NotificationList({ studentEmail }: NotificationListProps) {
     key: keyof Notification;
     direction: 'asc' | 'desc';
   }>({ key: 'created_at', direction: 'desc' });
+  
+  // Chiave per localStorage
+  const getLocalStorageKey = () => `notification_read_status_${studentEmail}`;
 
   useEffect(() => {
     loadNotifications();
@@ -36,6 +39,28 @@ export function NotificationList({ studentEmail }: NotificationListProps) {
       subscription();
     };
   }, [studentEmail]);
+
+  // Funzione per ottenere lo stato di lettura dal localStorage
+  const getReadStatusFromLocalStorage = (): Record<string, boolean> => {
+    try {
+      const storedData = localStorage.getItem(getLocalStorageKey());
+      return storedData ? JSON.parse(storedData) : {};
+    } catch (error) {
+      console.error('Errore nel recupero dello stato di lettura dal localStorage:', error);
+      return {};
+    }
+  };
+
+  // Funzione per salvare lo stato di lettura nel localStorage
+  const saveReadStatusToLocalStorage = (notificationId: string, isRead: boolean) => {
+    try {
+      const currentStatus = getReadStatusFromLocalStorage();
+      currentStatus[notificationId] = isRead;
+      localStorage.setItem(getLocalStorageKey(), JSON.stringify(currentStatus));
+    } catch (error) {
+      console.error('Errore nel salvare lo stato di lettura nel localStorage:', error);
+    }
+  };
 
   const loadNotifications = async () => {
     try {
@@ -51,17 +76,50 @@ export function NotificationList({ studentEmail }: NotificationListProps) {
       if (notifsError) throw notifsError;
 
       // Poi otteniamo lo stato di lettura per questo studente
-      const { data: readStatus, error: readError } = await supabase
-        .from('notification_read_status')
-        .select('notification_id, read_at')
-        .eq('student_email', studentEmail);
+      // Gestiamo il caso in cui la tabella notification_read_status non esiste o non ha la colonna student_email
+      let readStatus: { notification_id: string; read_at: string | null }[] = [];
+      let useLocalStorage = false;
+      
+      try {
+        const { data, error } = await supabase
+          .from('notification_read_status')
+          .select('notification_id, read_at')
+          .eq('student_email', studentEmail);
+        
+        if (!error) {
+          readStatus = data || [];
+        } else {
+          console.warn('Errore nel recupero dello stato di lettura:', error);
+          
+          // Verifichiamo se l'errore è dovuto alla colonna mancante
+          if (error.code === '42703' && error.message && error.message.includes('student_email does not exist')) {
+            console.log('La colonna student_email non esiste nella tabella notification_read_status.');
+            console.log('È necessario eseguire lo script SQL per aggiungere la colonna.');
+            console.log('Nel frattempo, utilizzeremo localStorage come soluzione temporanea.');
+            
+            useLocalStorage = true;
+          }
+          
+          // Continuiamo senza lo stato di lettura dal database
+        }
+      } catch (readError) {
+        console.warn('Errore nel recupero dello stato di lettura:', readError);
+        useLocalStorage = true;
+      }
 
-      if (readError) throw readError;
-
-      // Creiamo una mappa degli stati di lettura
-      const readMap = new Map(
-        readStatus?.map(status => [status.notification_id, !!status.read_at])
-      );
+      // Se non possiamo usare il database, usiamo localStorage
+      let readMap: Map<string, boolean>;
+      
+      if (useLocalStorage) {
+        // Otteniamo lo stato di lettura dal localStorage
+        const localReadStatus = getReadStatusFromLocalStorage();
+        readMap = new Map(Object.entries(localReadStatus));
+      } else {
+        // Creiamo una mappa degli stati di lettura dal database
+        readMap = new Map(
+          readStatus?.map(status => [status.notification_id, !!status.read_at])
+        );
+      }
 
       // Combiniamo le notifiche con il loro stato di lettura
       const formattedNotifs = (allNotifs || []).map(n => ({
@@ -97,21 +155,39 @@ export function NotificationList({ studentEmail }: NotificationListProps) {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      const { error } = await supabase
-        .from('notification_read_status')
-        .upsert([{
-          notification_id: notificationId,
-          student_email: studentEmail,
-          read_at: new Date().toISOString()
-        }], {
-          onConflict: 'notification_id,student_email'
-        });
-
-      if (error) throw error;
-
+      // Aggiorniamo lo stato locale immediatamente per una migliore esperienza utente
       setNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
       );
+      
+      // Salviamo lo stato nel localStorage come backup
+      saveReadStatusToLocalStorage(notificationId, true);
+      
+      // Poi proviamo ad aggiornare il database
+      try {
+        const { error } = await supabase
+          .from('notification_read_status')
+          .upsert([{
+            notification_id: notificationId,
+            student_email: studentEmail,
+            read_at: new Date().toISOString()
+          }], {
+            onConflict: 'notification_id,student_email'
+          });
+
+        if (error) {
+          console.warn('Errore nel salvare lo stato di lettura:', error);
+           
+          // Verifichiamo se l'errore è dovuto alla colonna mancante
+          if (error.code === '42703' && error.message && error.message.includes('student_email does not exist')) {
+            console.log('La colonna student_email non esiste nella tabella notification_read_status.');
+            console.log('È necessario eseguire lo script SQL per aggiungere la colonna.');
+            console.log('Nel frattempo, utilizzeremo localStorage come soluzione temporanea.');
+          }
+        }
+      } catch (dbError) {
+        console.warn('Errore nel salvare lo stato di lettura:', dbError);
+      }
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }

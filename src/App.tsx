@@ -25,6 +25,23 @@ function App() {
       const isMasterAdmin = localStorage.getItem('isMasterAdmin') === 'true';
       const hasActiveAccess = localStorage.getItem('hasActiveAccess') === 'true';
       const lastPath = sessionStorage.getItem('lastPath');
+      const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+      
+      console.log('[App] Verifica autenticazione:', { isAuthenticated, storedEmail, isProfessor });
+      
+      // Verifica se l'utente è effettivamente autenticato
+      if (!isAuthenticated) {
+        console.log('[App] Utente non autenticato');
+        // Puliamo completamente i dati utente in caso di mancata autenticazione
+        localStorage.removeItem('userEmail');
+        localStorage.removeItem('isProfessor');
+        localStorage.removeItem('isMasterAdmin');
+        localStorage.removeItem('hasActiveAccess');
+        return {
+          isStudent: false,
+          isProfessor: false
+        };
+      }
       
       // If user is already logged in as professor
       if (isProfessor) {
@@ -34,26 +51,21 @@ function App() {
             isStudent: false,
             isProfessor: true,
             needsSubscription: true,
-            isMasterAdmin: false
+            email: storedEmail || ''
           };
         }
-        // Restore last path if available
-        if (lastPath && lastPath !== '/login' && lastPath !== '/register' && lastPath !== '/instructor') {
-          window.history.replaceState(null, '', lastPath);
-        }
+        
         return {
           isStudent: false,
           isProfessor: true,
-          isMasterAdmin: isMasterAdmin
+          isMasterAdmin: isMasterAdmin,
+          hasActiveAccess: hasActiveAccess,
+          email: storedEmail || ''
         };
       }
-
-      // If user is logged in as student
+      
+      // If user is already logged in as student
       if (storedEmail) {
-        // Restore last path if available
-        if (lastPath && lastPath !== '/login' && lastPath !== '/register' && lastPath !== '/instructor') {
-          window.history.replaceState(null, '', lastPath);
-        }
         return {
           isStudent: true,
           isProfessor: false,
@@ -61,14 +73,12 @@ function App() {
         };
       }
       
-      // No valid login
       return {
         isStudent: false,
         isProfessor: false
       };
     } catch (error) {
-      localStorage.clear();
-      sessionStorage.clear();
+      console.error('Error initializing user role:', error);
       return {
         isStudent: false,
         isProfessor: false
@@ -368,11 +378,13 @@ function App() {
     if (userRole.isStudent || userRole.isProfessor) {
       loadQuizResults();
     }
-  }, [userRole.isStudent, userRole.isProfessor]);
+  }, [userRole.isStudent, userRole.isProfessor, userRole.email]);
 
   const loadQuizResults = async () => {
     try {
-      const results = await getQuizResults();
+      // Se l'utente è uno studente, passa la sua email per filtrare i risultati
+      const email = userRole.isStudent ? userRole.email : undefined;
+      const results = await getQuizResults(email);
       setResults(results);
     } catch (error) {
       console.error('Error loading quiz results:', error);
@@ -381,17 +393,56 @@ function App() {
 
   const handleLogout = () => {
     try {
-      localStorage.clear(); // Clear all storage on logout
+      // Prima rimuovo tutti i dati specifici dell'utente
+      localStorage.removeItem('isAuthenticated');
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('isProfessor');
+      localStorage.removeItem('isMasterAdmin');
+      localStorage.removeItem('hasActiveAccess');
+      localStorage.removeItem('masterCode');
+      localStorage.removeItem('firstName');
+      localStorage.removeItem('lastName');
+      
+      // Poi pulisco tutto il resto
+      localStorage.clear(); 
       sessionStorage.clear();
+      
+      // Aggiorno l'UI
       setUserRole({
         isStudent: false,
         isProfessor: false
       });
       setResults([]); // Clear results on logout
+      
+      // Forzo un hard refresh per garantire che tutto venga resettato
+      window.location.replace('/');
     } catch (error) {
       console.error('Error during logout:', error);
     }
   };
+
+  // Aggiungo un effetto per verificare lo stato di autenticazione all'avvio dell'app
+  useEffect(() => {
+    // Verifica se l'utente è autenticato
+    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+    
+    // Se non è autenticato, assicuriamoci che tutti i dati di autenticazione vengano rimossi
+    if (!isAuthenticated) {
+      console.log('[App] Pulizia dati utente non autenticato');
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('isProfessor');
+      localStorage.removeItem('isMasterAdmin');
+      localStorage.removeItem('hasActiveAccess');
+      localStorage.removeItem('firstName');
+      localStorage.removeItem('lastName');
+      
+      // Aggiorniamo lo stato dell'utente
+      setUserRole({
+        isStudent: false,
+        isProfessor: false
+      });
+    }
+  }, []);
 
   return (
     <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
@@ -464,25 +515,23 @@ function App() {
           <Route 
             path="/dashboard" 
             element={
-              userRole.isStudent ? (
-                <StudentDashboard 
-                  results={results.filter(r => r.email === userRole.email)}
-                  studentEmail={userRole.email || ''}
-                  onLogout={handleLogout}
-                />
-              ) : userRole.isStudent ? (
-                <StudentDashboard 
-                  results={results.filter(r => r.email === userRole.email)}
-                  studentEmail={userRole.email || ''}
-                  onLogout={handleLogout}
-                />
-              ) : userRole.isProfessor ? (
-                <ProfessorDashboard 
-                  results={results} 
-                  onLogout={handleLogout} 
-                  needsSubscription={userRole.needsSubscription}
-                  hostEmail={userRole.email}
-                />
+              localStorage.getItem('isAuthenticated') === 'true' ? (
+                userRole.isStudent ? (
+                  <StudentDashboard 
+                    results={results.filter(r => r.email === userRole.email)}
+                    studentEmail={userRole.email || ''}
+                    onLogout={handleLogout}
+                  />
+                ) : userRole.isProfessor ? (
+                  <ProfessorDashboard 
+                    results={results} 
+                    onLogout={handleLogout} 
+                    needsSubscription={userRole.needsSubscription}
+                    hostEmail={userRole.email}
+                  />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
               ) : (
                 <Navigate to="/login" replace />
               )

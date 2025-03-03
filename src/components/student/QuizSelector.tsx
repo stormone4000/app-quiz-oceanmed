@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Book, Key, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 interface QuizSelectorProps {
   onQuizSelect: (quizId: string) => void;
@@ -18,6 +19,7 @@ export function QuizSelector({ onQuizSelect }: QuizSelectorProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const handleCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +35,7 @@ export function QuizSelector({ onQuizSelect }: QuizSelectorProps) {
       // Verify quiz code
       const { data: quiz, error: quizError } = await supabase
         .from('quiz_templates')
-        .select('id, title')
+        .select('id, title, quiz_type, category')
         .eq('quiz_code', quizCode.trim())
         .single();
 
@@ -47,22 +49,29 @@ export function QuizSelector({ onQuizSelect }: QuizSelectorProps) {
       // Determine quiz type based on quiz data
       const quizType = quiz.quiz_type || 'learning';
       const category = quiz.category;
+      const quizId = quiz.id;
+      const quizTitle = quiz.title;
 
-      setSuccess('Codice verificato con successo!');
-      setTimeout(() => {
-        // Pass quiz type to parent component
-        if (quizType === 'exam') {
+      // Imposta il messaggio di successo in base al tipo di quiz
+      if (quizType === 'exam') {
+        setSuccess(`Quiz "${quizTitle}" aggiunto con successo! Verrai reindirizzato alla dashboard.`);
+        setTimeout(() => {
           navigate('/dashboard', { 
             state: { 
               quizType: 'exam',
-              quizId: quiz.id,
-              category: category 
+              quizId: quizId,
+              quizCategory: category 
             }
           });
-        } else {
-          onQuizSelect(quiz.id);
+        }, 2000);
+      } else {
+        setSuccess(`Quiz "${quizTitle}" aggiunto con successo! Puoi trovarlo nella sezione "Quiz Studenti" del menu laterale.`);
+        if (onQuizSelect) {
+          setTimeout(() => {
+            onQuizSelect(quizId);
+          }, 2000);
         }
-      }, 1000);
+      }
 
     } catch (error) {
       console.error('Error verifying quiz code:', error);

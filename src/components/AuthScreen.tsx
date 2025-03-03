@@ -98,10 +98,14 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
     setError(null);
     setLoading(true);
 
-    // Clear any existing auth data
-    localStorage.clear();
-    sessionStorage.clear();
-
+    // Prima di tentare di autenticare, assicuriamoci che tutti i dati di autenticazione siano rimossi
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('isProfessor');
+    localStorage.removeItem('isMasterAdmin');
+    localStorage.removeItem('hasActiveAccess');
+    localStorage.removeItem('firstName');
+    localStorage.removeItem('lastName');
     
     try {
       if (mode === 'instructor') {
@@ -128,6 +132,9 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
           throw new Error('Account sospeso. Contatta il supporto.');
         }
 
+        // Imposta flag autenticazione
+        localStorage.setItem('isAuthenticated', 'true');
+        
         // Check if master admin
         if (users.is_master) {
           localStorage.setItem('userEmail', users.email);
@@ -222,6 +229,7 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
       const user = users[0];
 
       // Store user email in localStorage
+      localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('userEmail', user.email.toLowerCase());
       localStorage.removeItem('isProfessor');
       localStorage.setItem('firstName', user.first_name || '');
