@@ -27,11 +27,13 @@ L'applicazione utilizza i seguenti strumenti per lo sviluppo e il deployment:
 - Possibilità di rendere pubblici o privati i quiz creati da qualsiasi utente
 
 ### Istruttore
-- Creazione e gestione dei propri quiz
-- Possibilità di rendere pubblici o privati i propri quiz
-- Assegnazione di quiz agli studenti
+- Accesso a "Tutti i quiz" nella sidebar per visualizzare l'elenco completo
+- Creazione e gestione dei propri quiz (simile all'admin)
+- Generazione di codici quiz da distribuire agli studenti
+- Accesso a "Gestione Alunni" nella sidebar per monitorare chi ha attivato i codici
 - Visualizzazione dei risultati e delle statistiche dei propri quiz
 - Modifica e eliminazione solo dei propri quiz
+- Non può rendere pubblici o privati i quiz (a differenza dell'admin)
 
 ### Studente
 - Partecipazione ai quiz assegnati
@@ -139,11 +141,13 @@ L'applicazione utilizza le politiche di sicurezza a livello di riga di Supabase 
 ## Flusso di Lavoro
 
 ### Creazione Quiz
-1. L'istruttore seleziona il tipo di quiz da creare
+1. L'istruttore o l'admin seleziona il tipo di quiz da creare
 2. Compila le informazioni di base (titolo, descrizione, categoria)
 3. Aggiunge domande, opzioni e risposte corrette
 4. Può caricare immagini per illustrare le domande
-5. Salva il quiz e sceglie se renderlo pubblico o privato
+5. Salva il quiz
+6. Se è un admin, può scegliere se rendere il quiz pubblico o privato
+7. Se è un istruttore, ottiene un codice quiz da distribuire agli studenti
 
 ### Sessione Quiz Interattivo
 1. L'istruttore crea una sessione da un quiz interattivo
@@ -178,6 +182,54 @@ L'applicazione utilizza le politiche di sicurezza a livello di riga di Supabase 
 5. Se il codice è valido, l'abbonamento viene attivato immediatamente
 6. L'utente viene reindirizzato alla dashboard dopo l'attivazione
 7. Lo stato dell'abbonamento è sempre visibile nella pagina dei prezzi
+
+## Interfaccia Utente
+
+### Sidebar e Navigazione
+
+#### Sidebar Amministratore
+- Dashboard
+- Tutti i Quiz
+- Gestione Quiz
+- Quiz Interattivi
+- Gestione Utenti
+- Statistiche Globali
+- Impostazioni
+
+#### Sidebar Istruttore
+- Dashboard
+- Tutti i Quiz (visualizzazione completa dei quiz disponibili)
+- Gestione Quiz (creazione e gestione dei propri quiz)
+- Quiz Interattivi
+- Gestione Alunni (monitoraggio degli studenti che hanno attivato i codici)
+- Statistiche dei propri quiz
+- Profilo
+
+#### Sidebar Studente
+- Dashboard
+- Quiz Disponibili
+- I Miei Risultati
+- Quiz Interattivi
+- Profilo
+
+### Funzionalità Specifiche per Ruolo
+
+#### Amministratore
+- Può creare, modificare ed eliminare qualsiasi quiz
+- Può rendere pubblici o privati i quiz
+- Ha accesso completo a tutte le statistiche e ai dati degli utenti
+
+#### Istruttore
+- Può creare e gestire i propri quiz
+- Ottiene codici quiz da distribuire agli studenti
+- Non può rendere pubblici o privati i quiz
+- Può monitorare gli studenti che hanno attivato i codici attraverso la sezione "Gestione Alunni"
+- Può visualizzare statistiche relative solo ai propri quiz
+
+#### Studente
+- Può accedere ai quiz tramite codici forniti dagli istruttori
+- Può visualizzare solo i propri risultati e progressi
+- Può partecipare a sessioni interattive tramite codice PIN
 
 ## Note Tecniche
 - L'applicazione è sviluppata con React e TypeScript
