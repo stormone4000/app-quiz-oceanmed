@@ -50,7 +50,7 @@ export function PricingPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [selectedInterval, setSelectedInterval] = useState<'month' | 'year'>('month');
-  const [verificationStep, setVerificationStep] = useState<'idle' | 'checking' | 'success' | 'error'>('idle');
+  const [verificationStep, setVerificationStep] = useState<'idle' | 'checking' | 'verifying' | 'success' | 'error'>('idle');
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
   const [loadingSubscription, setLoadingSubscription] = useState(true);
   const navigate = useNavigate();

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Book, GraduationCap, Menu, X, ChevronLeft, ChevronRight, LogOut, Key, UserCircle, Video, Target, Bell, CreditCard, Users } from 'lucide-react';
 import { NotificationBell } from '../notifications/NotificationBell';
@@ -15,27 +15,149 @@ interface SidebarProps {
 
 export function Sidebar({ activeTab, onTabChange, isSidebarOpen, onToggleSidebar, onLogout, studentEmail, isMaster }: SidebarProps) {
   const navigate = useNavigate();
-  const isProfessor = localStorage.getItem('isProfessor') === 'true';
-  const hasActiveAccess = localStorage.getItem('hasActiveAccess') === 'true';
+  const [localIsProfessor, setLocalIsProfessor] = useState(localStorage.getItem('isProfessor') === 'true');
+  const [localHasActiveAccess, setLocalHasActiveAccess] = useState(localStorage.getItem('hasActiveAccess') === 'true');
+  const [localIsMaster, setLocalIsMaster] = useState(localStorage.getItem('isMasterAdmin') === 'true');
+  const [isIstruttore1, setIsIstruttore1] = useState(localStorage.getItem('userEmail') === 'istruttore1@io.it');
+  const [needsSubscription, setNeedsSubscription] = useState(localStorage.getItem('needsSubscription') === 'true');
+  const [isCodeDeactivated, setIsCodeDeactivated] = useState(localStorage.getItem('isCodeDeactivated') === 'true');
+  
+  // Aggiorniamo gli stati locali quando cambia localStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const isProfessor = localStorage.getItem('isProfessor') === 'true';
+      const hasActiveAccess = localStorage.getItem('hasActiveAccess') === 'true';
+      const isMasterAdmin = localStorage.getItem('isMasterAdmin') === 'true';
+      const userEmail = localStorage.getItem('userEmail');
+      const needsSubscription = localStorage.getItem('needsSubscription') === 'true';
+      const isCodeDeactivated = localStorage.getItem('isCodeDeactivated') === 'true';
+      
+      console.log('Sidebar - Storage change detected:', { 
+        isProfessor, 
+        hasActiveAccess, 
+        isMasterAdmin, 
+        userEmail,
+        needsSubscription,
+        isCodeDeactivated
+      });
+      
+      setLocalIsProfessor(isProfessor);
+      setLocalHasActiveAccess(hasActiveAccess);
+      setLocalIsMaster(isMasterAdmin);
+      setIsIstruttore1(userEmail === 'istruttore1@io.it');
+      setNeedsSubscription(needsSubscription);
+      setIsCodeDeactivated(isCodeDeactivated);
+    };
+    
+    // Verifica i valori iniziali
+    handleStorageChange();
+    
+    // Ascolta gli eventi di storage
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('localStorageUpdated', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('localStorageUpdated', handleStorageChange);
+    };
+  }, []);
+
+  // Log delle props e degli stati per debugging
+  console.log('Sidebar props:', { isMaster, activeTab });
+  console.log('Sidebar local state:', { 
+    localIsProfessor, 
+    localHasActiveAccess, 
+    localIsMaster, 
+    isIstruttore1, 
+    needsSubscription,
+    isCodeDeactivated
+  });
 
   const menuItems = [
-    { id: 'stats', icon: BarChart, label: 'Statistiche', showFor: 'all', path: null, requiresAccess: isProfessor },
+    { id: 'stats', icon: BarChart, label: 'Statistiche', showFor: 'all', path: null, requiresAccess: localIsProfessor },
     { id: 'quizzes', icon: Book, label: 'Tutti i Quiz', showFor: 'master', path: null },
-    { id: 'quiz-live', icon: Target, label: 'Quiz Live', showFor: 'all', path: '/quiz-live', requiresAccess: isProfessor },
-    { id: 'quiz-studenti', icon: Target, label: 'Quiz Studenti', showFor: 'all', path: null, requiresAccess: isProfessor },
-    { id: 'videos', icon: Video, label: 'Video Lezioni', showFor: 'all', path: null, requiresAccess: isProfessor },
-    { id: 'students', icon: Users, label: isMaster ? 'Gestione Utenti' : 'Gestione Studenti', showFor: 'master', path: null, requiresAccess: true, lockedMessage: 'Inserisci il codice master per gestire gli studenti' },
+    { id: 'quiz-live', icon: Target, label: 'Quiz Live', showFor: 'all', path: '/quiz-live', requiresAccess: localIsProfessor },
+    { id: 'quiz-studenti', icon: Target, label: 'Quiz Studenti', showFor: 'all', path: null, requiresAccess: localIsProfessor },
+    { id: 'videos', icon: Video, label: 'Video Lezioni', showFor: 'all', path: null, requiresAccess: localIsProfessor },
+    { id: 'students', icon: Users, label: localIsMaster ? 'Gestione Utenti' : 'Gestione Studenti', showFor: 'master', path: null, requiresAccess: true, lockedMessage: 'Inserisci il codice master per gestire gli studenti' },
     { id: 'access-codes', icon: Key, label: 'Codici di Accesso', showFor: 'master', path: null, requiresAccess: true, lockedMessage: 'Inserisci il codice master per gestire i codici di accesso' },
     { id: 'subscriptions', icon: CreditCard, label: 'Abbonamenti', showFor: 'master', path: null, requiresAccess: true, lockedMessage: 'Inserisci il codice master per gestire gli abbonamenti' },
-    { id: 'notifications', icon: Bell, label: 'Notifiche', showFor: 'all', path: null, requiresAccess: isProfessor },
+    { id: 'notifications', icon: Bell, label: 'Notifiche', showFor: 'all', path: null, requiresAccess: localIsProfessor },
     { id: 'profile', icon: UserCircle, label: 'Profilo', showFor: 'all', path: null }
   ];
 
   // Filter menu items based on user role
   const filteredMenuItems = menuItems.filter(item => 
     item.showFor === 'all' || 
-    (item.showFor === 'master' && isMaster)
+    (item.showFor === 'master' && (isMaster || localIsMaster))
   );
+
+  // Nel renderMenuItems, utilizziamo sia le props che gli stati locali
+  const renderMenuItems = () => {
+    return filteredMenuItems.map(({ id, icon: Icon, label, requiresAccess, lockedMessage }) => {
+      // Caso speciale per istruttore1@io.it: se ha bisogno di sottoscrizione o il codice è disattivato,
+      // disabilitiamo tutte le voci tranne il profilo
+      const isProfileItem = id === 'profile';
+      const shouldDisableForIstruttore1 = isIstruttore1 && (needsSubscription || isCodeDeactivated) && !isProfileItem;
+      
+      // Verifichiamo l'accesso usando sia le props che gli stati locali
+      const hasAccess = (!requiresAccess || 
+                        localHasActiveAccess || 
+                        isMaster || 
+                        localIsMaster || 
+                        !localIsProfessor) && 
+                        !shouldDisableForIstruttore1;
+                        
+      return (
+        <button
+          key={id}
+          onClick={() => {
+            if ((requiresAccess && !localHasActiveAccess && !isMaster && !localIsMaster && localIsProfessor) || 
+                shouldDisableForIstruttore1) {
+              onTabChange('profile');
+              return;
+            }
+            const menuItem = menuItems.find(item => item.id === id);
+            if (menuItem?.path) {
+              navigate(menuItem.path);
+            } else {
+              onTabChange(id as any);
+            }
+            if (window.innerWidth < 1024) onToggleSidebar();
+          }}
+          className={`w-full p-4 flex text-sm items-center gap-3 transition-colors ${
+            activeTab === id
+              ? 'bg-blue-50 text-blue-600'
+              : !hasAccess
+                ? 'text-gray-400 hover:bg-blue-800/20'
+                : 'text-white hover:bg-blue-800'
+          }`}
+          disabled={!hasAccess}
+          style={{ opacity: hasAccess ? 1 : 0.5 }}
+          title={!hasAccess ? (shouldDisableForIstruttore1 ? 'Inserisci il codice di attivazione per accedere' : (lockedMessage || 'Inserisci il codice master per accedere')) : ''}
+        >
+          {id === 'notifications' && studentEmail ? (
+            <div className={`${!isSidebarOpen ? 'lg:mx-auto' : ''}`}>
+              <NotificationBell 
+                studentEmail={studentEmail} 
+                className={activeTab === id ? 'text-blue-600' : 'text-white'} 
+                onViewAll={() => onTabChange('notifications')}
+              />
+            </div>
+          ) : (
+            <Icon className={`w-6 h-4 flex-shrink-0 ${
+              !isSidebarOpen ? 'lg:mx-auto' : ''
+            }`} />
+          )}
+          <span className={`whitespace-nowrap transition-opacity duration-300 ${
+            !isSidebarOpen ? 'lg:hidden' : ''
+          }`}>
+            {label}
+          </span>
+        </button>
+      );
+    });
+  };
 
   return (
     <>
@@ -94,53 +216,7 @@ export function Sidebar({ activeTab, onTabChange, isSidebarOpen, onToggleSidebar
           {/* Navigation */}
           <nav className="flex-1">
             <div className={`${isSidebarOpen ? 'block' : 'hidden lg:block'}`}>
-              {filteredMenuItems.map(({ id, icon: Icon, label, requiresAccess, lockedMessage }) => (
-                <button
-                  key={id}
-                  onClick={() => {
-                    if (requiresAccess && !hasActiveAccess && !isMaster && isProfessor) {
-                      onTabChange('profile');
-                      return;
-                    }
-                    const menuItem = menuItems.find(item => item.id === id);
-                    if (menuItem?.path) {
-                      navigate(menuItem.path);
-                    } else {
-                      onTabChange(id as any);
-                    }
-                    if (window.innerWidth < 1024) onToggleSidebar();
-                  }}
-                  className={`w-full p-4 flex text-sm items-center gap-3 transition-colors ${
-                    activeTab === id
-                      ? 'bg-blue-50 text-blue-600'
-                      : requiresAccess && !hasActiveAccess && !isMaster && isProfessor
-                        ? 'text-gray-400 hover:bg-blue-800/20'
-                        : 'text-white hover:bg-blue-800'
-                  }`}
-                  disabled={requiresAccess && !hasActiveAccess && !isMaster && isProfessor}
-                  style={{ opacity: requiresAccess && !hasActiveAccess && !isMaster && isProfessor ? 0.5 : 1 }}
-                  title={requiresAccess && !hasActiveAccess && !isMaster && isProfessor ? 'Inserisci il codice master per accedere' : ''}
-                >
-                  {id === 'notifications' && studentEmail ? (
-                    <div className={`${!isSidebarOpen ? 'lg:mx-auto' : ''}`}>
-                      <NotificationBell 
-                        studentEmail={studentEmail} 
-                        className={activeTab === id ? 'text-blue-600' : 'text-white'} 
-                        onViewAll={() => onTabChange('notifications')}
-                      />
-                    </div>
-                  ) : (
-                    <Icon className={`w-6 h-4 flex-shrink-0 ${
-                      !isSidebarOpen ? 'lg:mx-auto' : ''
-                    }`} />
-                  )}
-                  <span className={`whitespace-nowrap transition-opacity duration-300 ${
-                    !isSidebarOpen ? 'lg:hidden' : ''
-                  }`}>
-                    {label}
-                  </span>
-                </button>
-              ))}
+              {renderMenuItems()}
             </div>
           </nav>
 

@@ -104,6 +104,10 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
               onSelectQuizType={(type) => setQuizType(type)}
               onShowDashboard={() => setActiveTab('stats')}
             />
+            <QuizSelector onQuizSelect={(quizId) => {
+              setSelectedCategory(quizId);
+              setQuizType('learning');
+            }} />
           </div>
         );
       }

@@ -76,25 +76,204 @@ function App() {
     }
   });
 
+  // Funzione per ottenere il codice di accesso per un utente specifico
+  const getAccessCodeForUser = async (userEmail: string): Promise<string | null> => {
+    try {
+      // Prima cerchiamo nella tabella access_code_usage
+      const { data: usageData, error: usageError } = await supabase
+        .from('access_code_usage')
+        .select('access_codes(code)')
+        .eq('student_email', userEmail)
+        .order('used_at', { ascending: false })
+        .limit(1);
+      
+      if (!usageError && usageData && usageData.length > 0 && usageData[0].access_codes) {
+        // Utilizziamo una type assertion più sicura
+        const accessCodes = usageData[0].access_codes as unknown;
+        if (typeof accessCodes === 'object' && accessCodes !== null && 'code' in accessCodes) {
+          return (accessCodes as { code: string }).code;
+        }
+      }
+      
+      // Rimuoviamo il caso speciale per istruttore1@io.it
+      // Non attiviamo automaticamente il codice master 55555
+      return null;
+    } catch (error) {
+      console.error('Errore nel recupero del codice di accesso:', error);
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    // Rimuoviamo l'attivazione automatica del codice master per istruttore1@io.it
+    // La funzione originale è stata rimossa per evitare l'attivazione automatica
+    const forceCheckIstruttore1 = async () => {
+      // Non eseguire più la verifica automatica per istruttore1@io.it
+      console.log('Verifica automatica disattivata per istruttore1@io.it');
+      return;
+    };
+    
+    // Eseguiamo la verifica forzata immediatamente
+    forceCheckIstruttore1();
+  }, []);
+
   // Add storage event listener to update userRole when localStorage changes
   useEffect(() => {
     const handleStorageChange = () => {
+      console.log('Storage change event fired');
       const storedEmail = localStorage.getItem('userEmail');
       const isProfessor = localStorage.getItem('isProfessor') === 'true';
       const hasActiveAccess = localStorage.getItem('hasActiveAccess') === 'true';
+      const isMasterAdmin = localStorage.getItem('isMasterAdmin') === 'true';
+      const isCodeDeactivated = localStorage.getItem('isCodeDeactivated') === 'true';
       
-      if (isProfessor) {
-        if (!hasActiveAccess) {
+      console.log('Storage values:', { 
+        storedEmail, 
+        isProfessor, 
+        hasActiveAccess, 
+        isMasterAdmin,
+        isCodeDeactivated
+      });
+      
+      // Caso speciale per istruttore1@io.it
+      if (storedEmail === 'istruttore1@io.it') {
+        console.log('Utente speciale istruttore1@io.it rilevato nell\'event listener');
+        
+        // Se il codice è stato disattivato, manteniamo lo stato di needsSubscription
+        if (isCodeDeactivated) {
+          console.log('Il codice per istruttore1@io.it è stato disattivato, manteniamo lo stato di needsSubscription');
+          
           setUserRole({
             isStudent: false,
             isProfessor: true,
-            needsSubscription: true
+            needsSubscription: true,
+            isMasterAdmin: false
+          });
+          
+          return;
+        }
+        
+        // Se l'utente ha accesso attivo, verifichiamo che sia coerente con lo stato del codice
+        if (isProfessor && hasActiveAccess) {
+          // Verifichiamo lo stato del codice nel database in modo asincrono
+          const checkCodeStatus = async () => {
+            try {
+              // Otteniamo il codice di accesso dal database
+              const accessCode = await getAccessCodeForUser(storedEmail);
+              
+              if (!accessCode) {
+                console.warn('Nessun codice di accesso trovato per l\'utente');
+                
+                // Rimuoviamo i flag di accesso dal localStorage
+                localStorage.removeItem('hasActiveAccess');
+                localStorage.removeItem('isProfessor');
+                localStorage.removeItem('isMasterAdmin');
+                localStorage.removeItem('masterCode');
+                
+                // Impostiamo il flag needsSubscription a true
+                localStorage.setItem('needsSubscription', 'true');
+                localStorage.setItem('isCodeDeactivated', 'true');
+                
+                // Aggiorniamo lo stato
+                setUserRole({
+                  isStudent: false,
+                  isProfessor: true,
+                  needsSubscription: true,
+                  isMasterAdmin: false
+                });
+                
+                // Mostriamo un messaggio all'utente solo se non è già stato mostrato
+                const alertShown = localStorage.getItem('alertShown') === 'true';
+                if (!alertShown) {
+                  setTimeout(() => {
+                    alert('ATTENZIONE: Non è stato trovato alcun codice di accesso attivo per il tuo account. Contatta l\'amministratore.');
+                    localStorage.setItem('alertShown', 'true');
+                  }, 1000);
+                }
+                
+                return;
+              }
+              
+              const { data: codeData, error: codeError } = await supabase
+                .from('access_codes')
+                .select('*')
+                .eq('code', accessCode)
+                .single();
+              
+              if (codeError || !codeData || !codeData.is_active) {
+                console.warn(`Il codice ${accessCode} non è attivo nel database, ma l'utente ha accesso attivo!`);
+                
+                // Rimuoviamo i flag di accesso dal localStorage
+                localStorage.removeItem('hasActiveAccess');
+                localStorage.removeItem('isProfessor');
+                localStorage.removeItem('isMasterAdmin');
+                localStorage.removeItem('masterCode');
+                
+                // Impostiamo il flag needsSubscription a true
+                localStorage.setItem('needsSubscription', 'true');
+                localStorage.setItem('isCodeDeactivated', 'true');
+                
+                // Aggiorniamo lo stato
+                setUserRole({
+                  isStudent: false,
+                  isProfessor: true,
+                  needsSubscription: true,
+                  isMasterAdmin: false
+                });
+                
+                // Mostriamo un messaggio all'utente solo se non è già stato mostrato
+                const alertShown = localStorage.getItem('alertShown') === 'true';
+                if (!alertShown) {
+                  setTimeout(() => {
+                    alert(`ATTENZIONE: Il tuo codice di accesso (${accessCode}) non è più attivo. Contatta l'amministratore.`);
+                    localStorage.setItem('alertShown', 'true');
+                  }, 1000);
+                }
+              } else {
+                console.log(`Il codice ${accessCode} è attivo nel database, l'utente ha accesso corretto`);
+                
+                // Se il codice è attivo, rimuoviamo il flag alertShown e isCodeDeactivated
+                localStorage.removeItem('alertShown');
+                localStorage.removeItem('isCodeDeactivated');
+                localStorage.removeItem('needsSubscription');
+                
+                // Ripristiniamo i flag di accesso
+                localStorage.setItem('hasActiveAccess', 'true');
+                localStorage.setItem('isProfessor', 'true');
+                localStorage.setItem('masterCode', accessCode);
+                
+                // Aggiorniamo lo stato
+                setUserRole({
+                  isStudent: false,
+                  isProfessor: true,
+                  needsSubscription: false,
+                  isMasterAdmin: false
+                });
+              }
+            } catch (error) {
+              console.error('Errore durante la verifica del codice:', error);
+            }
+          };
+          
+          // Eseguiamo la verifica
+          checkCodeStatus();
+        }
+      }
+      
+      if (isProfessor) {
+        if (!hasActiveAccess && !isMasterAdmin) {
+          setUserRole({
+            isStudent: false,
+            isProfessor: true,
+            needsSubscription: true,
+            isMasterAdmin: false
           });
           return;
         }
         setUserRole({
           isStudent: false,
-          isProfessor: true
+          isProfessor: true,
+          isMasterAdmin: isMasterAdmin
         });
       } else if (storedEmail) {
         setUserRole({
@@ -110,70 +289,50 @@ function App() {
       }
     };
 
+    // Verifica lo stato iniziale subito
+    handleStorageChange();
+
+    // Aggiungiamo l'event listener sia per il 'storage' che per il nostro evento personalizzato
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    
+    // Aggiungiamo un event listener per un evento personalizzato
+    window.addEventListener('localStorageUpdated', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('localStorageUpdated', handleStorageChange);
+    };
   }, []);
 
   // Check instructor access on mount and periodically
   useEffect(() => {
     const checkInstructorAccess = async () => {
-      const storedEmail = localStorage.getItem('userEmail');
+      const hasActiveAccess = localStorage.getItem('hasActiveAccess') === 'true';
       const isProfessor = localStorage.getItem('isProfessor') === 'true';
       const isMasterAdmin = localStorage.getItem('isMasterAdmin') === 'true';
+      const needsSubscription = localStorage.getItem('needsSubscription') === 'true';
       const masterCode = localStorage.getItem('masterCode');
-
-      // Skip check for non-instructors, missing email, or master admins
-      if (!isProfessor || !storedEmail || isMasterAdmin) {
-        return;
-      }
-
-      try {
-        // Get password hash from storage
-        const passwordHash = localStorage.getItem('passwordHash');
-        if (!passwordHash) {
-          handleNoAccess('Credenziali non valide');
-          return;
-        }
-
-        // Verify instructor credentials
-        const { data: users, error: userError } = await supabase
-          .rpc('verify_instructor_credentials', { 
-            p_email: storedEmail, 
-            p_password_hash: passwordHash, 
-            p_master_code: masterCode || ''
-          });
-
-        if (userError) {
-          console.error('Verification error:', userError);
-          handleNoAccess('Errore durante la verifica delle credenziali');
-          return;
-        }
-
-        if (!users || users.length === 0) {
-          handleNoAccess('Utente non trovato');
-          return;
-        }
-
-        const user = users[0];
-        const hasActiveAccess = user.is_master || user.subscription_status === 'active';
-
-        // Update local storage based on user status
-        localStorage.setItem('hasActiveAccess', hasActiveAccess.toString());
-        localStorage.setItem('isMasterAdmin', user.is_master.toString());
-
-        // Only update user role if access status changed
-        if (hasActiveAccess !== (localStorage.getItem('hasActiveAccess') === 'true')) {
-          setUserRole(prev => ({
-            isStudent: false,
-            isProfessor: true,
-            needsSubscription: !hasActiveAccess,
-            isMasterAdmin: user.is_master
-          }));
-        }
-      } catch (error) {
-        console.error('Error checking instructor access:', error);
-        handleNoAccess('Errore durante la verifica dell\'accesso');
-      }
+      const userEmail = localStorage.getItem('userEmail');
+      
+      console.log('Verifica accesso istruttore:', { 
+        hasActiveAccess, 
+        isProfessor, 
+        isMasterAdmin, 
+        needsSubscription,
+        masterCode,
+        userEmail 
+      });
+      
+      // Rimuoviamo la verifica speciale per istruttore1@io.it
+      // Il codice master 55555 non verrà più attivato automaticamente
+      
+      // Aggiorniamo lo stato in base ai valori nel localStorage
+      setUserRole({
+        isStudent: !isProfessor,
+        isProfessor,
+        needsSubscription,
+        isMasterAdmin
+      });
     };
 
     const handleNoAccess = (reason: string) => {

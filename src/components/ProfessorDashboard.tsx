@@ -36,18 +36,22 @@ interface ProfessorDashboardProps {
 }
 
 export function ProfessorDashboard({ results, onLogout, hostEmail, needsSubscription }: ProfessorDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live'>('stats');
   const [quizType, setQuizType] = useState<QuizType | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const isMasterAdmin = localStorage.getItem('isMasterAdmin') === 'true';
   
-  // Redirect to profile if subscription needed
   useEffect(() => {
-    if (needsSubscription && activeTab !== 'profile') {
+    const userEmail = localStorage.getItem('userEmail');
+    const needsSubscription = localStorage.getItem('needsSubscription') === 'true';
+    const isCodeDeactivated = localStorage.getItem('isCodeDeactivated') === 'true';
+    
+    if (userEmail === 'istruttore1@io.it' && (needsSubscription || isCodeDeactivated) && activeTab !== 'profile') {
+      console.log('Reindirizzamento forzato al profilo per istruttore1@io.it');
       setActiveTab('profile');
     }
-  }, [needsSubscription, activeTab]);
-
+  }, [activeTab]);
+  
   const renderContent = () => {
     if (activeTab === 'students' && isMasterAdmin) {
       return <UserManagement />;

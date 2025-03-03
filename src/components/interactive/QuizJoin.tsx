@@ -402,7 +402,7 @@ export function QuizJoin() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background transition-colors">
+    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)]">
       {/* Connection Status */}
       <div className={`fixed top-4 right-4 p-2 rounded-lg border transition-colors ${
         isConnected 
@@ -426,7 +426,7 @@ export function QuizJoin() {
         )}
       </div>
 
-      {/* Main Content */}
+      {/* Main Content Container */}
       <div className="w-full max-w-md mx-auto">
         {!userEmail ? (
           <div className="bg-card text-card-foreground rounded-xl shadow-lg border border-border p-8 w-full text-center transition-colors">
@@ -451,10 +451,10 @@ export function QuizJoin() {
                 alt="OceanMed Logo"
                 className="h-16 md:h-20 w-auto mx-auto mb-4"
               />
-              <h1 className="text-2xl md:text-3xl font-bold mb-2 text-foreground">
+              <h1 className="text-2xl md:text-3xl font-bold mb-2 font-poppins text-white dark:text-foreground">
                 {step === 'pin' ? 'Partecipa al Quiz' : 'Un ultimo passo!'}
               </h1>
-              <p className="text-muted-foreground md:text-lg">
+              <p className="md:text-lg text-white dark:text-muted-foreground">
                 {step === 'pin' 
                   ? 'Inserisci il PIN a 6 cifre fornito dal tuo istruttore'
                   : 'Scegli un nickname per iniziare il quiz'
@@ -462,7 +462,7 @@ export function QuizJoin() {
               </p>
             </div>
 
-            <div className="bg-card text-card-foreground rounded-xl shadow-lg border border-border p-6 md:p-8 transition-colors">
+            <div className="bg-card text-card-foreground rounded-xl shadow-lg border border-border p-6 md:p-8 transition-colors w-full">
               <AnimatePresence mode="wait">
                 {error && (
                   <motion.div
@@ -686,10 +686,10 @@ export function QuizJoin() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="mt-6 p-4 border border-border rounded-lg bg-muted/30"
+              className="mt-6 p-4 border border-gray-300 dark:border-border rounded-lg bg-white/80 dark:bg-muted/30 shadow-sm"
             >
-              <h2 className="font-medium mb-2 text-foreground text-sm">Come partecipare al quiz</h2>
-              <ol className="text-sm text-muted-foreground space-y-1.5 list-decimal list-inside">
+              <h2 className="font-medium mb-2 text-gray-800 dark:text-foreground text-sm">Come partecipare al quiz</h2>
+              <ol className="text-sm text-gray-700 dark:text-muted-foreground space-y-1.5 list-decimal list-inside">
                 <li>{step === 'pin' ? <strong className="text-primary">Inserisci il PIN</strong> : 'Inserisci il PIN'} fornito dall'istruttore</li>
                 <li>{step === 'nickname' ? <strong className="text-primary">Scegli un nickname</strong> : 'Scegli un nickname'} per identificarti nella sessione</li>
                 <li>Attendi che l'istruttore avvii il quiz oppure inizia subito se già attivo</li>

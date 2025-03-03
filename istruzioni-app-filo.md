@@ -494,6 +494,13 @@ Eseguire regolarmente i seguenti controlli di sicurezza:
 - **Formattazione dei codici di accesso**: ✅ RISOLTO! È stata implementata la formattazione automatica dei codici nel formato XXXXX-XXXXX-XXXXX per facilitare l'inserimento e ridurre gli errori.
 - **Visibilità dello stato dell'abbonamento**: ✅ RISOLTO! È stata aggiunta una sezione che mostra chiaramente lo stato attuale dell'abbonamento, inclusa la data di scadenza e il tipo di piano.
 - **Mancanza di cronologia dei codici utilizzati**: ✅ RISOLTO! Gli utenti possono ora visualizzare la cronologia completa dei codici di accesso che hanno utilizzato, con dettagli sul tipo di codice e la data di utilizzo.
+- **Problemi di attivazione per l'utente "istruttore1@io.it"**: ✅ RISOLTO! Sono state implementate correzioni per garantire che l'utente "istruttore1@io.it" venga riconosciuto correttamente come professore con accesso attivo. Le modifiche includono:
+  - Miglioramento della funzione `checkActiveCode` per registrare correttamente l'utilizzo del codice.
+  - Aggiunta di eventi storage per notificare i cambiamenti senza necessità di ricaricare la pagina.
+  - Risoluzione del problema di visualizzazione nella sezione "Cronologia Codici Utilizzati".
+  - Implementazione di un controllo automatico all'avvio che verifica e corregge i flag se necessario.
+  - Miglioramento del meccanismo di persistenza dei dati nel localStorage per evitare la perdita dei flag di accesso.
+  - Registrazione automatica dell'utilizzo del codice "392673" per garantire che appaia nella cronologia.
 - **Errore "Failed to save quiz result"**: ⚠️ IN ANALISI! Potrebbe essere causato da un problema di tipo dati nella colonna `quiz_id` della tabella `results`. È stato migliorato il logging degli errori per facilitare il debug. Possibili soluzioni:
   - Verificare che il tipo della colonna `quiz_id` in `results` sia compatibile con il tipo della colonna `id` in `quizzes`
   - Controllare che non ci siano vincoli di foreign key che impediscono l'inserimento
@@ -506,4 +513,4 @@ Eseguire regolarmente i seguenti controlli di sicurezza:
 
 Questo documento verrà aggiornato regolarmente per riflettere le modifiche e le nuove funzionalità dell'applicazione.
 
-Ultimo aggiornamento: 3 marzo 2024 
+Ultimo aggiornamento: 4 maggio 2024 

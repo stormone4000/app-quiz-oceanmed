@@ -52,12 +52,12 @@ export function QuizLiveLayout() {
       )}
 
       <div className="flex-1">
-        {/* Header */}
-        <header className={`bg-white shadow-md ${isQuizRoute ? 'hidden' : ''}`}>
+        {/* Header - nascosto nella pagina di join e nelle sessioni di quiz attive */}
+        <header className={`bg-white shadow-md ${isQuizRoute || isJoinRoute ? 'hidden' : ''}`}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center gap-4">
-                {!isRoot && !isJoinRoute && (
+                {!isRoot && (
                   <Link
                     to="/quiz-live"
                     className="text-gray-600 hover:text-gray-900 dark:text-slate-400 dark:hover:text-slate-300 flex items-center gap-2"
@@ -74,7 +74,7 @@ export function QuizLiveLayout() {
                 )}
               </div>
               <div className="flex items-center gap-4">
-                {isProfessor && !isJoinRoute && (
+                {isProfessor && (
                   <Link
                     to="/dashboard"
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
@@ -89,7 +89,7 @@ export function QuizLiveLayout() {
         </header>
 
         {/* Main content */}
-        <main className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${isSidebarOpen ? 'lg:ml-64' : 'lg:ml-20'} transition-all duration-300`}>
+        <main className={`max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${isSidebarOpen ? 'lg:ml-64' : 'lg:ml-20'} transition-all duration-300`}>
           <Outlet />
         </main>
       </div>
