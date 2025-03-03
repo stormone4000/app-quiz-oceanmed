@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart, Book, GraduationCap, Menu, X, ChevronLeft, ChevronRight, LogOut, Key, UserCircle, Video, Target, Bell, CreditCard, Users } from 'lucide-react';
+import { BarChart, Book, GraduationCap, Menu, X, ChevronLeft, ChevronRight, LogOut, Key, UserCircle, Video, Target, Bell, CreditCard, Users, Home, PlusCircle, LayoutDashboard } from 'lucide-react';
 import { NotificationBell } from '../notifications/NotificationBell';
 
 interface SidebarProps {
-  activeTab: 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live';
-  onTabChange: (tab: 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live') => void;
+  activeTab: 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live' | 'dashboard' | 'gestione-quiz' | 'gestione-alunni';
+  onTabChange: (tab: 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live' | 'dashboard' | 'gestione-quiz' | 'gestione-alunni') => void;
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
   onLogout: () => void;
@@ -73,18 +73,47 @@ export function Sidebar({ activeTab, onTabChange, isSidebarOpen, onToggleSidebar
     isCodeDeactivated
   });
 
-  const menuItems = [
-    { id: 'stats', icon: BarChart, label: 'Statistiche', showFor: 'all', path: null, requiresAccess: localIsProfessor },
-    { id: 'quizzes', icon: Book, label: 'Tutti i Quiz', showFor: 'master', path: null },
-    { id: 'quiz-live', icon: Target, label: 'Quiz Live', showFor: 'all', path: '/quiz-live', requiresAccess: localIsProfessor },
-    { id: 'quiz-studenti', icon: Target, label: 'Quiz Studenti', showFor: 'all', path: null, requiresAccess: localIsProfessor },
-    { id: 'videos', icon: Video, label: 'Video Lezioni', showFor: 'all', path: null, requiresAccess: localIsProfessor },
-    { id: 'students', icon: Users, label: localIsMaster ? 'Gestione Utenti' : 'Gestione Studenti', showFor: 'master', path: null, requiresAccess: true, lockedMessage: 'Inserisci il codice master per gestire gli studenti' },
-    { id: 'access-codes', icon: Key, label: 'Codici di Accesso', showFor: 'master', path: null, requiresAccess: true, lockedMessage: 'Inserisci il codice master per gestire i codici di accesso' },
-    { id: 'subscriptions', icon: CreditCard, label: 'Abbonamenti', showFor: 'master', path: null, requiresAccess: true, lockedMessage: 'Inserisci il codice master per gestire gli abbonamenti' },
-    { id: 'notifications', icon: Bell, label: 'Notifiche', showFor: 'all', path: null, requiresAccess: localIsProfessor },
+  // Voci di menu per l'amministratore
+  const adminMenuItems = [
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', showFor: 'all', path: null },
+    { id: 'quizzes', icon: Book, label: 'Tutti i Quiz', showFor: 'all', path: null },
+    { id: 'quiz-live', icon: Target, label: 'Quiz Live', showFor: 'all', path: '/quiz-live', requiresAccess: true },
+    { id: 'students', icon: Users, label: 'Gestione Utenti', showFor: 'all', path: null, requiresAccess: true },
+    { id: 'access-codes', icon: Key, label: 'Codici di Accesso', showFor: 'all', path: null, requiresAccess: true },
+    { id: 'subscriptions', icon: CreditCard, label: 'Abbonamenti', showFor: 'all', path: null, requiresAccess: true },
+    { id: 'notifications', icon: Bell, label: 'Notifiche', showFor: 'all', path: null, requiresAccess: true },
     { id: 'profile', icon: UserCircle, label: 'Profilo', showFor: 'all', path: null }
   ];
+
+  // Voci di menu per l'istruttore
+  const instructorMenuItems = [
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', showFor: 'all', path: null, requiresAccess: true },
+    { id: 'quizzes', icon: Book, label: 'Tutti i Quiz', showFor: 'all', path: null, requiresAccess: true },
+    { id: 'gestione-quiz', icon: PlusCircle, label: 'Gestione Quiz', showFor: 'all', path: null, requiresAccess: true },
+    { id: 'quiz-live', icon: Target, label: 'Quiz Interattivi', showFor: 'all', path: '/quiz-live', requiresAccess: true },
+    { id: 'gestione-alunni', icon: Users, label: 'Gestione Alunni', showFor: 'all', path: null, requiresAccess: true },
+    { id: 'stats', icon: BarChart, label: 'Statistiche', showFor: 'all', path: null, requiresAccess: true },
+    { id: 'notifications', icon: Bell, label: 'Notifiche', showFor: 'all', path: null, requiresAccess: true },
+    { id: 'profile', icon: UserCircle, label: 'Profilo', showFor: 'all', path: null }
+  ];
+
+  // Voci di menu per lo studente
+  const studentMenuItems = [
+    { id: 'dashboard', icon: Home, label: 'Home', showFor: 'all', path: null },
+    { id: 'quiz-studenti', icon: Target, label: 'Quiz', showFor: 'all', path: null },
+    { id: 'videos', icon: Video, label: 'Video Lezioni', showFor: 'all', path: null },
+    { id: 'notifications', icon: Bell, label: 'Notifiche', showFor: 'all', path: null },
+    { id: 'profile', icon: UserCircle, label: 'Profilo', showFor: 'all', path: null }
+  ];
+
+  // Seleziona il menu appropriato in base al ruolo dell'utente
+  let menuItems = studentMenuItems;
+  
+  if (localIsMaster) {
+    menuItems = adminMenuItems;
+  } else if (localIsProfessor) {
+    menuItems = instructorMenuItems;
+  }
 
   // Filter menu items based on user role
   const filteredMenuItems = menuItems.filter(item => 

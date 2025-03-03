@@ -17,7 +17,7 @@ import { QuizSelector } from './student/QuizSelector';
 import type { QuizType, QuizResult } from '../types';
 
 // Definisco il tipo per i tab
-type DashboardTab = 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live';
+type DashboardTab = 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live' | 'dashboard' | 'gestione-quiz' | 'gestione-alunni';
 
 interface Props {
   results: QuizResult[];
