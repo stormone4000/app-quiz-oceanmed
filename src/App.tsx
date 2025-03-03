@@ -16,6 +16,7 @@ import { getQuizResults } from './services/api';
 import type { UserRole, QuizResult } from './types';
 import { supabase } from './services/supabase';
 import { ThemeProvider } from './components/theme-provider';
+import { LoginDemo } from './components/auth/LoginDemo';
 
 function App() {
   const [userRole, setUserRole] = useState<UserRole>(() => {
@@ -131,19 +132,56 @@ function App() {
   useEffect(() => {
     const handleStorageChange = () => {
       console.log('Storage change event fired');
+      const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
       const storedEmail = localStorage.getItem('userEmail');
       const isProfessor = localStorage.getItem('isProfessor') === 'true';
       const hasActiveAccess = localStorage.getItem('hasActiveAccess') === 'true';
       const isMasterAdmin = localStorage.getItem('isMasterAdmin') === 'true';
       const isCodeDeactivated = localStorage.getItem('isCodeDeactivated') === 'true';
+      const firstName = localStorage.getItem('firstName') || '';
+      const lastName = localStorage.getItem('lastName') || '';
       
       console.log('Storage values:', { 
+        isAuthenticated,
         storedEmail, 
         isProfessor, 
         hasActiveAccess, 
         isMasterAdmin,
-        isCodeDeactivated
+        isCodeDeactivated,
+        firstName,
+        lastName
       });
+      
+      // Se non è autenticato, resetta lo stato dell'utente
+      if (!isAuthenticated) {
+        setUserRole({
+          isStudent: false,
+          isProfessor: false
+        });
+        return;
+      }
+      
+      // Se è autenticato, aggiorna lo stato userRole in base ai valori nel localStorage
+      if (isProfessor) {
+        setUserRole({
+          isStudent: false,
+          isProfessor: true,
+          firstName,
+          lastName,
+          email: storedEmail || '',
+          hasActiveAccess,
+          isMasterAdmin,
+          needsSubscription: !hasActiveAccess && !isMasterAdmin
+        });
+      } else if (storedEmail) {
+        setUserRole({
+          isStudent: true,
+          isProfessor: false,
+          firstName,
+          lastName,
+          email: storedEmail
+        });
+      }
       
       // Caso speciale per istruttore1@io.it
       if (storedEmail === 'istruttore1@io.it') {
@@ -402,6 +440,8 @@ function App() {
       localStorage.removeItem('masterCode');
       localStorage.removeItem('firstName');
       localStorage.removeItem('lastName');
+      localStorage.removeItem('nickname');
+      localStorage.removeItem('quizId');
       
       // Poi pulisco tutto il resto
       localStorage.clear(); 
@@ -414,10 +454,15 @@ function App() {
       });
       setResults([]); // Clear results on logout
       
-      // Forzo un hard refresh per garantire che tutto venga resettato
+      // Triggera un evento storage per forzare la sincronizzazione
+      window.dispatchEvent(new Event('storage'));
+      
+      // Reindirizzo alla home page
       window.location.replace('/');
     } catch (error) {
       console.error('Error during logout:', error);
+      // In caso di errore, forza un hard refresh
+      window.location.href = '/';
     }
   };
 
@@ -444,102 +489,179 @@ function App() {
     }
   }, []);
 
+  useEffect(() => {
+    // Funzione per sincronizzare userRole con localStorage
+    const syncUserRoleWithLocalStorage = () => {
+      const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+      const storedEmail = localStorage.getItem('userEmail');
+      const isProfessor = localStorage.getItem('isProfessor') === 'true';
+      const hasActiveAccess = localStorage.getItem('hasActiveAccess') === 'true';
+      const isMasterAdmin = localStorage.getItem('isMasterAdmin') === 'true';
+      const firstName = localStorage.getItem('firstName') || '';
+      const lastName = localStorage.getItem('lastName') || '';
+      
+      console.log('[App] Sincronizzazione userRole con localStorage:', { 
+        isAuthenticated,
+        storedEmail, 
+        isProfessor, 
+        hasActiveAccess, 
+        isMasterAdmin,
+        firstName,
+        lastName
+      });
+      
+      if (!isAuthenticated) {
+        setUserRole({
+          isStudent: false,
+          isProfessor: false
+        });
+        return;
+      }
+      
+      if (isProfessor) {
+        setUserRole({
+          isStudent: false,
+          isProfessor: true,
+          firstName,
+          lastName,
+          email: storedEmail || '',
+          hasActiveAccess,
+          isMasterAdmin,
+          needsSubscription: !hasActiveAccess && !isMasterAdmin
+        });
+      } else if (storedEmail) {
+        setUserRole({
+          isStudent: true,
+          isProfessor: false,
+          firstName,
+          lastName,
+          email: storedEmail
+        });
+      }
+    };
+    
+    // Sincronizza lo stato subito all'avvio dell'app
+    syncUserRoleWithLocalStorage();
+    
+    // Aggiungi event listener per gli eventi di storage
+    const handleStorageEvent = () => {
+      console.log('[App] Storage event detected');
+      syncUserRoleWithLocalStorage();
+    };
+    
+    window.addEventListener('storage', handleStorageEvent);
+    
+    // Imposta un timer per verificare periodicamente lo stato di autenticazione
+    const intervalId = setInterval(syncUserRoleWithLocalStorage, 30000);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('storage', handleStorageEvent);
+      clearInterval(intervalId);
+    };
+  }, []);
+
   return (
     <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
       <Router>
-        <Routes>
-          {/* Landing page route */}
-          <Route 
-            path="/" 
-            element={<LandingPage />}
-            handle={{ title: 'Home' }}
-          />
+        <div className="min-h-screen bg-white dark:bg-slate-950">
+          <Routes>
+            {/* Landing page route */}
+            <Route 
+              path="/" 
+              element={<LandingPage />}
+              handle={{ title: 'Home' }}
+            />
 
-          {/* Auth routes */}
-          <Route 
-            path="/login" 
-            element={
-              !userRole.isStudent && !userRole.isProfessor ? (
-                <AuthScreen onRoleSelect={setUserRole} mode="student" />
-              ) : (
-                <Navigate to="/dashboard" replace />
-              )
-            } 
-          />
+            {/* Login Demo route */}
+            <Route path="/login-demo" element={<LoginDemo />} />
 
-          <Route 
-            path="/instructor" 
-            element={
-              !userRole.isStudent && !userRole.isProfessor ? (
-                <AuthScreen onRoleSelect={setUserRole} mode="instructor" />
-              ) : (
-                <Navigate to="/dashboard" replace />
-              )
-            } 
-          />
-          
-          <Route 
-            path="/register" 
-            element={
-              !userRole.isStudent && !userRole.isProfessor ? (
-                <RegistrationPage />
-              ) : (
-                <Navigate to="/dashboard" replace />
-              )
-            } 
-          />
-          
-          {/* Quiz Live routes */}
-          <Route path="/quiz-live" element={<QuizLiveLayout />}>
-            <Route index element={
-              userRole.isProfessor 
-                ? <QuizLive hostEmail={userRole.email || ''} />
-                : <Navigate to="/quiz-live/join" replace />
-            } />
-            <Route path="join" element={<QuizJoin />} />
-            <Route path="join/:pin" element={<QuizJoin />} />
-            <Route path="waiting/:id" element={
-              localStorage.getItem('nickname') || userRole.isProfessor 
-                ? <QuizWaiting />
-                : <Navigate to="/quiz-live/join" replace />
-            } />
-            <Route path="play/:id" element={
-              (localStorage.getItem('nickname') && localStorage.getItem('quizId')) || userRole.isProfessor
-                ? <QuizPlay />
-                : <Navigate to="/quiz-live/join" replace />
-            } />
-            <Route path="leaderboard/:id" element={<QuizLeaderboard />} />
-          </Route>
+            {/* Auth routes */}
+            <Route 
+              path="/login" 
+              element={
+                !userRole.isStudent && !userRole.isProfessor ? (
+                  <AuthScreen onRoleSelect={setUserRole} mode="student" />
+                ) : (
+                  <Navigate to="/dashboard" replace />
+                )
+              } 
+            />
 
-          {/* Protected dashboard route */}
-          <Route 
-            path="/dashboard" 
-            element={
-              localStorage.getItem('isAuthenticated') === 'true' ? (
-                userRole.isStudent ? (
-                  <StudentDashboard 
-                    results={results.filter(r => r.email === userRole.email)}
-                    studentEmail={userRole.email || ''}
-                    onLogout={handleLogout}
-                  />
-                ) : userRole.isProfessor ? (
-                  <ProfessorDashboard 
-                    results={results} 
-                    onLogout={handleLogout} 
-                    needsSubscription={userRole.needsSubscription}
-                    hostEmail={userRole.email}
-                  />
+            <Route 
+              path="/instructor" 
+              element={
+                !userRole.isStudent && !userRole.isProfessor ? (
+                  <AuthScreen onRoleSelect={setUserRole} mode="instructor" />
+                ) : (
+                  <Navigate to="/dashboard" replace />
+                )
+              } 
+            />
+            
+            <Route 
+              path="/register" 
+              element={
+                !userRole.isStudent && !userRole.isProfessor ? (
+                  <RegistrationPage />
+                ) : (
+                  <Navigate to="/dashboard" replace />
+                )
+              } 
+            />
+            
+            {/* Quiz Live routes */}
+            <Route path="/quiz-live" element={<QuizLiveLayout />}>
+              <Route index element={
+                userRole.isProfessor 
+                  ? <QuizLive hostEmail={userRole.email || ''} />
+                  : <Navigate to="/quiz-live/join" replace />
+              } />
+              <Route path="join" element={<QuizJoin />} />
+              <Route path="join/:pin" element={<QuizJoin />} />
+              <Route path="waiting/:id" element={
+                localStorage.getItem('nickname') || userRole.isProfessor 
+                  ? <QuizWaiting />
+                  : <Navigate to="/quiz-live/join" replace />
+              } />
+              <Route path="play/:id" element={
+                (localStorage.getItem('nickname') && localStorage.getItem('quizId')) || userRole.isProfessor
+                  ? <QuizPlay />
+                  : <Navigate to="/quiz-live/join" replace />
+              } />
+              <Route path="leaderboard/:id" element={<QuizLeaderboard />} />
+            </Route>
+
+            {/* Protected dashboard route */}
+            <Route 
+              path="/dashboard" 
+              element={
+                localStorage.getItem('isAuthenticated') === 'true' ? (
+                  localStorage.getItem('isProfessor') === 'true' ? (
+                    <ProfessorDashboard 
+                      results={results} 
+                      onLogout={handleLogout} 
+                      needsSubscription={localStorage.getItem('hasActiveAccess') !== 'true' && localStorage.getItem('isMasterAdmin') !== 'true'}
+                      hostEmail={localStorage.getItem('userEmail') || ''}
+                    />
+                  ) : localStorage.getItem('userEmail') ? (
+                    <StudentDashboard 
+                      results={results.filter(r => r.email === localStorage.getItem('userEmail'))}
+                      studentEmail={localStorage.getItem('userEmail') || ''}
+                      onLogout={handleLogout}
+                    />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
                 ) : (
                   <Navigate to="/login" replace />
                 )
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
-          
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+              }
+            />
+            
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
       </Router>
     </ThemeProvider>
   );

@@ -155,6 +155,10 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
           });
 
           navigate('/dashboard', { replace: true });
+          
+          // Triggera un evento storage per forzare la sincronizzazione dei dati
+          window.dispatchEvent(new Event('storage'));
+          
           return;
         }
 
@@ -200,9 +204,13 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
         // Redirect based on access status
         if (hasAccess) {
           navigate('/dashboard', { replace: true });
+          
+          // Triggera un evento storage per forzare la sincronizzazione dei dati
+          window.dispatchEvent(new Event('storage'));
         } else {
           navigate('/pricing', { replace: true });
         }
+        
         return;
       }
 
@@ -243,6 +251,9 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
         lastName: user.last_name || '',
         email: user.email
       });
+
+      // Triggera un evento storage per forzare la sincronizzazione dei dati
+      window.dispatchEvent(new Event('storage'));
 
       // Navigate to dashboard
       navigate('/dashboard', { replace: true });
