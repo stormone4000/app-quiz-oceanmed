@@ -4,6 +4,19 @@
 
 L'App Quiz è una piattaforma educativa completa progettata per la formazione nel settore della navigazione. Consente la creazione, gestione e somministrazione di diversi tipi di quiz e moduli di apprendimento attraverso un'interfaccia intuitiva e moderna.
 
+## Strumenti di Sviluppo e Deployment
+
+L'applicazione utilizza i seguenti strumenti per lo sviluppo e il deployment:
+
+- **GitHub**: Repository del codice sorgente
+  - URL: https://github.com/stormone4000/globalquiz.git
+
+- **Vercel**: Piattaforma di hosting e deployment
+  - URL Produzione: https://globalquiz-beta.vercel.app/
+
+- **Supabase**: Database, autenticazione e storage
+  - Dashboard: https://supabase.com/dashboard/project/uqutbomzymeklyowfewp/editor
+
 ## Ruoli Utente
 
 ### Amministratore Master
