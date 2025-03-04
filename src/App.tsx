@@ -118,29 +118,6 @@ function App() {
       }));
       return;
     }
-    
-    // Caso speciale per istruttore1@io.it
-    if (email === 'istruttore1@io.it' && isAuthenticated) {
-      // Assicuriamoci di avere tutti i flag necessari
-      localStorage.setItem('hasActiveAccess', 'true');
-      localStorage.setItem('hasInstructorAccess', 'true');
-      localStorage.setItem('isMasterAdmin', 'true');
-      localStorage.setItem('needsSubscription', 'false');
-      localStorage.setItem('isProfessor', 'true');
-      
-      dispatch(login({
-        isStudent: false,
-        isProfessor: true,
-        firstName: localStorage.getItem('firstName') || '',
-        lastName: localStorage.getItem('lastName') || '',
-        email: email,
-        hasActiveAccess: true,
-        hasInstructorAccess: true,
-        isMasterAdmin: true,
-        needsSubscription: false
-      }));
-      return;
-    }
 
     if (isAuthenticated) {
       // Per gli istruttori, hasActiveAccess e hasInstructorAccess dovrebbero essere sincronizzati
@@ -173,29 +150,6 @@ function App() {
 
       // Caso speciale per marcosrenatobruno@gmail.com (ADMIN)
       if (email === 'marcosrenatobruno@gmail.com' && isAuthenticated) {
-        // Assicuriamoci di avere tutti i flag necessari
-        localStorage.setItem('hasActiveAccess', 'true');
-        localStorage.setItem('hasInstructorAccess', 'true');
-        localStorage.setItem('isMasterAdmin', 'true');
-        localStorage.setItem('needsSubscription', 'false');
-        localStorage.setItem('isProfessor', 'true');
-        
-        dispatch(login({
-          isStudent: false,
-          isProfessor: true,
-          firstName: localStorage.getItem('firstName') || '',
-          lastName: localStorage.getItem('lastName') || '',
-          email: email,
-          hasActiveAccess: true,
-          hasInstructorAccess: true,
-          isMasterAdmin: true,
-          needsSubscription: false
-        }));
-        return;
-      }
-
-      // Caso speciale per istruttore1@io.it
-      if (email === 'istruttore1@io.it' && isAuthenticated) {
         // Assicuriamoci di avere tutti i flag necessari
         localStorage.setItem('hasActiveAccess', 'true');
         localStorage.setItem('hasInstructorAccess', 'true');
