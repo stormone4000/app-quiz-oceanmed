@@ -17,6 +17,23 @@ interface Student {
   account_status: 'active' | 'suspended';
 }
 
+// Interfaccia per i dati restituiti dalla query student_instructor
+interface StudentInstructorRow {
+  student_email: string;
+  student: {
+    id: string;
+    email: string;
+    first_name: string | null;
+    last_name: string | null;
+    last_login: string | null;
+    subscriptions: {
+      plan_id: string;
+      status: string;
+    }[];
+    account_status: string;
+  } | null;
+}
+
 export function StudentManagement() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,64 +64,79 @@ export function StudentManagement() {
       
       console.log('Caricamento studenti per l\'istruttore:', instructorEmail);
       
-      // Ottieni l'ID dell'utente dalla sua email
-      const { data: userData, error: userError } = await supabase
-        .from('auth_users')
-        .select('id')
-        .eq('email', instructorEmail)
-        .single();
+      // Primo metodo: carica gli studenti dalla tabella student_instructor
+      const { data: studentData, error: studentError } = await supabase
+        .from('student_instructor')
+        .select(`
+          student_email,
+          student:student_email (
+            id,
+            email,
+            first_name,
+            last_name,
+            last_login,
+            subscriptions (
+              plan_id,
+              status
+            ),
+            account_status
+          )
+        `)
+        .eq('instructor_email', instructorEmail);
         
-      if (userError || !userData) {
-        console.error('Errore nel recupero dell\'ID utente:', userError);
-        throw new Error('Impossibile recuperare l\'ID dell\'utente');
+      if (studentError) {
+        console.error('Errore nel caricamento degli studenti dalla tabella student_instructor:', studentError);
+        throw studentError;
       }
       
-      const userId = userData.id;
-      console.log('Caricamento studenti per l\'istruttore con ID:', userId);
-      
-      // 1. Prima, ottieni gli ID dei codici di accesso che appartengono a questo istruttore
-      const { data: accessCodes, error: accessCodesError } = await supabase
-        .from('access_codes')
-        .select('id')
-        .eq('created_by', userId);
+      if (studentData && studentData.length > 0) {
+        console.log('Studenti trovati nella tabella student_instructor:', studentData.length);
         
-      if (accessCodesError) {
-        console.error('Errore nel caricamento dei codici di accesso:', accessCodesError);
-        throw accessCodesError;
-      }
-      
-      if (!accessCodes || accessCodes.length === 0) {
-        console.log('Nessun codice di accesso trovato per l\'istruttore');
-        setStudents([]);
+        const formattedStudents = (studentData as unknown as StudentInstructorRow[]).map(item => ({
+          id: item.student?.id || '',
+          email: item.student_email,
+          first_name: item.student?.first_name || '',
+          last_name: item.student?.last_name || '',
+          last_login: item.student?.last_login || '',
+          subscription: item.student?.subscriptions?.[0],
+          account_status: (item.student?.account_status || 'active') as 'active' | 'suspended'
+        }));
+        
+        setStudents(formattedStudents);
         setLoading(false);
         return;
       }
       
-      const codeIds = accessCodes.map(code => code.id);
-      console.log('Codici di accesso trovati:', codeIds);
+      // Metodo di fallback: utilizzare la relazione tramite access_code_usage
+      console.log('Nessuno studente trovato nella tabella student_instructor, tentativo con access_code_usage');
       
-      // 2. Ora, ottieni tutte le email degli studenti che hanno utilizzato questi codici
-      const { data: usageRecords, error: usageError } = await supabase
+      // Carica direttamente gli studenti usando la colonna instructor_email nella tabella access_code_usage
+      const { data: usageData, error: usageError } = await supabase
         .from('access_code_usage')
-        .select('student_email')
-        .in('code_id', codeIds);
+        .select(`
+          student_email,
+          first_name,
+          last_name
+        `)
+        .eq('instructor_email', instructorEmail);
         
       if (usageError) {
         console.error('Errore nel caricamento dell\'utilizzo dei codici:', usageError);
         throw usageError;
       }
       
-      if (!usageRecords || usageRecords.length === 0) {
+      if (!usageData || usageData.length === 0) {
         console.log('Nessuno studente ha utilizzato i codici di questo istruttore');
         setStudents([]);
         setLoading(false);
         return;
       }
       
-      const studentEmails = usageRecords.map(record => record.student_email);
+      // Estrai le email degli studenti e rimuovi i duplicati
+      const studentEmails = [...new Set(usageData.map(record => record.student_email))];
       console.log('Email degli studenti trovate:', studentEmails);
       
-      // 3. Infine, carica i dati degli studenti che hanno usato i codici dell'istruttore
+      // Carica i dati degli studenti
       const { data: users, error: usersError } = await supabase
         .from('auth_users')
         .select(`
@@ -126,7 +158,7 @@ export function StudentManagement() {
         last_name: user.last_name || '',
         last_login: user.last_login || user.created_at,
         subscription: user.subscriptions?.[0],
-        account_status: user.account_status || 'active'
+        account_status: (user.account_status || 'active') as 'active' | 'suspended'
       }));
 
       setStudents(formattedStudents);
