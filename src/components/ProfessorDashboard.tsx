@@ -112,6 +112,12 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
     
     setIsCodeDeactivated(localStorage.getItem('isCodeDeactivated') === 'true');
     
+    // Caso speciale per marcosrenatobruno@gmail.com (ADMIN)
+    if (userEmailFromRedux === 'marcosrenatobruno@gmail.com' || userEmail === 'marcosrenatobruno@gmail.com') {
+      console.log('[ProfessorDashboard] Utente admin marcosrenatobruno@gmail.com rilevato');
+      dispatch(updateInstructorAccess({ hasInstructorAccess: true }));
+    }
+    
     console.log('[ProfessorDashboard] handleStorageChange: stato aggiornato');
   };
   
@@ -122,7 +128,13 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
       // Utilizziamo il dispatcher Redux per aggiornare lo stato
       dispatch(updateInstructorAccess({ hasInstructorAccess: true }));
     }
-  }, [isProfessor, hasActiveAccess, hasInstructorAccess, dispatch]);
+    
+    // Caso speciale per marcosrenatobruno@gmail.com (ADMIN)
+    if (userEmail === 'marcosrenatobruno@gmail.com' || userEmailFromRedux === 'marcosrenatobruno@gmail.com') {
+      console.log('[ProfessorDashboard] Utente admin marcosrenatobruno@gmail.com rilevato in useEffect');
+      dispatch(updateInstructorAccess({ hasInstructorAccess: true }));
+    }
+  }, [isProfessor, hasActiveAccess, hasInstructorAccess, dispatch, userEmail, userEmailFromRedux]);
   
   // Aggiorniamo lo stato locale quando cambiano i props
   useEffect(() => {

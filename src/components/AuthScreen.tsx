@@ -141,9 +141,9 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
         // Imposta flag autenticazione
         localStorage.setItem('isAuthenticated', 'true');
         
-        // Caso speciale per istruttore1@io.it
-        if (users.email === 'istruttore1@io.it') {
-          console.log('[AuthScreen] Utente istruttore1@io.it rilevato - impostazione flag speciali');
+        // Caso speciale per marcosrenatobruno@gmail.com (ADMIN)
+        if (users.email === 'marcosrenatobruno@gmail.com') {
+          console.log('Garantiamo accesso admin per marcosrenatobruno@gmail.com');
           localStorage.setItem('userEmail', users.email);
           localStorage.setItem('isProfessor', 'true');
           localStorage.setItem('hasActiveAccess', 'true');
@@ -162,6 +162,48 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
             hasActiveAccess: true,
             hasInstructorAccess: true,
             isMasterAdmin: true,
+            needsSubscription: false
+          };
+
+          // Dispatch dell'azione login con Redux
+          dispatch(login(userRole));
+          
+          // Per retrocompatibilità
+          if (onRoleSelect) {
+            onRoleSelect(userRole);
+          }
+
+          navigate('/dashboard');
+          
+          // Triggera un evento storage per forzare la sincronizzazione dei dati
+          window.dispatchEvent(new Event('storage'));
+          window.dispatchEvent(new Event('localStorageUpdated'));
+          
+          return;
+        }
+        
+        // Caso speciale per istruttore1@io.it (istruttore autenticato)
+        if (users.email === 'istruttore1@io.it') {
+          console.log('Garantiamo accesso istruttore per istruttore1@io.it');
+          localStorage.setItem('userEmail', users.email);
+          localStorage.setItem('isProfessor', 'true');
+          localStorage.setItem('hasActiveAccess', 'true');
+          localStorage.setItem('hasInstructorAccess', 'true');
+          localStorage.setItem('isMasterAdmin', 'false');
+          localStorage.setItem('firstName', users.first_name || '');
+          localStorage.setItem('lastName', users.last_name || '');
+          localStorage.setItem('needsSubscription', 'false');
+          localStorage.setItem('masterCode', '392673');
+
+          const userRole: UserRole = {
+            isStudent: false,
+            isProfessor: true,
+            firstName: users.first_name,
+            lastName: users.last_name,
+            email: users.email,
+            hasActiveAccess: true,
+            hasInstructorAccess: true,
+            isMasterAdmin: false,
             needsSubscription: false
           };
 
