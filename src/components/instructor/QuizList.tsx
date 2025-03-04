@@ -1,9 +1,9 @@
 import React from 'react';
-import { Book, GraduationCap, Edit, Trash2, Users, Compass, Shield, CloudSun, Wrench, Anchor, Ship, Navigation, Map, Waves, Wind, Thermometer, LifeBuoy, RefreshCw } from 'lucide-react';
+import { Book, GraduationCap, Edit, Trash2, Users, Compass, Shield, CloudSun, Wrench, Anchor, Ship, Navigation, Map, Waves, Wind, Thermometer, LifeBuoy, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { COLORS } from './QuizCreator';
 
-const ICONS: { [key: string]: any } = {
+const ICONS: { [key: string]: React.ComponentType<React.SVGProps<SVGSVGElement>> } = {
   'compass': Compass,
   'shield': Shield,
   'cloud-sun': CloudSun,
@@ -24,7 +24,7 @@ interface Quiz {
   id: string;
   title: string;
   description: string;
-  quiz_type: 'exam' | 'learning';
+  quiz_type: 'exam' | 'learning' | 'interactive';
   category: string;
   question_count: number;
   duration_minutes: number;
@@ -33,20 +33,22 @@ interface Quiz {
   quiz_code?: string;
   visibility?: string;
   created_by?: string;
+  activations_count?: number;
 }
 
 interface QuizListProps {
   quizzes: Quiz[];
-  quizType: 'exam' | 'learning';
-  onEdit: (quiz: Quiz) => void;
-  onDelete: (quiz: Quiz) => void;
-  onAssign: (quiz: Quiz) => void;
+  onEdit?: (quiz: Quiz) => void;
+  onDelete?: (quiz: Quiz) => void;
+  onAssign?: (quiz: Quiz) => void;
   onVisibilityChange: (quizId: string, isPublic: boolean) => void;
   onRegenerateCode: (quizId: string) => void;
+  onTestQuiz?: (quiz: Quiz) => void;
   isMaster: boolean;
+  viewMode?: 'all' | 'manage';
 }
 
-export function QuizList({ quizzes, quizType, onEdit, onDelete, onAssign, onVisibilityChange, onRegenerateCode, isMaster }: QuizListProps) {
+export function QuizList({ quizzes, onEdit, onDelete, onAssign, onVisibilityChange, onRegenerateCode, onTestQuiz, isMaster, viewMode = 'manage' }: QuizListProps) {
   return (
     <div className="grid grid-cols-1 gap-4">
       {quizzes.map((quiz) => {
@@ -69,12 +71,7 @@ export function QuizList({ quizzes, quizType, onEdit, onDelete, onAssign, onVisi
                 <div className="flex-1 min-w-0">
                   <h3 className="text-xl font-bold text-white dark:text-slate-100 truncate">{quiz.title}</h3>
                   <p className="text-gray-200 dark:text-slate-300 mt-1 line-clamp-2">{quiz.description}</p>
-                  {isMaster && quiz.created_by && (
-                    <p className="text-sm text-gray-300 dark:text-slate-400 mt-1">
-                      Creato da: {quiz.created_by}
-                    </p>
-                  )}
-                  {isMaster && quiz.created_by && (
+                  {quiz.created_by && (
                     <p className="text-sm text-gray-300 dark:text-slate-400 mt-1">
                       Creato da: {quiz.created_by}
                     </p>
@@ -97,6 +94,14 @@ export function QuizList({ quizzes, quizType, onEdit, onDelete, onAssign, onVisi
                         </span>
                       </>
                     )}
+                    {quiz.activations_count !== undefined && (
+                      <>
+                        <span className="hidden sm:inline">•</span>
+                        <span className="bg-indigo-900/30 px-2 py-0.5 rounded">
+                          Attivazioni: {quiz.activations_count}
+                        </span>
+                      </>
+                    )}
                     {isMaster && (
                       <>
                         <span className="hidden sm:inline">•</span>
@@ -105,13 +110,23 @@ export function QuizList({ quizzes, quizType, onEdit, onDelete, onAssign, onVisi
                             e.stopPropagation();
                             onVisibilityChange(quiz.id, quiz.visibility !== 'public');
                           }}
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
                             quiz.visibility === 'public'
                               ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                               : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
                           }`}
                         >
-                          {quiz.visibility === 'public' ? 'Pubblico' : 'Privato'}
+                          {quiz.visibility === 'public' ? (
+                            <>
+                              <Eye className="w-3 h-3" />
+                              <span>Pubblico</span>
+                            </>
+                          ) : (
+                            <>
+                              <EyeOff className="w-3 h-3" />
+                              <span>Privato</span>
+                            </>
+                          )}
                         </button>
                       </>
                     )}
@@ -120,60 +135,114 @@ export function QuizList({ quizzes, quizType, onEdit, onDelete, onAssign, onVisi
               </div>
 
               {/* Mobile Actions */}
-              <div className="grid grid-cols-3 gap-2 sm:hidden mt-4">
-                <button
-                  onClick={() => onAssign(quiz)}
-                  className="flex items-center justify-center gap-2 p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
-                >
-                  <Users className="w-5 h-5" />
-                  <span>Assegna</span>
-                </button>
-                <button
-                  onClick={() => onEdit(quiz)}
-                  className="flex items-center justify-center gap-2 p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
-                >
-                  <Edit className="w-5 h-5" />
-                  <span>Modifica</span>
-                </button>
-                <button
-                  onClick={() => onDelete(quiz)}
-                  className="flex items-center justify-center gap-2 p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-5 h-5" />
-                  <span>Elimina</span>
-                </button>
+              <div className="sm:hidden flex flex-wrap justify-end gap-2 mt-4">
+                {viewMode === 'all' && onTestQuiz && (
+                  <button
+                    onClick={() => {
+                      if (onTestQuiz) onTestQuiz(quiz);
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded flex items-center gap-1 text-sm transition-colors"
+                  >
+                    <Eye className="w-3 h-3" />
+                    <span>Prova</span>
+                  </button>
+                )}
+                
+                {onAssign && (
+                  <button
+                    onClick={() => {
+                      if (onAssign) onAssign(quiz);
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded flex items-center gap-1 text-sm transition-colors"
+                  >
+                    <Users className="w-3 h-3" />
+                    <span>Assegna</span>
+                  </button>
+                )}
+                
+                {onEdit && (
+                  <button
+                    onClick={() => {
+                      if (onEdit) onEdit(quiz);
+                    }}
+                    className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded flex items-center gap-1 text-sm transition-colors"
+                  >
+                    <Edit className="w-3 h-3" />
+                    <span>Modifica</span>
+                  </button>
+                )}
+                
+                {onDelete && (
+                  <button
+                    onClick={() => {
+                      if (onDelete) onDelete(quiz);
+                    }}
+                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded flex items-center gap-1 text-sm transition-colors"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Elimina</span>
+                  </button>
+                )}
               </div>
 
               {/* Desktop Actions */}
               <div className="hidden sm:flex gap-2 justify-end mt-4">
-                <button
-                  onClick={() => onAssign(quiz)}
-                  className="p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
-                  title="Assegna Quiz"
-                >
-                  <Users className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => onRegenerateCode(quiz.id)}
-                  className="p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
-                  title="Rigenera Codice"
-                >
-                  <RefreshCw className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => onEdit(quiz)}
-                  className="p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
-                  title="Modifica Quiz"
-                >
-                  <Edit className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => onDelete(quiz)}
-                  className="p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
-                  title="Elimina Quiz"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
+                {viewMode === 'all' && onTestQuiz && (
+                  <button
+                    onClick={() => {
+                      if (onTestQuiz) onTestQuiz(quiz);
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                  >
+                    <Eye className="w-4 h-4" />
+                    <span>Prova Quiz</span>
+                  </button>
+                )}
+                
+                {quiz.quiz_code && (
+                  <button
+                    onClick={() => onRegenerateCode(quiz.id)}
+                    className="text-gray-300 hover:text-white border border-gray-300 hover:border-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Rigenera Codice</span>
+                  </button>
+                )}
+                
+                {onAssign && (
+                  <button
+                    onClick={() => {
+                      if (onAssign) onAssign(quiz);
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                  >
+                    <span>Assegna</span>
+                  </button>
+                )}
+                
+                {onEdit && (
+                  <button
+                    onClick={() => {
+                      if (onEdit) onEdit(quiz);
+                    }}
+                    className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                  >
+                    <Edit className="w-4 h-4" />
+                    <span>Modifica</span>
+                  </button>
+                )}
+                
+                {onDelete && (
+                  <button
+                    onClick={() => {
+                      if (onDelete) onDelete(quiz);
+                    }}
+                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Elimina</span>
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>

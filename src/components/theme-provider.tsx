@@ -28,32 +28,45 @@ export function ThemeProvider({
   ...props
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
+    () => {
+      const savedTheme = localStorage.getItem(storageKey) as Theme
+      console.log("Tema inizializzato:", savedTheme || defaultTheme)
+      return (savedTheme || defaultTheme)
+    }
   )
 
   useEffect(() => {
     const root = window.document.documentElement
-
+    
+    // Rimuovo prima tutte le classi di tema
     root.classList.remove('light', 'dark')
-
+    
     if (theme === "system") {
       const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
         .matches
         ? 'dark'
         : 'light'
-
+      
+      console.log("Tema di sistema rilevato:", systemTheme)
       root.classList.add(systemTheme)
-      return
+    } else {
+      console.log("Applicazione tema esplicito:", theme)
+      root.classList.add(theme)
     }
-
-    root.classList.add(theme)
+    
+    // Salvo il tema in localStorage
     localStorage.setItem(storageKey, theme)
-  }, [theme])
+    console.log("Tema salvato in localStorage:", theme)
+    
+    // Debug: verifico che le classi siano state applicate
+    console.log("Classi attuali sul documento:", root.classList.toString())
+  }, [theme, storageKey])
 
   const value = {
     theme,
-    setTheme: (theme: Theme) => {
-      setTheme(theme)
+    setTheme: (newTheme: Theme) => {
+      console.log("setTheme chiamato con:", newTheme)
+      setTheme(newTheme)
     },
   }
 

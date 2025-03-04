@@ -4,7 +4,28 @@ import { supabase, supabaseAdmin } from '../../services/supabase';
 
 interface QuizCreatorProps {
   quizType: 'exam' | 'learning' | 'interactive';
-  editQuiz?: any;
+  editQuiz?: {
+    id: string;
+    title: string;
+    description: string;
+    quiz_type: 'exam' | 'learning' | 'interactive';
+    category: string;
+    question_count: number;
+    duration_minutes: number;
+    icon: string;
+    icon_color: string;
+    quiz_code?: string;
+    visibility?: string;
+    created_by?: string;
+    quiz_format?: string;
+    questions?: Array<{
+      question_text: string;
+      options: string[];
+      correct_answer: number;
+      explanation?: string;
+      image_url?: string;
+    }>;
+  };
   hostEmail?: string;
   onClose: () => void;
   onSaveSuccess?: () => void;
@@ -58,20 +79,21 @@ const COLOR_OPTIONS = [
 ];
 
 export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSuccess }: QuizCreatorProps) {
-  const [title, setTitle] = useState(editQuiz?.title || '');
-  const [description, setDescription] = useState(editQuiz?.description || '');
-  const [category, setCategory] = useState(editQuiz?.category || '');
-  const [icon, setIcon] = useState(editQuiz?.icon || 'compass');
-  const [iconColor, setIconColor] = useState(editQuiz?.icon_color || 'blue');
-  const [questionCount, setQuestionCount] = useState(editQuiz?.question_count || getDefaultQuestionCount());
-  const [duration, setDuration] = useState(editQuiz?.duration_minutes || getDefaultDuration());
+  const [title, setTitle] = useState<string>(editQuiz?.title || '');
+  const [description, setDescription] = useState<string>(editQuiz?.description || '');
+  const [category, setCategory] = useState<string>(editQuiz?.category || '');
+  const [icon, setIcon] = useState<string>(editQuiz?.icon || 'compass');
+  const [iconColor, setIconColor] = useState<string>(editQuiz?.icon_color || 'blue');
+  const [questionCount, setQuestionCount] = useState<number>(editQuiz?.question_count || getDefaultQuestionCount());
+  const [duration, setDuration] = useState<number>(editQuiz?.duration_minutes || getDefaultDuration());
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string>('');
   const [uploadingImage, setUploadingImage] = useState<{ [key: number]: boolean }>({});
   const [imagePreview, setImagePreview] = useState<{ [key: number]: string }>({});
-  const [visibility, setVisibility] = useState(editQuiz?.visibility || 'private');
-  const [quizFormat, setQuizFormat] = useState(editQuiz?.quiz_format || 'multiple_choice');
-  const [loading, setLoading] = useState(false);
+  const [visibility, setVisibility] = useState<string>(editQuiz?.visibility || 'private');
+  const [quizFormat, setQuizFormat] = useState<string>(editQuiz?.quiz_format || 'multiple_choice');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   function getDefaultQuestionCount() {
     switch (quizType) {
@@ -86,7 +108,6 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
       default: return 15;
     }
   }
-  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
     const email = localStorage.getItem('userEmail');
@@ -121,7 +142,7 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
         setQuestions(formattedQuestions);
         
         // Set image previews for existing images
-        const previews = {};
+        const previews: { [key: number]: string } = {};
         formattedQuestions.forEach((q, index) => {
           if (q.image_url) {
             previews[index] = q.image_url;
@@ -176,7 +197,7 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
       setQuestions(formattedQuestions);
       
       // Set image previews for existing images
-      const previews = {};
+      const previews: { [key: number]: string } = {};
       formattedQuestions.forEach((q, index) => {
         if (q.image_url) {
           previews[index] = q.image_url;
@@ -185,7 +206,7 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
       setImagePreview(previews);
       
       console.log('Questions set in state:', formattedQuestions);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error loading questions:', error);
       setError('Errore durante il caricamento delle domande');
     }
@@ -207,12 +228,12 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
     setQuestions(questions.filter((_, i) => i !== index));
   };
 
-  const updateQuestion = (index: number, field: keyof Question, value: any) => {
+  const updateQuestion = (index: number, field: keyof Question, value: string | string[] | number | undefined) => {
     const updatedQuestions = [...questions];
     if (field === 'options') {
       updatedQuestions[index] = {
         ...updatedQuestions[index],
-        options: value
+        options: value as string[]
       };
     } else {
       updatedQuestions[index] = {
@@ -261,7 +282,7 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
       setQuestions(updatedQuestions);
       setImagePreview(prev => ({ ...prev, [questionIndex]: publicUrl }));
 
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error uploading image:', error);
       setError('Errore durante il caricamento dell\'immagine');
     } finally {
@@ -288,39 +309,51 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
         delete newImagePreview[questionIndex];
         setImagePreview(newImagePreview);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error removing image:', error);
       setError('Errore durante la rimozione dell\'immagine');
     }
   };
 
-  const handleSave = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     try {
       setLoading(true);
       setError('');
-      console.log('Starting quiz save...', { title, description, questions, quizType });
-
+      
+      const userEmail = localStorage.getItem('userEmail');
       if (!userEmail) {
-        throw new Error('Sessione utente non valida');
+        throw new Error('Email utente non trovata nel localStorage');
       }
 
-      if (!title || !description || !questions.length) {
-        throw new Error('Compila tutti i campi obbligatori e aggiungi almeno una domanda');
+      // Ottieni l'ID dell'utente basato sull'email
+      const { data: userData, error: userError } = await supabase
+        .from('auth_users')
+        .select('id')
+        .eq('email', userEmail)
+        .single();
+
+      if (userError) {
+        console.error('Errore nel recuperare l\'ID utente:', userError);
+        throw userError;
       }
 
-      // Prepare quiz template data
+      const userId = userData.id;
+      console.log('ID utente per la creazione del quiz:', userId);
+      
+      // Preparazione dei dati del quiz
       const quizData = {
         title,
         description,
         quiz_type: quizType,
-        visibility: quizType === 'interactive' ? (visibility || 'private') : 'private',
-        quiz_format: quizType === 'interactive' ? quizFormat : null,
-        category: category || null,
+        visibility,
+        quiz_format: quizFormat || null,
         question_count: questionCount,
         duration_minutes: duration,
         icon,
         icon_color: iconColor,
-        created_by: userEmail,
+        created_by: userId, // Utilizzo l'ID utente invece dell'email
         host_email: quizType === 'interactive' ? hostEmail || userEmail : null
       };
 
@@ -415,7 +448,7 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
       }
       
       onClose();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error saving quiz:', error);
       setError(error instanceof Error ? error.message : 'Errore durante il salvataggio del quiz');
     } finally {
@@ -768,7 +801,7 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
             Annulla
           </button>
           <button
-            onClick={handleSave}
+            onClick={handleSubmit}
             disabled={loading}
             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
           >

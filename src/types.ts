@@ -8,6 +8,7 @@ export interface UserRole {
   hasActiveAccess?: boolean;
   isMasterAdmin?: boolean;
   needsSubscription?: boolean;
+  hasInstructorAccess?: boolean;
 }
 
 export interface Question {

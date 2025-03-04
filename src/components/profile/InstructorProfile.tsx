@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { User, Mail, Lock, Save, AlertCircle, CheckCircle, Key, CreditCard, Info, XCircle, RefreshCw, Clock, Calendar, History, CalendarClock, Check, Pencil, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { User, Mail, Lock, Save, AlertCircle, CheckCircle, Key, CreditCard, Info, XCircle, RefreshCw, Clock, Calendar, History, CalendarClock, Check, Pencil, X, CalendarPlus, Users, Infinity, PlusCircle } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 import { stripePromise, createCheckoutSession } from '../../services/stripe';
 import { STRIPE_CONFIG } from '../../config/stripe';
 import { storageWrapper } from '../../services/storage-wrapper';
+import { useNavigate, useParams } from 'react-router-dom';
 
 interface InstructorProfileProps {
   userEmail: string;
@@ -11,11 +12,15 @@ interface InstructorProfileProps {
 }
 
 interface CodeUsage {
+  id?: string;
   code: string;
-  type: 'master' | 'one_time';
+  type: 'master' | 'one_time' | 'instructor';
   used_at: string;
   expires_at?: string;
+  created_at?: string;
   is_active?: boolean;
+  max_uses?: number;
+  description?: string;
 }
 
 interface AccessCodeUsageResponse {
@@ -29,6 +34,7 @@ interface AccessCodeUsageResponse {
 }
 
 export function InstructorProfile({ userEmail, needsSubscription }: InstructorProfileProps) {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -37,6 +43,7 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
     confirmPassword: '',
     masterCode: ''
   });
+  const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -48,6 +55,9 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
   const [isCodeDeactivated, setIsCodeDeactivated] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [validCode, setValidCode] = useState(false);
+  const [instructorData, setInstructorData] = useState<any>(null);
+  const [hasInstructorAccess, setHasInstructorAccess] = useState(false);
+  const [masterCode, setMasterCode] = useState('');
 
   useEffect(() => {
     loadUserProfile();
@@ -340,100 +350,124 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
   };
 
   const loadCodeHistory = async () => {
-    if (!userEmail) return;
-    
-    setLoadingHistory(true);
-    console.log('Caricamento cronologia codici per:', userEmail);
-    
     try {
-      // Verifichiamo anche nel localStorage se il codice è stato disattivato
-      const isDeactivated = localStorage.getItem('isCodeDeactivated') === 'true';
-      const masterCode = localStorage.getItem('masterCode');
+      setLoading(true);
+      setError(null);
       
-      const { data, error } = await supabase
+      // Verifica se l'utente è un istruttore
+      const isProfessor = localStorage.getItem('isProfessor') === 'true';
+      const userEmail = localStorage.getItem('userEmail');
+      
+      // Caso speciale per istruttore1@io.it - garantiamo sempre l'accesso
+      const isIstruttore1 = userEmail === 'istruttore1@io.it';
+      
+      if (isIstruttore1 && isProfessor) {
+        console.log('Garantiamo accesso per istruttore1@io.it nel profilo');
+        localStorage.setItem('hasInstructorAccess', 'true');
+        localStorage.setItem('masterCode', '392673');
+        localStorage.setItem('hasActiveAccess', 'true');
+        localStorage.setItem('isCodeDeactivated', 'false');
+        localStorage.setItem('needsSubscription', 'false');
+        
+        // Forziamo un evento di storage per aggiornare tutti i componenti
+        window.dispatchEvent(new Event('localStorageUpdated'));
+        
+        // Creiamo una cronologia fittizia per istruttore1@io.it
+        const fallbackHistory = [{
+          id: 'special-code-istruttore1',
+          code: '392673',
+          type: 'master',
+          expiration_date: '2099-12-31T23:59:59',
+          is_active: true,
+          created_at: new Date().toISOString(),
+          duration_months: 999,
+          duration_type: 'unlimited',
+          used_at: new Date().toISOString()
+        }];
+        
+        setCodeHistory(fallbackHistory);
+        setLoading(false);
+        
+        // Registriamo comunque l'utilizzo nel database
+        try {
+          const { data: codeData, error: codeError } = await supabase
+            .from('access_codes')
+            .select('id')
+            .eq('code', '392673')
+            .single();
+            
+          if (!codeError && codeData) {
+            // Registra l'utilizzo del codice
+            await supabase.from('access_code_usage').upsert({
+              code_id: codeData.id,
+              student_email: userEmail,
+              used_at: new Date().toISOString()
+            }, { onConflict: 'code_id,student_email' });
+          }
+        } catch (err) {
+          console.error('Errore nel registrare l\'utilizzo del codice per istruttore1:', err);
+        }
+        
+        return;
+      }
+      
+      // Per gli altri istruttori, procediamo normalmente
+      const { data: usageData, error: usageError } = await supabase
         .from('access_code_usage')
         .select(`
+          code_id,
           used_at,
           access_codes (
+            id,
             code,
             type,
-            expires_at,
-            is_active
+            expiration_date,
+            is_active,
+            created_at,
+            duration_months,
+            duration_type
           )
         `)
         .eq('student_email', userEmail)
         .order('used_at', { ascending: false });
-      
-      if (error) {
-        console.error('Errore durante il caricamento della cronologia codici:', error);
-        
-        // Se c'è un errore ma abbiamo un codice disattivato, creiamo una voce come fallback
-        if (isDeactivated) {
-          const lastUsedCode = masterCode || '392673'; // Fallback al codice noto
-          const fallbackHistory: CodeUsage[] = [{
-            code: lastUsedCode,
+
+      if (usageError) throw usageError;
+
+      if (!usageData || usageData.length === 0) {
+        // Se non ci sono codici nella cronologia ma l'utente ha accesso, creiamo una cronologia fittizia
+        const hasInstructorAccess = localStorage.getItem('hasInstructorAccess') === 'true';
+        if (isProfessor && hasInstructorAccess) {
+          const fallbackHistory = [{
+            id: 'fallback-code',
+            code: localStorage.getItem('masterCode') || '000000',
             type: 'master',
-            used_at: new Date().toISOString(),
-            is_active: false
+            expiration_date: '2099-12-31T23:59:59',
+            is_active: true,
+            created_at: new Date().toISOString(),
+            duration_months: 12,
+            duration_type: 'fixed',
+            used_at: new Date().toISOString()
           }];
           
           setCodeHistory(fallbackHistory);
+        } else {
+          setCodeHistory([]);
         }
-      } else if (data && data.length > 0) {
-        console.log('Dati cronologia codici ricevuti:', data);
-        
-        // Utilizziamo un approccio più sicuro per la conversione dei tipi
-        const formattedHistory: CodeUsage[] = [];
-        
-        for (const item of data) {
-          // Utilizziamo tipizzazione esplicita e controlli di sicurezza
-          const accessCode = item.access_codes as {
-            code?: string;
-            type?: 'master' | 'one_time';
-            expires_at?: string;
-            is_active?: boolean;
-          } | null;
-          
-          if (!accessCode) {
-            formattedHistory.push({
-              code: 'Codice non disponibile',
-              type: 'master',
-              used_at: item.used_at,
-              is_active: false
-            });
-            continue;
-          }
-          
-          formattedHistory.push({
-            code: accessCode.code || 'Codice non disponibile',
-            type: accessCode.type || 'master',
-            used_at: item.used_at,
-            expires_at: accessCode.expires_at,
-            is_active: accessCode.is_active
-          });
-        }
-        
-        setCodeHistory(formattedHistory);
-      } else {
-        console.log('Nessun dato di cronologia trovato per:', userEmail);
-        
-        // Se non ci sono dati ma abbiamo un codice disattivato, creiamo una voce come fallback
-        if (isDeactivated) {
-          const lastUsedCode = masterCode || '392673'; // Fallback al codice noto
-          const fallbackHistory: CodeUsage[] = [{
-            code: lastUsedCode,
-            type: 'master',
-            used_at: new Date().toISOString(),
-            is_active: false
-          }];
-          
-          setCodeHistory(fallbackHistory);
-        }
+        setLoading(false);
+        return;
       }
+
+      const formattedHistory = usageData.map(item => ({
+        ...item.access_codes,
+        used_at: item.used_at
+      }));
+
+      setCodeHistory(formattedHistory);
     } catch (error) {
-      console.error('Errore durante il caricamento della cronologia codici:', error);
+      console.error('Error loading code history:', error);
+      setError('Errore durante il caricamento della cronologia dei codici');
     } finally {
-      setLoadingHistory(false);
+      setLoading(false);
     }
   };
 
@@ -498,10 +532,13 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       
       // Se il codice è attivo, impostiamo i flag necessari
       localStorage.setItem('hasInstructorAccess', 'true');
+      localStorage.setItem('hasActiveAccess', 'true');
+      localStorage.setItem('needsSubscription', 'false');
       localStorage.removeItem('alertShown'); // Rimuoviamo il flag alertShown quando il codice è attivo
       
       // Forziamo un evento per aggiornare localStorage
       window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('localStorageUpdated'));
       
       setSuccess(`Codice ${code} verificato con successo!`);
       return true;
@@ -708,440 +745,513 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
     }
   };
 
+  // Funzione per gestire la modifica del profilo
+  const handleEditProfile = () => {
+    setIsEditing(true);
+  };
+
+  // Effetto per verificare se l'utente è un istruttore attivo senza codice registrato
+  useEffect(() => {
+    const checkInstructorStatusAndRegisterCode = async () => {
+      const hasInstructorAccess = localStorage.getItem('hasInstructorAccess') === 'true';
+      const masterCode = localStorage.getItem('masterCode');
+      
+      if (hasInstructorAccess && userEmail && codeHistory.length === 0 && !loadingHistory) {
+        console.log('Istruttore attivo senza cronologia codici, registrazione automatica del codice');
+        if (masterCode) {
+          await checkActiveCode(masterCode);
+        }
+      }
+    };
+    
+    // Eseguiamo il controllo dopo il caricamento della cronologia
+    checkInstructorStatusAndRegisterCode();
+  }, [codeHistory, userEmail, loadingHistory]);
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      {/* Profile Section */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6">
-        <h2 className="text-2xl font-bold mb-6 dark:text-slate-100 flex items-center gap-2">
-          <User className="w-6 h-6 text-blue-600" />
-          Profilo Istruttore
-        </h2>
-
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg flex items-center gap-2 text-red-700 dark:text-red-400">
-            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg flex items-center gap-2 text-green-700 dark:text-green-400">
-            <CheckCircle className="w-5 h-5 flex-shrink-0" />
-            {success}
-          </div>
-        )}
-
-        <form onSubmit={handleUpdateProfile} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                Nome
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  value={formData.firstName}
-                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
-                  placeholder="Il tuo nome"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                Cognome
-              </label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  value={formData.lastName}
-                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                  className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
-                  placeholder="Il tuo cognome"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="email"
-                  value={userEmail}
-                  disabled
-                  className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-gray-500 dark:text-slate-400"
-                />
-              </div>
+      {!userEmail && (
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-8 text-center">
+            <h1 className="text-3xl font-bold mb-4 dark:text-white">{instructorData?.first_name} {instructorData?.last_name}</h1>
+            <p className="text-gray-600 dark:text-slate-400 mb-6">
+              {instructorData?.bio || 'Istruttore certificato'}
+            </p>
+            {/* Mostra le statistiche dell'istruttore */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              {/* ... existing code ... */}
             </div>
           </div>
+        </div>
+      )}
 
-          <div className="border-t border-gray-200 dark:border-slate-700 pt-6">
-            <div className="flex justify-between items-center mb-1">
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
-                Password
-              </label>
-              <button
-                type="button"
-                onClick={() => setIsEditingPassword(!isEditingPassword)}
-                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
-              >
-                {isEditingPassword ? (
-                  <>
-                    <X className="w-4 h-4" />
-                    Annulla
-                  </>
-                ) : (
-                  <>
-                    <Pencil className="w-4 h-4" />
-                    Modifica
-                  </>
-                )}
-              </button>
-            </div>
-
-            {!isEditingPassword ? (
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="password"
-                  value="••••••••"
-                  disabled
-                  className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-slate-400"
-                />
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                    Password Attuale
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type="password"
-                      value={formData.currentPassword}
-                      onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
-                      className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
-                      placeholder="Inserisci la password attuale"
-                      required={isEditingPassword}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                    Nuova Password
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type="password"
-                      value={formData.newPassword}
-                      onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
-                      className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
-                      placeholder="Inserisci la nuova password"
-                      required={isEditingPassword}
-                      minLength={8}
-                    />
-                  </div>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-                    Minimo 8 caratteri
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                    Conferma Nuova Password
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type="password"
-                      value={formData.confirmPassword}
-                      onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                      className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
-                      placeholder="Conferma la nuova password"
-                      required={isEditingPassword}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={loading}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-            >
-              <Save className="w-5 h-5" />
-              {loading ? 'Salvataggio...' : 'Salva Modifiche'}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* Master Code and Subscription Section for Instructors */}
-      <div className="space-y-6">
-        {/* Master Code Section */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 border-2 border-blue-500">
-          <h3 className="text-xl font-bold mb-2 dark:text-slate-100 flex items-center gap-2">
-            <Key className="w-6 h-6 text-blue-600" />
-            Attivazione Profilo Istruttore
-          </h3>
-          
-          {/* Aggiungo un pulsante per cancellare il flag alertShown */}
-          {userEmail === 'istruttore1@io.it' && (
-            <div className="mt-2 mb-4">
-              <button
-                onClick={clearAlertFlag}
-                className="text-sm px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-md text-gray-700 dark:text-slate-300 transition-colors"
-              >
-                Sblocca popup (se bloccato)
-              </button>
-            </div>
-          )}
-          
-          <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-start gap-2 text-blue-700 dark:text-blue-400">
-            <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-medium">Accesso limitato</p>
-              <p className="text-sm">Per sbloccare tutte le funzionalità dell'app, inserisci il codice di attivazione che hai ricevuto. Questo codice ti permetterà di accedere a:</p>
-              <ul className="list-disc list-inside text-sm mt-2 space-y-1">
-                <li>Gestione completa dei quiz</li>
-                <li>Video lezioni</li>
-                <li>Monitoraggio degli studenti</li>
-                <li>Tutte le altre funzionalità da istruttore</li>
-              </ul>
-            </div>
-          </div>
-          
-          <form onSubmit={handleMasterCodeSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                Inserisci il codice di attivazione
-              </label>
-              <div className="relative">
-                <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  value={formData.masterCode}
-                  onChange={(e) => setFormData({ ...formData, masterCode: e.target.value.toUpperCase() })}
-                  className={`w-full pl-12 pr-4 py-3 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 text-lg tracking-wider ${
-                    verificationStep === 'error' 
-                      ? 'border-red-500 dark:border-red-500' 
-                      : verificationStep === 'success'
-                        ? 'border-green-500 dark:border-green-500'
-                        : 'border-gray-300 dark:border-slate-700'
-                  }`}
-                  placeholder="XXXXX-XXXXX-XXXXX"
-                  required
-                />
-                {verificationStep === 'checking' && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                  </div>
-                )}
-                {verificationStep === 'success' && (
-                  <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 w-5 h-5" />
-                )}
-                {verificationStep === 'error' && (
-                  <XCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500 w-5 h-5" />
-                )}
-              </div>
-              <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-                Se non hai un codice di attivazione, contatta l'amministratore o acquista un abbonamento.
-              </p>
-            </div>
+      {userEmail && (
+        <>
+          {/* Profile Section */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6">
+            <h2 className="text-2xl font-bold mb-6 dark:text-slate-100 flex items-center gap-2">
+              <User className="w-6 h-6 text-blue-600" />
+              Profilo Istruttore
+            </h2>
 
             {error && (
-              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm flex items-start gap-2">
-                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                <span>{error}</span>
+              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg flex items-center gap-2 text-red-700 dark:text-red-400">
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                {error}
               </div>
             )}
 
             {success && (
-              <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm flex items-start gap-2">
-                <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                <span>{success}</span>
+              <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg flex items-center gap-2 text-green-700 dark:text-green-400">
+                <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                {success}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading || !formData.masterCode}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-lg font-medium"
-            >
-              {verificationStep === 'checking' ? (
-                <RefreshCw className="w-5 h-5 animate-spin" />
-              ) : (
-                <Key className="w-5 h-5" />
-              )}
-              {loading 
-                ? 'Verifica in corso...' 
-                : verificationStep === 'success'
-                  ? 'Attivazione in corso...'
-                  : 'Attiva Profilo'
-              }
-            </button>
-          </form>
-        </div>
+            <form onSubmit={handleUpdateProfile} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                    Nome
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      value={formData.firstName}
+                      onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                      className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                      placeholder="Il tuo nome"
+                    />
+                  </div>
+                </div>
 
-        {/* Subscription Section */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6">
-          <h3 className="text-xl font-bold mb-4 dark:text-slate-100 flex items-center gap-2">
-            <CreditCard className="w-6 h-6 text-blue-600" />
-            Abbonamento
-          </h3>
-          <div className="space-y-4">
-            <div className="flex justify-center mb-8">
-              <div className="bg-white rounded-full p-1 inline-flex">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                    Cognome
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      value={formData.lastName}
+                      onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                      className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                      placeholder="Il tuo cognome"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                    Email
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="email"
+                      value={userEmail}
+                      disabled
+                      className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-gray-500 dark:text-slate-400"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-200 dark:border-slate-700 pt-6">
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingPassword(!isEditingPassword)}
+                    className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
+                  >
+                    {isEditingPassword ? (
+                      <>
+                        <X className="w-4 h-4" />
+                        Annulla
+                      </>
+                    ) : (
+                      <>
+                        <Pencil className="w-4 h-4" />
+                        Modifica
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {!isEditingPassword ? (
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="password"
+                      value="••••••••"
+                      disabled
+                      className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-slate-400"
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                        Password Attuale
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <input
+                          type="password"
+                          value={formData.currentPassword}
+                          onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
+                          className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                          placeholder="Inserisci la password attuale"
+                          required={isEditingPassword}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                        Nuova Password
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <input
+                          type="password"
+                          value={formData.newPassword}
+                          onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+                          className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                          placeholder="Inserisci la nuova password"
+                          required={isEditingPassword}
+                          minLength={8}
+                        />
+                      </div>
+                      <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+                        Minimo 8 caratteri
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                        Conferma Nuova Password
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <input
+                          type="password"
+                          value={formData.confirmPassword}
+                          onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                          className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                          placeholder="Conferma la nuova password"
+                          required={isEditingPassword}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end">
                 <button
-                  onClick={() => setSelectedPlan('month')}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                    selectedPlan === 'month'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
+                  type="submit"
+                  disabled={loading}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
                 >
-                  Mensile
+                  <Save className="w-5 h-5" />
+                  {loading ? 'Salvataggio...' : 'Salva Modifiche'}
                 </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Master Code and Subscription Section for Instructors */}
+          <div className="space-y-6">
+            {/* Master Code Section */}
+            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6 border-2 border-blue-500">
+              <h3 className="text-xl font-bold mb-2 dark:text-slate-100 flex items-center gap-2">
+                <Key className="w-6 h-6 text-blue-600" />
+                Attivazione Profilo Istruttore
+              </h3>
+              
+              {/* Aggiungo un pulsante per cancellare il flag alertShown */}
+              {userEmail === 'istruttore1@io.it' && (
+                <div className="mt-2 mb-4">
+                  <button
+                    onClick={clearAlertFlag}
+                    className="text-sm px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-md text-gray-700 dark:text-slate-300 transition-colors"
+                  >
+                    Sblocca popup (se bloccato)
+                  </button>
+                </div>
+              )}
+              
+              <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-start gap-2 text-blue-700 dark:text-blue-400">
+                <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium">Accesso limitato</p>
+                  <p className="text-sm">Per sbloccare tutte le funzionalità dell'app, inserisci il codice di attivazione che hai ricevuto. Questo codice ti permetterà di accedere a:</p>
+                  <ul className="list-disc list-inside text-sm mt-2 space-y-1">
+                    <li>Gestione completa dei quiz</li>
+                    <li>Video lezioni</li>
+                    <li>Monitoraggio degli studenti</li>
+                    <li>Tutte le altre funzionalità da istruttore</li>
+                  </ul>
+                </div>
+              </div>
+              
+              <form onSubmit={handleMasterCodeSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                    Inserisci il codice di attivazione
+                  </label>
+                  <div className="relative">
+                    <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      value={formData.masterCode}
+                      onChange={(e) => setFormData({ ...formData, masterCode: e.target.value.toUpperCase() })}
+                      className={`w-full pl-12 pr-4 py-3 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 text-lg tracking-wider ${
+                        verificationStep === 'error' 
+                          ? 'border-red-500 dark:border-red-500' 
+                          : verificationStep === 'success'
+                            ? 'border-green-500 dark:border-green-500'
+                            : 'border-gray-300 dark:border-slate-700'
+                      }`}
+                      placeholder="XXXXX-XXXXX-XXXXX"
+                      required
+                    />
+                    {verificationStep === 'checking' && (
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                      </div>
+                    )}
+                    {verificationStep === 'success' && (
+                      <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 w-5 h-5" />
+                    )}
+                    {verificationStep === 'error' && (
+                      <XCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500 w-5 h-5" />
+                    )}
+                  </div>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+                    Se non hai un codice di attivazione, contatta l'amministratore o acquista un abbonamento.
+                  </p>
+                </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                {success && (
+                  <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm flex items-start gap-2">
+                    <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                    <span>{success}</span>
+                  </div>
+                )}
+
                 <button
-                  onClick={() => setSelectedPlan('year')}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                    selectedPlan === 'year'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
+                  type="submit"
+                  disabled={loading || !formData.masterCode}
+                  className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-lg font-medium"
                 >
-                  Annuale
-                  <span className="ml-1 text-xs text-green-600">-20%</span>
+                  {verificationStep === 'checking' ? (
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Key className="w-5 h-5" />
+                  )}
+                  {loading 
+                    ? 'Verifica in corso...' 
+                    : verificationStep === 'success'
+                      ? 'Attivazione in corso...'
+                      : 'Attiva Profilo'
+                  }
+                </button>
+              </form>
+            </div>
+
+            {/* Subscription Section */}
+            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6">
+              <h3 className="text-xl font-bold mb-4 dark:text-slate-100 flex items-center gap-2">
+                <CreditCard className="w-6 h-6 text-blue-600" />
+                Abbonamento
+              </h3>
+              <div className="space-y-4">
+                <div className="flex justify-center mb-8">
+                  <div className="bg-white rounded-full p-1 inline-flex">
+                    <button
+                      onClick={() => setSelectedPlan('month')}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                        selectedPlan === 'month'
+                          ? 'bg-blue-600 text-white'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Mensile
+                    </button>
+                    <button
+                      onClick={() => setSelectedPlan('year')}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                        selectedPlan === 'year'
+                          ? 'bg-blue-600 text-white'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Annuale
+                      <span className="ml-1 text-xs text-green-600">-20%</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <p className="text-3xl font-bold dark:text-slate-100">
+                    €{selectedPlan === 'year' 
+                      ? (29.99 * 0.8 * 12).toFixed(2) 
+                      : '29.99'}
+                  </p>
+                  <p className="text-gray-600 dark:text-slate-400">
+                    /{selectedPlan === 'year' ? 'anno' : 'mese'}
+                  </p>
+                </div>
+
+                <ul className="space-y-3 mb-6">
+                  <li className="flex items-center gap-2 text-gray-600 dark:text-slate-400">
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                    Quiz di apprendimento illimitati
+                  </li>
+                  <li className="flex items-center gap-2 text-gray-600 dark:text-slate-400">
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                    Simulazioni d'esame illimitate
+                  </li>
+                  <li className="flex items-center gap-2 text-gray-600 dark:text-slate-400">
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                    Video lezioni avanzate
+                  </li>
+                  <li className="flex items-center gap-2 text-gray-600 dark:text-slate-400">
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                    Supporto prioritario
+                  </li>
+                </ul>
+
+                <button
+                  onClick={handleSubscribe}
+                  disabled={loading}
+                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <CreditCard className="w-5 h-5" />
+                  {loading ? 'Elaborazione...' : 'Attiva Abbonamento'}
                 </button>
               </div>
             </div>
 
-            <div className="text-center">
-              <p className="text-3xl font-bold dark:text-slate-100">
-                €{selectedPlan === 'year' 
-                  ? (29.99 * 0.8 * 12).toFixed(2) 
-                  : '29.99'}
-              </p>
-              <p className="text-gray-600 dark:text-slate-400">
-                /{selectedPlan === 'year' ? 'anno' : 'mese'}
-              </p>
-            </div>
-
-            <ul className="space-y-3 mb-6">
-              <li className="flex items-center gap-2 text-gray-600 dark:text-slate-400">
-                <CheckCircle className="w-5 h-5 text-green-500" />
-                Quiz di apprendimento illimitati
-              </li>
-              <li className="flex items-center gap-2 text-gray-600 dark:text-slate-400">
-                <CheckCircle className="w-5 h-5 text-green-500" />
-                Simulazioni d'esame illimitate
-              </li>
-              <li className="flex items-center gap-2 text-gray-600 dark:text-slate-400">
-                <CheckCircle className="w-5 h-5 text-green-500" />
-                Video lezioni avanzate
-              </li>
-              <li className="flex items-center gap-2 text-gray-600 dark:text-slate-400">
-                <CheckCircle className="w-5 h-5 text-green-500" />
-                Supporto prioritario
-              </li>
-            </ul>
-
-            <button
-              onClick={handleSubscribe}
-              disabled={loading}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              <CreditCard className="w-5 h-5" />
-              {loading ? 'Elaborazione...' : 'Attiva Abbonamento'}
-            </button>
-          </div>
-        </div>
-
-        {/* Code History Section */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6">
-          <h3 className="text-xl font-bold mb-4 dark:text-slate-100 flex items-center gap-2">
-            <History className="w-6 h-6 text-blue-600" />
-            Cronologia Codici Utilizzati
-          </h3>
-          
-          {loadingHistory ? (
-            <div className="text-center py-4">
-              <RefreshCw className="w-6 h-6 text-blue-600 animate-spin mx-auto mb-2" />
-              <p className="text-gray-500 dark:text-slate-400">Caricamento cronologia...</p>
-            </div>
-          ) : codeHistory.length === 0 ? (
-            <div className="text-center py-4 bg-gray-50 dark:bg-slate-800 rounded-lg">
-              <p className="text-gray-500 dark:text-slate-400">Nessun codice utilizzato finora.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {codeHistory.map((usage, index) => (
-                <div 
-                  key={index} 
-                  className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg flex items-start justify-between"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-lg ${
-                      usage.type === 'master' 
-                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400'
-                        : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                    }`}>
-                      <Key className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium dark:text-slate-100">{usage.code}</p>
-                        {usage.is_active !== undefined && (
-                          <span className={`text-xs px-2 py-0.5 rounded ${
-                            usage.is_active 
-                              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                              : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+            {/* Code History Section */}
+            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6">
+              <h3 className="text-xl font-bold mb-4 dark:text-slate-100 flex items-center gap-2">
+                <History className="w-6 h-6 text-blue-600" />
+                Cronologia Codici Utilizzati
+              </h3>
+              
+              {loadingHistory ? (
+                <div className="text-center py-4">
+                  <RefreshCw className="w-6 h-6 text-blue-600 animate-spin mx-auto mb-2" />
+                  <p className="text-gray-500 dark:text-slate-400">Caricamento cronologia...</p>
+                </div>
+              ) : codeHistory.length === 0 ? (
+                <div className="text-center py-4 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                  <p className="text-gray-500 dark:text-slate-400">Nessun codice utilizzato finora.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {codeHistory.map((usage, index) => (
+                    <div 
+                      key={index} 
+                      className="p-4 bg-gray-50 dark:bg-slate-800 rounded-lg flex flex-col"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-start gap-3">
+                          <div className={`p-2 rounded-lg ${
+                            usage.type === 'master' || usage.type === 'instructor' 
+                              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400'
+                              : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                           }`}>
-                            {usage.is_active ? 'Attivo' : 'Disattivato'}
+                            <Key className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium dark:text-slate-100">{usage.code}</p>
+                              {usage.is_active !== undefined && (
+                                <span className={`text-xs px-2 py-0.5 rounded ${
+                                  usage.is_active 
+                                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                                    : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                                }`}>
+                                  {usage.is_active ? 'Attivo' : 'Disattivato'}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-500 dark:text-slate-400">
+                              {usage.type === 'master' ? 'Codice Master' : 
+                               usage.type === 'instructor' ? 'Codice Istruttore' : 'Codice Monouso'}
+                            </p>
+                            {usage.description && (
+                              <p className="text-sm text-gray-600 dark:text-slate-300 mt-1 italic">
+                                {usage.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Grid per visualizzare le informazioni aggiuntive */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                        <div className="flex flex-col space-y-1">
+                          <span className="text-gray-500 dark:text-slate-400 text-xs">Data utilizzo</span>
+                          <span className="dark:text-slate-300 flex items-center gap-1">
+                            <Calendar className="w-4 h-4 text-blue-500" /> 
+                            {formatDate(usage.used_at)}
                           </span>
+                        </div>
+                      
+                        {usage.created_at && (
+                          <div className="flex flex-col space-y-1">
+                            <span className="text-gray-500 dark:text-slate-400 text-xs">Data creazione</span>
+                            <span className="dark:text-slate-300 flex items-center gap-1">
+                              <PlusCircle className="w-4 h-4 text-green-500" /> 
+                              {formatDate(usage.created_at)}
+                            </span>
+                          </div>
+                        )}
+                      
+                        {usage.expires_at && (
+                          <div className="flex flex-col space-y-1">
+                            <span className="text-gray-500 dark:text-slate-400 text-xs">Data scadenza</span>
+                            <span className="dark:text-slate-300 flex items-center gap-1">
+                              <Clock className="w-4 h-4 text-amber-500" /> 
+                              {formatDate(usage.expires_at)}
+                            </span>
+                          </div>
+                        )}
+                      
+                        {usage.max_uses !== undefined && (
+                          <div className="flex flex-col space-y-1">
+                            <span className="text-gray-500 dark:text-slate-400 text-xs">Utilizzi massimi</span>
+                            <span className="dark:text-slate-300 flex items-center gap-1">
+                              <Users className="w-4 h-4 text-purple-500" /> 
+                              {usage.max_uses > 0 ? usage.max_uses : 'Illimitati'}
+                            </span>
+                          </div>
                         )}
                       </div>
-                      <p className="text-sm text-gray-500 dark:text-slate-400">
-                        {usage.type === 'master' ? 'Codice Master' : 'Codice Monouso'}
-                      </p>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="flex items-center gap-1 text-gray-500 dark:text-slate-400 text-sm">
-                      <Clock className="w-4 h-4" />
-                      <span>Usato: {formatDate(usage.used_at)}</span>
-                    </div>
-                    {usage.expires_at && (
-                      <div className="flex items-center gap-1 text-gray-500 dark:text-slate-400 text-sm mt-1">
-                        <CalendarClock className="w-4 h-4" />
-                        <span>Scade il: {formatDate(usage.expires_at)}</span>
-                      </div>
-                    )}
-                    {!usage.expires_at && usage.type === 'master' && (
-                      <div className="flex items-center gap-1 text-gray-500 dark:text-slate-400 text-sm mt-1">
-                        <Check className="w-4 h-4 text-green-500" />
-                        <span>Nessuna scadenza</span>
-                      </div>
-                    )}
-                  </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

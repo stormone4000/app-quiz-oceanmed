@@ -91,6 +91,27 @@ export function AccessCodeManager() {
     try {
       setError(null);
       
+      // Get current instructor email
+      const instructorEmail = localStorage.getItem('userEmail');
+      if (!instructorEmail) {
+        throw new Error('Email dell\'istruttore non trovata');
+      }
+      
+      // Ottieni l'ID dell'utente dalla sua email
+      const { data: userData, error: userError } = await supabase
+        .from('auth_users')
+        .select('id')
+        .eq('email', instructorEmail)
+        .single();
+        
+      if (userError || !userData) {
+        console.error('Errore nel recupero dell\'ID utente:', userError);
+        throw new Error('Impossibile recuperare l\'ID dell\'utente');
+      }
+      
+      const userId = userData.id;
+      console.log('Codice creato dall\'utente con ID:', userId);
+      
       // Generate a random 6-digit code if not provided
       const code = form.code || Math.floor(100000 + Math.random() * 900000).toString();
       
@@ -110,7 +131,8 @@ export function AccessCodeManager() {
           expiration_date: form.expiration_date || expirationDate,
           is_active: true,
           duration_months: form.duration_months,
-          duration_type: form.duration_type
+          duration_type: form.duration_type,
+          created_by: userId // Utilizzo l'ID utente invece dell'email
         }]);
 
       if (insertError) throw insertError;

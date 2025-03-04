@@ -9,13 +9,16 @@ interface AssignQuizProps {
     description: string;
   };
   onClose: () => void;
+  onAssignSuccess?: () => void;
 }
 
-export function AssignQuiz({ quiz, onClose }: AssignQuizProps) {
+export function AssignQuiz({ quiz, onClose, onAssignSuccess }: AssignQuizProps) {
   const [studentEmails, setStudentEmails] = useState('');
   const [startDate, setStartDate] = useState('');
   const [deadline, setDeadline] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const handleAssign = async () => {
     try {
@@ -45,6 +48,10 @@ export function AssignQuiz({ quiz, onClose }: AssignQuizProps) {
         .insert(assignments);
 
       if (insertError) throw insertError;
+
+      if (onAssignSuccess) {
+        onAssignSuccess();
+      }
 
       onClose();
     } catch (error) {

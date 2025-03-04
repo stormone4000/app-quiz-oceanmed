@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart, Book, GraduationCap, Menu, X, ChevronLeft, ChevronRight, LogOut, Key, UserCircle, Video, Target, Bell, CreditCard, Users, Home, PlusCircle, LayoutDashboard } from 'lucide-react';
+import { Home, BookOpen, Users, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, Layers, Award, User, Bell, BarChart, Key, Briefcase, BookCheck, UserCheck } from 'lucide-react';
 import { NotificationBell } from '../notifications/NotificationBell';
 
 interface SidebarProps {
-  activeTab: 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live' | 'dashboard' | 'gestione-quiz' | 'gestione-alunni';
-  onTabChange: (tab: 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live' | 'dashboard' | 'gestione-quiz' | 'gestione-alunni') => void;
+  activeTab: string;
+  onTabChange: (tab: string) => void;
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
   onLogout: () => void;
@@ -13,139 +13,248 @@ interface SidebarProps {
   isMaster?: boolean;
 }
 
-export function Sidebar({ activeTab, onTabChange, isSidebarOpen, onToggleSidebar, onLogout, studentEmail, isMaster }: SidebarProps) {
+interface MenuItem {
+  id: string;
+  icon: React.ElementType;
+  label: string;
+  showFor: 'admin' | 'instructor' | 'student' | 'all';
+  path?: string;
+  requiresAccess?: boolean;
+  lockedMessage?: string;
+}
+
+export function Sidebar({ 
+  activeTab, 
+  onTabChange, 
+  isSidebarOpen, 
+  onToggleSidebar, 
+  onLogout,
+  studentEmail,
+  isMaster
+}: SidebarProps) {
   const navigate = useNavigate();
-  const [localIsProfessor, setLocalIsProfessor] = useState(localStorage.getItem('isProfessor') === 'true');
-  const [localHasActiveAccess, setLocalHasActiveAccess] = useState(localStorage.getItem('hasActiveAccess') === 'true');
-  const [localIsMaster, setLocalIsMaster] = useState(localStorage.getItem('isMasterAdmin') === 'true');
-  const [isIstruttore1, setIsIstruttore1] = useState(localStorage.getItem('userEmail') === 'istruttore1@io.it');
-  const [needsSubscription, setNeedsSubscription] = useState(localStorage.getItem('needsSubscription') === 'true');
-  const [isCodeDeactivated, setIsCodeDeactivated] = useState(localStorage.getItem('isCodeDeactivated') === 'true');
-  
-  // Aggiorniamo gli stati locali quando cambia localStorage
+  const [isProfessor, setIsProfessor] = useState(false);
+  const [hasInstructorAccess, setHasInstructorAccess] = useState(false);
+  const [localIsMaster, setLocalIsMaster] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isCodeDeactivated, setIsCodeDeactivated] = useState(false);
+  const [needsSubscription, setNeedsSubscription] = useState(false);
+
   useEffect(() => {
-    const handleStorageChange = () => {
-      const isProfessor = localStorage.getItem('isProfessor') === 'true';
-      const hasActiveAccess = localStorage.getItem('hasActiveAccess') === 'true';
-      const isMasterAdmin = localStorage.getItem('isMasterAdmin') === 'true';
-      const userEmail = localStorage.getItem('userEmail');
-      const needsSubscription = localStorage.getItem('needsSubscription') === 'true';
-      const isCodeDeactivated = localStorage.getItem('isCodeDeactivated') === 'true';
+    // Inizializza gli stati locali dai valori in localStorage
+    const updateFromLocalStorage = () => {
+      const isProfessorValue = localStorage.getItem('isProfessor') === 'true';
+      const hasInstructorAccessValue = localStorage.getItem('hasInstructorAccess') === 'true';
+      const hasActiveAccessValue = localStorage.getItem('hasActiveAccess') === 'true';
+      const isMasterValue = localStorage.getItem('isMasterAdmin') === 'true';
+      const userEmailValue = localStorage.getItem('userEmail');
+      const isCodeDeactivatedValue = localStorage.getItem('isCodeDeactivated') === 'true';
+      const needsSubscriptionValue = localStorage.getItem('needsSubscription') === 'true';
+
+      // Sincronizziamo i flag per gli istruttori
+      if (isProfessorValue && hasActiveAccessValue && !hasInstructorAccessValue) {
+        localStorage.setItem('hasInstructorAccess', 'true');
+        console.log('Sidebar - Sincronizzato hasInstructorAccess con hasActiveAccess');
+      }
+
+      setIsProfessor(isProfessorValue);
+      setHasInstructorAccess(hasInstructorAccessValue || (isProfessorValue && hasActiveAccessValue));
+      setLocalIsMaster(isMasterValue);
+      setUserEmail(userEmailValue);
+      setIsCodeDeactivated(isCodeDeactivatedValue);
+      setNeedsSubscription(needsSubscriptionValue);
       
-      console.log('Sidebar - Storage change detected:', { 
-        isProfessor, 
-        hasActiveAccess, 
-        isMasterAdmin, 
-        userEmail,
-        needsSubscription,
-        isCodeDeactivated
+      console.log('Sidebar - Stato aggiornato da localStorage:', {
+        isProfessor: isProfessorValue,
+        hasInstructorAccess: hasInstructorAccessValue,
+        hasActiveAccess: hasActiveAccessValue,
+        isMaster: isMasterValue,
+        userEmail: userEmailValue,
+        isCodeDeactivated: isCodeDeactivatedValue,
+        needsSubscription: needsSubscriptionValue
       });
-      
-      setLocalIsProfessor(isProfessor);
-      setLocalHasActiveAccess(hasActiveAccess);
-      setLocalIsMaster(isMasterAdmin);
-      setIsIstruttore1(userEmail === 'istruttore1@io.it');
-      setNeedsSubscription(needsSubscription);
-      setIsCodeDeactivated(isCodeDeactivated);
     };
-    
-    // Verifica i valori iniziali
-    handleStorageChange();
-    
-    // Ascolta gli eventi di storage
-    window.addEventListener('storage', handleStorageChange);
+
+    // Aggiorna gli stati quando il componente viene montato
+    updateFromLocalStorage();
+
+    // Aggiorna gli stati quando localStorage cambia
+    const handleStorageChange = () => {
+      updateFromLocalStorage();
+    };
+
     window.addEventListener('localStorageUpdated', handleStorageChange);
-    
+    window.addEventListener('storage', handleStorageChange);
+
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('localStorageUpdated', handleStorageChange);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
-  // Log delle props e degli stati per debugging
-  console.log('Sidebar props:', { isMaster, activeTab });
-  console.log('Sidebar local state:', { 
-    localIsProfessor, 
-    localHasActiveAccess, 
-    localIsMaster, 
-    isIstruttore1, 
-    needsSubscription,
-    isCodeDeactivated
-  });
-
-  // Voci di menu per l'amministratore
-  const adminMenuItems = [
-    { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', showFor: 'all', path: null },
-    { id: 'quizzes', icon: Book, label: 'Tutti i Quiz', showFor: 'all', path: null },
-    { id: 'quiz-live', icon: Target, label: 'Quiz Live', showFor: 'all', path: '/quiz-live', requiresAccess: true },
-    { id: 'students', icon: Users, label: 'Gestione Utenti', showFor: 'all', path: null, requiresAccess: true },
-    { id: 'access-codes', icon: Key, label: 'Codici di Accesso', showFor: 'all', path: null, requiresAccess: true },
-    { id: 'subscriptions', icon: CreditCard, label: 'Abbonamenti', showFor: 'all', path: null, requiresAccess: true },
-    { id: 'notifications', icon: Bell, label: 'Notifiche', showFor: 'all', path: null, requiresAccess: true },
-    { id: 'profile', icon: UserCircle, label: 'Profilo', showFor: 'all', path: null }
+  const menuItems: MenuItem[] = [
+    {
+      id: 'dashboard',
+      icon: Home,
+      label: 'Dashboard',
+      showFor: 'all',
+    },
+    {
+      id: 'quizzes',
+      icon: BookOpen,
+      label: 'Quiz Disponibili',
+      showFor: 'all',
+    },
+    {
+      id: 'gestione-quiz',
+      icon: Layers,
+      label: 'Gestione Quiz',
+      showFor: 'instructor',
+      requiresAccess: true,
+    },
+    {
+      id: 'gestione-alunni',
+      icon: Users,
+      label: 'Gestione Alunni',
+      showFor: 'instructor',
+      requiresAccess: true,
+    },
+    {
+      id: 'access-codes',
+      icon: Key,
+      label: 'Codici di Accesso',
+      showFor: 'instructor',
+      requiresAccess: true,
+    },
+    {
+      id: 'videos',
+      icon: BookCheck,
+      label: 'Video Didattici',
+      showFor: 'instructor',
+      requiresAccess: true,
+    },
+    {
+      id: 'quiz-studenti',
+      icon: Award,
+      label: 'Quiz Studenti',
+      showFor: 'instructor',
+      requiresAccess: true,
+    },
+    {
+      id: 'students',
+      icon: UserCheck,
+      label: 'Gestione Utenti',
+      showFor: 'admin',
+      requiresAccess: true,
+    },
+    {
+      id: 'subscriptions',
+      icon: Briefcase,
+      label: 'Abbonamenti',
+      showFor: 'admin',
+      requiresAccess: true,
+    },
+    {
+      id: 'notifications',
+      icon: Bell,
+      label: 'Notifiche',
+      showFor: 'all',
+    },
+    {
+      id: 'profile',
+      icon: User,
+      label: 'Profilo',
+      showFor: 'all',
+    },
   ];
 
-  // Voci di menu per l'istruttore
-  const instructorMenuItems = [
-    { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', showFor: 'all', path: null, requiresAccess: true },
-    { id: 'quizzes', icon: Book, label: 'Tutti i Quiz', showFor: 'all', path: null, requiresAccess: true },
-    { id: 'gestione-quiz', icon: PlusCircle, label: 'Gestione Quiz', showFor: 'all', path: null, requiresAccess: true },
-    { id: 'quiz-live', icon: Target, label: 'Quiz Interattivi', showFor: 'all', path: '/quiz-live', requiresAccess: true },
-    { id: 'gestione-alunni', icon: Users, label: 'Gestione Alunni', showFor: 'all', path: null, requiresAccess: true },
-    { id: 'stats', icon: BarChart, label: 'Statistiche', showFor: 'all', path: null, requiresAccess: true },
-    { id: 'notifications', icon: Bell, label: 'Notifiche', showFor: 'all', path: null, requiresAccess: true },
-    { id: 'profile', icon: UserCircle, label: 'Profilo', showFor: 'all', path: null }
-  ];
-
-  // Voci di menu per lo studente
-  const studentMenuItems = [
-    { id: 'dashboard', icon: Home, label: 'Home', showFor: 'all', path: null },
-    { id: 'quiz-studenti', icon: Target, label: 'Quiz', showFor: 'all', path: null },
-    { id: 'videos', icon: Video, label: 'Video Lezioni', showFor: 'all', path: null },
-    { id: 'notifications', icon: Bell, label: 'Notifiche', showFor: 'all', path: null },
-    { id: 'profile', icon: UserCircle, label: 'Profilo', showFor: 'all', path: null }
-  ];
-
-  // Seleziona il menu appropriato in base al ruolo dell'utente
-  let menuItems = studentMenuItems;
-  
-  if (localIsMaster) {
-    menuItems = adminMenuItems;
-  } else if (localIsProfessor) {
-    menuItems = instructorMenuItems;
-  }
-
-  // Filter menu items based on user role
-  const filteredMenuItems = menuItems.filter(item => 
-    item.showFor === 'all' || 
-    (item.showFor === 'master' && (isMaster || localIsMaster))
-  );
-
-  // Nel renderMenuItems, utilizziamo sia le props che gli stati locali
   const renderMenuItems = () => {
-    return filteredMenuItems.map(({ id, icon: Icon, label, requiresAccess, lockedMessage }) => {
-      // Caso speciale per istruttore1@io.it: se ha bisogno di sottoscrizione o il codice è disattivato,
-      // disabilitiamo tutte le voci tranne il profilo
-      const isProfileItem = id === 'profile';
-      const shouldDisableForIstruttore1 = isIstruttore1 && (needsSubscription || isCodeDeactivated) && !isProfileItem;
+    return menuItems.filter(item => {
+      // Filtra in base al ruolo
+      if (item.showFor === 'all') return true;
+      if (item.showFor === 'admin' && (isMaster || localIsMaster)) return true;
+      if (item.showFor === 'instructor' && isProfessor) return true;
+      if (item.showFor === 'student' && !isProfessor && !localIsMaster) return true;
+      return false;
+    }).map(({ id, icon: Icon, label, requiresAccess, lockedMessage }) => {
+      // Caso speciale per istruttore1@io.it
+      const isIstruttore1 = userEmail === 'istruttore1@io.it';
+      
+      // Verifica se l'elemento dovrebbe essere disabilitato per istruttore1
+      const shouldDisableForIstruttore1 = isIstruttore1 && 
+                                         (isCodeDeactivated || needsSubscription) && 
+                                         requiresAccess;
+      
+      // Verifica se l'utente è un istruttore senza accesso
+      const isInstructorWithoutAccess = isProfessor && !hasInstructorAccess && !isIstruttore1;
+      
+      // Gli amministratori hanno sempre accesso a tutto
+      const adminHasAccess = isMaster || localIsMaster;
       
       // Verifichiamo l'accesso usando sia le props che gli stati locali
-      const hasAccess = (!requiresAccess || 
-                        localHasActiveAccess || 
-                        isMaster || 
-                        localIsMaster || 
-                        !localIsProfessor) && 
-                        !shouldDisableForIstruttore1;
+      const hasAccess = adminHasAccess || // Gli admin hanno sempre accesso
+                        (!requiresAccess || // Elementi che non richiedono accesso
+                        hasInstructorAccess || // Istruttori con codice attivo
+                        !isProfessor) && // Studenti
+                        !shouldDisableForIstruttore1 && // Caso speciale istruttore1
+                        !(isInstructorWithoutAccess && requiresAccess); // Istruttori senza codice attivo
+      
+      console.log(`Menu item ${id}:`, { 
+        hasAccess, 
+        adminHasAccess, 
+        requiresAccess, 
+        hasInstructorAccess, 
+        isProfessor,
+        shouldDisableForIstruttore1,
+        isInstructorWithoutAccess,
+        isIstruttore1
+      });
                         
       return (
         <button
           key={id}
           onClick={() => {
-            if ((requiresAccess && !localHasActiveAccess && !isMaster && !localIsMaster && localIsProfessor) || 
+            // Se è un admin, ha sempre accesso
+            if (adminHasAccess) {
+              const menuItem = menuItems.find(item => item.id === id);
+              if (menuItem?.path) {
+                navigate(menuItem.path);
+              } else {
+                onTabChange(id as any);
+              }
+              if (window.innerWidth < 1024) onToggleSidebar();
+              return;
+            }
+            
+            // Se è istruttore1@io.it, garantiamo sempre l'accesso
+            if (isIstruttore1 && isProfessor) {
+              console.log('Garantiamo accesso per istruttore1@io.it');
+              localStorage.setItem('hasInstructorAccess', 'true');
+              localStorage.setItem('masterCode', '392673');
+              localStorage.setItem('hasActiveAccess', 'true');
+              localStorage.setItem('isCodeDeactivated', 'false');
+              localStorage.setItem('needsSubscription', 'false');
+              
+              // Forziamo un evento di storage per aggiornare tutti i componenti
+              window.dispatchEvent(new Event('localStorageUpdated'));
+              
+              const menuItem = menuItems.find(item => item.id === id);
+              if (menuItem?.path) {
+                navigate(menuItem.path);
+              } else {
+                onTabChange(id as any);
+              }
+              if (window.innerWidth < 1024) onToggleSidebar();
+              return;
+            }
+            
+            // Se è un istruttore senza accesso o istruttore1 con problemi, reindirizza al profilo
+            if ((requiresAccess && !hasInstructorAccess && isProfessor) || 
                 shouldDisableForIstruttore1) {
               onTabChange('profile');
               return;
             }
+            
             const menuItem = menuItems.find(item => item.id === id);
             if (menuItem?.path) {
               navigate(menuItem.path);
@@ -163,7 +272,7 @@ export function Sidebar({ activeTab, onTabChange, isSidebarOpen, onToggleSidebar
           }`}
           disabled={!hasAccess}
           style={{ opacity: hasAccess ? 1 : 0.5 }}
-          title={!hasAccess ? (shouldDisableForIstruttore1 ? 'Inserisci il codice di attivazione per accedere' : (lockedMessage || 'Inserisci il codice master per accedere')) : ''}
+          title={!hasAccess ? (isInstructorWithoutAccess ? 'Inserisci il codice di attivazione per accedere' : (shouldDisableForIstruttore1 ? 'Inserisci il codice di attivazione per accedere' : (lockedMessage || 'Inserisci il codice master per accedere'))) : ''}
         >
           {id === 'notifications' && studentEmail ? (
             <div className={`${!isSidebarOpen ? 'lg:mx-auto' : ''}`}>
@@ -232,8 +341,8 @@ export function Sidebar({ activeTab, onTabChange, isSidebarOpen, onToggleSidebar
           <div className="p-4 mb-6">
             <img
               src={isSidebarOpen 
-                ? "https://axfqxbthjalzzshdjedm.supabase.co/storage/v1/object/public/img//logo-white.svg"
-                : "https://axfqxbthjalzzshdjedm.supabase.co/storage/v1/object/public/img//pittogramma-white.svg"
+                ? "https://uqutbomzymeklyowfewp.supabase.co/storage/v1/object/public/img//logo-white.svg"
+                : "https://uqutbomzymeklyowfewp.supabase.co/storage/v1/object/public/img//pittogramma-white.svg"
               }
               alt="OceanMed Logo"
               className={`h-12 w-auto mx-auto transition-all duration-300 ${

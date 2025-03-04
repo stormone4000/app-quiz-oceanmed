@@ -37,7 +37,74 @@ export function StudentManagement() {
     try {
       setLoading(true);
       setError(null);
-
+      
+      // Ottieni l'email dell'istruttore corrente dal localStorage
+      const instructorEmail = localStorage.getItem('userEmail');
+      
+      if (!instructorEmail) {
+        throw new Error('Email dell\'istruttore non trovata');
+      }
+      
+      console.log('Caricamento studenti per l\'istruttore:', instructorEmail);
+      
+      // Ottieni l'ID dell'utente dalla sua email
+      const { data: userData, error: userError } = await supabase
+        .from('auth_users')
+        .select('id')
+        .eq('email', instructorEmail)
+        .single();
+        
+      if (userError || !userData) {
+        console.error('Errore nel recupero dell\'ID utente:', userError);
+        throw new Error('Impossibile recuperare l\'ID dell\'utente');
+      }
+      
+      const userId = userData.id;
+      console.log('Caricamento studenti per l\'istruttore con ID:', userId);
+      
+      // 1. Prima, ottieni gli ID dei codici di accesso che appartengono a questo istruttore
+      const { data: accessCodes, error: accessCodesError } = await supabase
+        .from('access_codes')
+        .select('id')
+        .eq('created_by', userId);
+        
+      if (accessCodesError) {
+        console.error('Errore nel caricamento dei codici di accesso:', accessCodesError);
+        throw accessCodesError;
+      }
+      
+      if (!accessCodes || accessCodes.length === 0) {
+        console.log('Nessun codice di accesso trovato per l\'istruttore');
+        setStudents([]);
+        setLoading(false);
+        return;
+      }
+      
+      const codeIds = accessCodes.map(code => code.id);
+      console.log('Codici di accesso trovati:', codeIds);
+      
+      // 2. Ora, ottieni tutte le email degli studenti che hanno utilizzato questi codici
+      const { data: usageRecords, error: usageError } = await supabase
+        .from('access_code_usage')
+        .select('student_email')
+        .in('code_id', codeIds);
+        
+      if (usageError) {
+        console.error('Errore nel caricamento dell\'utilizzo dei codici:', usageError);
+        throw usageError;
+      }
+      
+      if (!usageRecords || usageRecords.length === 0) {
+        console.log('Nessuno studente ha utilizzato i codici di questo istruttore');
+        setStudents([]);
+        setLoading(false);
+        return;
+      }
+      
+      const studentEmails = usageRecords.map(record => record.student_email);
+      console.log('Email degli studenti trovate:', studentEmails);
+      
+      // 3. Infine, carica i dati degli studenti che hanno usato i codici dell'istruttore
       const { data: users, error: usersError } = await supabase
         .from('auth_users')
         .select(`
@@ -47,6 +114,7 @@ export function StudentManagement() {
             status
           )
         `)
+        .in('email', studentEmails)
         .order('last_login', { ascending: false });
 
       if (usersError) throw usersError;

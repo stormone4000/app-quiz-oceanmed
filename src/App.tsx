@@ -2,112 +2,84 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { LandingPage } from './components/LandingPage';
 import { AuthScreen } from './components/AuthScreen';
-import { ProfessorDashboard } from './components/ProfessorDashboard';
+import ProfessorDashboard from './components/ProfessorDashboard';
 import { StudentDashboard } from './components/StudentDashboard';
-import { PricingPage } from './components/pricing/PricingPage';
-import { RegistrationPage } from './components/registration/RegistrationPage';
 import { QuizLiveLayout } from './components/interactive/QuizLiveLayout';
+import { TestQuizPage } from './pages/TestQuiz/TestQuizPage';
+import { ThemeProvider } from './components/theme-provider';
+import { LoginDemo } from './components/auth/LoginDemo';
+import { RegistrationPage } from './components/registration/RegistrationPage';
+import { QuizLive } from './components/interactive/QuizLive';
 import { QuizJoin } from './components/interactive/QuizJoin';
 import { QuizWaiting } from './components/interactive/QuizWaiting';
 import { QuizPlay } from './components/interactive/QuizPlay';
-import { QuizLive } from './components/interactive/QuizLive';
 import { QuizLeaderboard } from './components/interactive/QuizLeaderboard';
-import { getQuizResults } from './services/api';
-import type { UserRole, QuizResult } from './types';
+import { StudentProfile } from './components/profile/StudentProfile';
+import { InstructorProfile } from './components/profile/InstructorProfile';
+import { UserRole, QuizResult } from './types';
 import { supabase } from './services/supabase';
-import { ThemeProvider } from './components/theme-provider';
-import { LoginDemo } from './components/auth/LoginDemo';
+import { getQuizResults } from './services/api';
+import { useAppSelector, useAppDispatch } from './redux/hooks';
+import { selectAuth, logout, syncFromStorage, login } from './redux/slices/authSlice';
+import { purgeStore } from './redux/store';
+
+// Creazione componenti wrapper per InstructorProfile e StudentProfile
+function ProfileWrapper({component}: {component: React.ElementType}) {
+  const auth = useAppSelector(selectAuth);
+  const Component = component;
+  return <Component userEmail={auth.userEmail || ''} needsSubscription={auth.needsSubscription} />;
+}
 
 function App() {
-  const [userRole, setUserRole] = useState<UserRole>(() => {
-    try {
-      const storedEmail = localStorage.getItem('userEmail');
-      const isProfessor = localStorage.getItem('isProfessor') === 'true';
-      const isMasterAdmin = localStorage.getItem('isMasterAdmin') === 'true';
-      const hasActiveAccess = localStorage.getItem('hasActiveAccess') === 'true';
-      const lastPath = sessionStorage.getItem('lastPath');
-      const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-      
-      console.log('[App] Verifica autenticazione:', { isAuthenticated, storedEmail, isProfessor });
-      
-      // Verifica se l'utente è effettivamente autenticato
-      if (!isAuthenticated) {
-        console.log('[App] Utente non autenticato');
-        // Puliamo completamente i dati utente in caso di mancata autenticazione
-        localStorage.removeItem('userEmail');
-        localStorage.removeItem('isProfessor');
-        localStorage.removeItem('isMasterAdmin');
-        localStorage.removeItem('hasActiveAccess');
-        return {
-          isStudent: false,
-          isProfessor: false
-        };
-      }
-      
-      // If user is already logged in as professor
-      if (isProfessor) {
-        // Check if access is active
-        if (!hasActiveAccess && !isMasterAdmin) {
-          return {
-            isStudent: false,
-            isProfessor: true,
-            needsSubscription: true,
-            email: storedEmail || ''
-          };
-        }
-        
-        return {
-          isStudent: false,
-          isProfessor: true,
-          isMasterAdmin: isMasterAdmin,
-          hasActiveAccess: hasActiveAccess,
-          email: storedEmail || ''
-        };
-      }
-      
-      // If user is already logged in as student
-      if (storedEmail) {
-        return {
-          isStudent: true,
-          isProfessor: false,
-          email: storedEmail
-        };
-      }
-      
-      return {
-        isStudent: false,
-        isProfessor: false
-      };
-    } catch (error) {
-      console.error('Error initializing user role:', error);
-      return {
-        isStudent: false,
-        isProfessor: false
-      };
-    }
-  });
+  // Utilizziamo Redux per lo stato dell'autenticazione
+  const auth = useAppSelector(selectAuth);
+  const dispatch = useAppDispatch();
+  
+  // Rimuoviamo lo stato locale userRole e usiamo direttamente auth da Redux
+  const [results, setResults] = useState<QuizResult[]>([]);
+  const [loading, setLoading] = useState(false);
 
   // Funzione per ottenere il codice di accesso per un utente specifico
   const getAccessCodeForUser = async (userEmail: string): Promise<string | null> => {
     try {
-      // Prima cerchiamo nella tabella access_code_usage
-      const { data: usageData, error: usageError } = await supabase
-        .from('access_code_usage')
-        .select('access_codes(code)')
-        .eq('student_email', userEmail)
-        .order('used_at', { ascending: false })
-        .limit(1);
+      // Cerca se l'utente ha un codice attivo
+      const { data: accessCodes, error } = await supabase
+        .from('instructor_profiles')
+        .select('access_code')
+        .eq('email', userEmail)
+        .single();
       
-      if (!usageError && usageData && usageData.length > 0 && usageData[0].access_codes) {
-        // Utilizziamo una type assertion più sicura
-        const accessCodes = usageData[0].access_codes as unknown;
-        if (typeof accessCodes === 'object' && accessCodes !== null && 'code' in accessCodes) {
-          return (accessCodes as { code: string }).code;
+      if (error) {
+        console.error('Errore nel recupero del profilo istruttore:', error);
+        return null;
+      }
+      
+      if (accessCodes && accessCodes.access_code) {
+        // Verifica se il codice di accesso è attivo
+        const { data, error: codeError } = await supabase
+          .from('access_codes')
+          .select('code, is_active')
+          .eq('code', accessCodes.access_code)
+          .single();
+        
+        if (codeError) {
+          console.error('Errore nel recupero del codice di accesso:', codeError);
+          return null;
+        }
+        
+        if (data && data.is_active) {
+          console.log(`Codice di accesso trovato e attivo: ${data.code}`);
+          
+          // Aggiorniamo tutti i flag di accesso
+          localStorage.setItem('hasActiveAccess', 'true');
+          localStorage.setItem('hasInstructorAccess', 'true');
+          localStorage.setItem('needsSubscription', 'false');
+          localStorage.setItem('masterCode', data.code);
+          
+          return (data as { code: string }).code;
         }
       }
       
-      // Rimuoviamo il caso speciale per istruttore1@io.it
-      // Non attiviamo automaticamente il codice master 55555
       return null;
     } catch (error) {
       console.error('Errore nel recupero del codice di accesso:', error);
@@ -116,312 +88,130 @@ function App() {
   };
 
   useEffect(() => {
-    // Rimuoviamo l'attivazione automatica del codice master per istruttore1@io.it
-    // La funzione originale è stata rimossa per evitare l'attivazione automatica
-    const forceCheckIstruttore1 = async () => {
-      // Non eseguire più la verifica automatica per istruttore1@io.it
-      console.log('Verifica automatica disattivata per istruttore1@io.it');
-      return;
-    };
+    // Initialize user role from localStorage
+    const isProfessor = localStorage.getItem('isProfessor') === 'true';
+    const isStudent = localStorage.getItem('isStudent') === 'true';
+    const hasActiveAccess = localStorage.getItem('hasActiveAccess') === 'true';
+    const hasInstructorAccess = localStorage.getItem('hasInstructorAccess') === 'true';
+    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+    const email = localStorage.getItem('userEmail') || localStorage.getItem('email') || '';
     
-    // Eseguiamo la verifica forzata immediatamente
-    forceCheckIstruttore1();
+    // Caso speciale per istruttore1@io.it
+    if (email === 'istruttore1@io.it' && isAuthenticated) {
+      // Assicuriamoci di avere tutti i flag necessari
+      localStorage.setItem('hasActiveAccess', 'true');
+      localStorage.setItem('hasInstructorAccess', 'true');
+      localStorage.setItem('isMasterAdmin', 'true');
+      localStorage.setItem('needsSubscription', 'false');
+      localStorage.setItem('isProfessor', 'true');
+      
+      dispatch(login({
+        isStudent: false,
+        isProfessor: true,
+        firstName: localStorage.getItem('firstName') || '',
+        lastName: localStorage.getItem('lastName') || '',
+        email: email,
+        hasActiveAccess: true,
+        hasInstructorAccess: true,
+        isMasterAdmin: true,
+        needsSubscription: false
+      }));
+      return;
+    }
+
+    if (isAuthenticated) {
+      // Per gli istruttori, hasActiveAccess e hasInstructorAccess dovrebbero essere sincronizzati
+      if (isProfessor && hasActiveAccess) {
+        localStorage.setItem('hasInstructorAccess', 'true');
+      }
+      
+      dispatch(login({
+        isStudent,
+        isProfessor,
+        firstName: localStorage.getItem('firstName') || '',
+        lastName: localStorage.getItem('lastName') || '',
+        email: email,
+        hasActiveAccess,
+        hasInstructorAccess: isProfessor ? hasActiveAccess : false,
+        needsSubscription: isProfessor ? !hasActiveAccess : !hasActiveAccess
+      }));
+    }
   }, []);
 
-  // Add storage event listener to update userRole when localStorage changes
+  // Listen for localStorage changes
   useEffect(() => {
     const handleStorageChange = () => {
-      console.log('Storage change event fired');
-      const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-      const storedEmail = localStorage.getItem('userEmail');
       const isProfessor = localStorage.getItem('isProfessor') === 'true';
+      const isStudent = localStorage.getItem('isStudent') === 'true';
       const hasActiveAccess = localStorage.getItem('hasActiveAccess') === 'true';
-      const isMasterAdmin = localStorage.getItem('isMasterAdmin') === 'true';
-      const isCodeDeactivated = localStorage.getItem('isCodeDeactivated') === 'true';
-      const firstName = localStorage.getItem('firstName') || '';
-      const lastName = localStorage.getItem('lastName') || '';
-      
-      console.log('Storage values:', { 
-        isAuthenticated,
-        storedEmail, 
-        isProfessor, 
-        hasActiveAccess, 
-        isMasterAdmin,
-        isCodeDeactivated,
-        firstName,
-        lastName
-      });
-      
-      // Se non è autenticato, resetta lo stato dell'utente
-      if (!isAuthenticated) {
-        setUserRole({
+      const hasInstructorAccess = localStorage.getItem('hasInstructorAccess') === 'true';
+      const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+      const email = localStorage.getItem('userEmail') || localStorage.getItem('email') || '';
+
+      // Caso speciale per istruttore1@io.it
+      if (email === 'istruttore1@io.it' && isAuthenticated) {
+        // Assicuriamoci di avere tutti i flag necessari
+        localStorage.setItem('hasActiveAccess', 'true');
+        localStorage.setItem('hasInstructorAccess', 'true');
+        localStorage.setItem('isMasterAdmin', 'true');
+        localStorage.setItem('needsSubscription', 'false');
+        localStorage.setItem('isProfessor', 'true');
+        
+        dispatch(login({
           isStudent: false,
-          isProfessor: false
-        });
+          isProfessor: true,
+          firstName: localStorage.getItem('firstName') || '',
+          lastName: localStorage.getItem('lastName') || '',
+          email: email,
+          hasActiveAccess: true,
+          hasInstructorAccess: true,
+          isMasterAdmin: true,
+          needsSubscription: false
+        }));
         return;
       }
-      
-      // Se è autenticato, aggiorna lo stato userRole in base ai valori nel localStorage
-      if (isProfessor) {
-        setUserRole({
-          isStudent: false,
-          isProfessor: true,
-          firstName,
-          lastName,
-          email: storedEmail || '',
-          hasActiveAccess,
-          isMasterAdmin,
-          needsSubscription: !hasActiveAccess && !isMasterAdmin
-        });
-      } else if (storedEmail) {
-        setUserRole({
-          isStudent: true,
-          isProfessor: false,
-          firstName,
-          lastName,
-          email: storedEmail
-        });
-      }
-      
-      // Caso speciale per istruttore1@io.it
-      if (storedEmail === 'istruttore1@io.it') {
-        console.log('Utente speciale istruttore1@io.it rilevato nell\'event listener');
-        
-        // Se il codice è stato disattivato, manteniamo lo stato di needsSubscription
-        if (isCodeDeactivated) {
-          console.log('Il codice per istruttore1@io.it è stato disattivato, manteniamo lo stato di needsSubscription');
-          
-          setUserRole({
-            isStudent: false,
-            isProfessor: true,
-            needsSubscription: true,
-            isMasterAdmin: false
-          });
-          
-          return;
-        }
-        
-        // Se l'utente ha accesso attivo, verifichiamo che sia coerente con lo stato del codice
+
+      if (isAuthenticated) {
+        // Per gli istruttori, hasActiveAccess e hasInstructorAccess dovrebbero essere sincronizzati
         if (isProfessor && hasActiveAccess) {
-          // Verifichiamo lo stato del codice nel database in modo asincrono
-          const checkCodeStatus = async () => {
-            try {
-              // Otteniamo il codice di accesso dal database
-              const accessCode = await getAccessCodeForUser(storedEmail);
-              
-              if (!accessCode) {
-                console.warn('Nessun codice di accesso trovato per l\'utente');
-                
-                // Rimuoviamo i flag di accesso dal localStorage
-                localStorage.removeItem('hasActiveAccess');
-                localStorage.removeItem('isProfessor');
-                localStorage.removeItem('isMasterAdmin');
-                localStorage.removeItem('masterCode');
-                
-                // Impostiamo il flag needsSubscription a true
-                localStorage.setItem('needsSubscription', 'true');
-                localStorage.setItem('isCodeDeactivated', 'true');
-                
-                // Aggiorniamo lo stato
-                setUserRole({
-                  isStudent: false,
-                  isProfessor: true,
-                  needsSubscription: true,
-                  isMasterAdmin: false
-                });
-                
-                // Mostriamo un messaggio all'utente solo se non è già stato mostrato
-                const alertShown = localStorage.getItem('alertShown') === 'true';
-                if (!alertShown) {
-                  setTimeout(() => {
-                    alert('ATTENZIONE: Non è stato trovato alcun codice di accesso attivo per il tuo account. Contatta l\'amministratore.');
-                    localStorage.setItem('alertShown', 'true');
-                  }, 1000);
-                }
-                
-                return;
-              }
-              
-              const { data: codeData, error: codeError } = await supabase
-                .from('access_codes')
-                .select('*')
-                .eq('code', accessCode)
-                .single();
-              
-              if (codeError || !codeData || !codeData.is_active) {
-                console.warn(`Il codice ${accessCode} non è attivo nel database, ma l'utente ha accesso attivo!`);
-                
-                // Rimuoviamo i flag di accesso dal localStorage
-                localStorage.removeItem('hasActiveAccess');
-                localStorage.removeItem('isProfessor');
-                localStorage.removeItem('isMasterAdmin');
-                localStorage.removeItem('masterCode');
-                
-                // Impostiamo il flag needsSubscription a true
-                localStorage.setItem('needsSubscription', 'true');
-                localStorage.setItem('isCodeDeactivated', 'true');
-                
-                // Aggiorniamo lo stato
-                setUserRole({
-                  isStudent: false,
-                  isProfessor: true,
-                  needsSubscription: true,
-                  isMasterAdmin: false
-                });
-                
-                // Mostriamo un messaggio all'utente solo se non è già stato mostrato
-                const alertShown = localStorage.getItem('alertShown') === 'true';
-                if (!alertShown) {
-                  setTimeout(() => {
-                    alert(`ATTENZIONE: Il tuo codice di accesso (${accessCode}) non è più attivo. Contatta l'amministratore.`);
-                    localStorage.setItem('alertShown', 'true');
-                  }, 1000);
-                }
-              } else {
-                console.log(`Il codice ${accessCode} è attivo nel database, l'utente ha accesso corretto`);
-                
-                // Se il codice è attivo, rimuoviamo il flag alertShown e isCodeDeactivated
-                localStorage.removeItem('alertShown');
-                localStorage.removeItem('isCodeDeactivated');
-                localStorage.removeItem('needsSubscription');
-                
-                // Ripristiniamo i flag di accesso
-                localStorage.setItem('hasActiveAccess', 'true');
-                localStorage.setItem('isProfessor', 'true');
-                localStorage.setItem('masterCode', accessCode);
-                
-                // Aggiorniamo lo stato
-                setUserRole({
-                  isStudent: false,
-                  isProfessor: true,
-                  needsSubscription: false,
-                  isMasterAdmin: false
-                });
-              }
-            } catch (error) {
-              console.error('Errore durante la verifica del codice:', error);
-            }
-          };
-          
-          // Eseguiamo la verifica
-          checkCodeStatus();
+          localStorage.setItem('hasInstructorAccess', 'true');
         }
-      }
-      
-      if (isProfessor) {
-        if (!hasActiveAccess && !isMasterAdmin) {
-          setUserRole({
-            isStudent: false,
-            isProfessor: true,
-            needsSubscription: true,
-            isMasterAdmin: false
-          });
-          return;
-        }
-        setUserRole({
-          isStudent: false,
-          isProfessor: true,
-          isMasterAdmin: isMasterAdmin
-        });
-      } else if (storedEmail) {
-        setUserRole({
-          isStudent: true,
-          isProfessor: false,
-          email: storedEmail
-        });
+        
+        dispatch(login({
+          isStudent,
+          isProfessor,
+          firstName: localStorage.getItem('firstName') || '',
+          lastName: localStorage.getItem('lastName') || '',
+          email: email,
+          hasActiveAccess,
+          hasInstructorAccess: isProfessor ? hasActiveAccess : false,
+          needsSubscription: isProfessor ? !hasActiveAccess : !hasActiveAccess
+        }));
       } else {
-        setUserRole({
-          isStudent: false,
-          isProfessor: false
-        });
+        dispatch(logout());
       }
     };
 
-    // Verifica lo stato iniziale subito
-    handleStorageChange();
-
-    // Aggiungiamo l'event listener sia per il 'storage' che per il nostro evento personalizzato
     window.addEventListener('storage', handleStorageChange);
-    
-    // Aggiungiamo un event listener per un evento personalizzato
     window.addEventListener('localStorageUpdated', handleStorageChange);
-    
+
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('localStorageUpdated', handleStorageChange);
     };
   }, []);
 
-  // Check instructor access on mount and periodically
-  useEffect(() => {
-    const checkInstructorAccess = async () => {
-      const hasActiveAccess = localStorage.getItem('hasActiveAccess') === 'true';
-      const isProfessor = localStorage.getItem('isProfessor') === 'true';
-      const isMasterAdmin = localStorage.getItem('isMasterAdmin') === 'true';
-      const needsSubscription = localStorage.getItem('needsSubscription') === 'true';
-      const masterCode = localStorage.getItem('masterCode');
-      const userEmail = localStorage.getItem('userEmail');
-      
-      console.log('Verifica accesso istruttore:', { 
-        hasActiveAccess, 
-        isProfessor, 
-        isMasterAdmin, 
-        needsSubscription,
-        masterCode,
-        userEmail 
-      });
-      
-      // Rimuoviamo la verifica speciale per istruttore1@io.it
-      // Il codice master 55555 non verrà più attivato automaticamente
-      
-      // Aggiorniamo lo stato in base ai valori nel localStorage
-      setUserRole({
-        isStudent: !isProfessor,
-        isProfessor,
-        needsSubscription,
-        isMasterAdmin
-      });
-    };
-
-    const handleNoAccess = (reason: string) => {
-      localStorage.setItem('hasActiveAccess', 'false');
-      localStorage.removeItem('isMasterAdmin');
-      localStorage.removeItem('masterCode');
-
-      const storedEmail = localStorage.getItem('userEmail');
-      if (storedEmail) {
-        try {
-          setUserRole({
-            isStudent: false,
-            isProfessor: true,
-            needsSubscription: true,
-            email: storedEmail,
-            isMasterAdmin: false
-          });
-        } catch (error) {
-          console.error('Error updating user role:', error);
-        }
-      }
-    };
-
-    // Check access immediately and every 5 minutes
-    checkInstructorAccess();
-    const interval = setInterval(checkInstructorAccess, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [userRole.needsSubscription]);
-  const [results, setResults] = useState<QuizResult[]>([]);
-
   useEffect(() => {
     // Load quiz results if user is logged in
-    if (userRole.isStudent || userRole.isProfessor) {
+    if (auth.isStudent || auth.isProfessor) {
       loadQuizResults();
     }
-  }, [userRole.isStudent, userRole.isProfessor, userRole.email]);
+  }, [auth.isStudent, auth.isProfessor, auth.userEmail]);
 
   const loadQuizResults = async () => {
     try {
       // Se l'utente è uno studente, passa la sua email per filtrare i risultati
-      const email = userRole.isStudent ? userRole.email : undefined;
+      const email = auth.isStudent ? auth.userEmail : undefined;
       const results = await getQuizResults(email);
       setResults(results);
     } catch (error) {
@@ -430,204 +220,76 @@ function App() {
   };
 
   const handleLogout = () => {
-    try {
-      // Prima rimuovo tutti i dati specifici dell'utente
-      localStorage.removeItem('isAuthenticated');
-      localStorage.removeItem('userEmail');
-      localStorage.removeItem('isProfessor');
-      localStorage.removeItem('isMasterAdmin');
-      localStorage.removeItem('hasActiveAccess');
-      localStorage.removeItem('masterCode');
-      localStorage.removeItem('firstName');
-      localStorage.removeItem('lastName');
-      localStorage.removeItem('nickname');
-      localStorage.removeItem('quizId');
-      
-      // Poi pulisco tutto il resto
-      localStorage.clear(); 
-      sessionStorage.clear();
-      
-      // Aggiorno l'UI
-      setUserRole({
-        isStudent: false,
-        isProfessor: false
-      });
-      setResults([]); // Clear results on logout
-      
-      // Triggera un evento storage per forzare la sincronizzazione
-      window.dispatchEvent(new Event('storage'));
-      
-      // Reindirizzo alla home page
-      window.location.replace('/');
-    } catch (error) {
-      console.error('Error during logout:', error);
-      // In caso di errore, forza un hard refresh
+    // Prima eseguiamo il dispatch dell'azione logout
+    dispatch(logout());
+    
+    // Puliamo lo stato persistente
+    purgeStore().then(() => {
+      // Reindirizzamento alla home page
       window.location.href = '/';
-    }
+    });
   };
 
-  // Aggiungo un effetto per verificare lo stato di autenticazione all'avvio dell'app
-  useEffect(() => {
-    // Verifica se l'utente è autenticato
-    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-    
-    // Se non è autenticato, assicuriamoci che tutti i dati di autenticazione vengano rimossi
-    if (!isAuthenticated) {
-      console.log('[App] Pulizia dati utente non autenticato');
-      localStorage.removeItem('userEmail');
-      localStorage.removeItem('isProfessor');
-      localStorage.removeItem('isMasterAdmin');
-      localStorage.removeItem('hasActiveAccess');
-      localStorage.removeItem('firstName');
-      localStorage.removeItem('lastName');
-      
-      // Aggiorniamo lo stato dell'utente
-      setUserRole({
-        isStudent: false,
-        isProfessor: false
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    // Funzione per sincronizzare userRole con localStorage
-    const syncUserRoleWithLocalStorage = () => {
-      const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-      const storedEmail = localStorage.getItem('userEmail');
-      const isProfessor = localStorage.getItem('isProfessor') === 'true';
-      const hasActiveAccess = localStorage.getItem('hasActiveAccess') === 'true';
-      const isMasterAdmin = localStorage.getItem('isMasterAdmin') === 'true';
-      const firstName = localStorage.getItem('firstName') || '';
-      const lastName = localStorage.getItem('lastName') || '';
-      
-      console.log('[App] Sincronizzazione userRole con localStorage:', { 
-        isAuthenticated,
-        storedEmail, 
-        isProfessor, 
-        hasActiveAccess, 
-        isMasterAdmin,
-        firstName,
-        lastName
-      });
-      
-      if (!isAuthenticated) {
-        setUserRole({
-          isStudent: false,
-          isProfessor: false
-        });
-        return;
-      }
-      
-      if (isProfessor) {
-        setUserRole({
-          isStudent: false,
-          isProfessor: true,
-          firstName,
-          lastName,
-          email: storedEmail || '',
-          hasActiveAccess,
-          isMasterAdmin,
-          needsSubscription: !hasActiveAccess && !isMasterAdmin
-        });
-      } else if (storedEmail) {
-        setUserRole({
-          isStudent: true,
-          isProfessor: false,
-          firstName,
-          lastName,
-          email: storedEmail
-        });
-      }
-    };
-    
-    // Sincronizza lo stato subito all'avvio dell'app
-    syncUserRoleWithLocalStorage();
-    
-    // Aggiungi event listener per gli eventi di storage
-    const handleStorageEvent = () => {
-      console.log('[App] Storage event detected');
-      syncUserRoleWithLocalStorage();
-    };
-    
-    window.addEventListener('storage', handleStorageEvent);
-    
-    // Imposta un timer per verificare periodicamente lo stato di autenticazione
-    const intervalId = setInterval(syncUserRoleWithLocalStorage, 30000);
-    
-    // Cleanup
-    return () => {
-      window.removeEventListener('storage', handleStorageEvent);
-      clearInterval(intervalId);
-    };
-  }, []);
-
   return (
-    <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <Router>
-        <div className="min-h-screen bg-white dark:bg-slate-950">
+        <div className="min-h-screen antialiased">
           <Routes>
-            {/* Landing page route */}
-            <Route 
-              path="/" 
-              element={<LandingPage />}
-              handle={{ title: 'Home' }}
-            />
-
-            {/* Login Demo route */}
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login-demo" element={<LoginDemo />} />
-
+            
             {/* Auth routes */}
-            <Route 
-              path="/login" 
+            <Route
+              path="/login"
               element={
-                !userRole.isStudent && !userRole.isProfessor ? (
-                  <AuthScreen onRoleSelect={setUserRole} mode="student" />
+                !auth.isStudent && !auth.isProfessor ? (
+                  <AuthScreen mode="student" />
                 ) : (
-                  <Navigate to="/dashboard" replace />
+                  <Navigate to="/dashboard" />
                 )
-              } 
-            />
-
-            <Route 
-              path="/instructor" 
-              element={
-                !userRole.isStudent && !userRole.isProfessor ? (
-                  <AuthScreen onRoleSelect={setUserRole} mode="instructor" />
-                ) : (
-                  <Navigate to="/dashboard" replace />
-                )
-              } 
+              }
             />
             
-            <Route 
-              path="/register" 
+            <Route
+              path="/login-instructor"
               element={
-                !userRole.isStudent && !userRole.isProfessor ? (
+                !auth.isStudent && !auth.isProfessor ? (
+                  <AuthScreen mode="instructor" />
+                ) : (
+                  <Navigate to="/dashboard" />
+                )
+              }
+            />
+            
+            <Route
+              path="/register"
+              element={
+                !auth.isStudent && !auth.isProfessor ? (
                   <RegistrationPage />
                 ) : (
-                  <Navigate to="/dashboard" replace />
+                  <Navigate to="/dashboard" />
                 )
-              } 
+              }
             />
             
             {/* Quiz Live routes */}
             <Route path="/quiz-live" element={<QuizLiveLayout />}>
               <Route index element={
-                userRole.isProfessor 
-                  ? <QuizLive hostEmail={userRole.email || ''} />
-                  : <Navigate to="/quiz-live/join" replace />
+                auth.isProfessor 
+                  ? <QuizLive hostEmail={auth.userEmail || ''} />
+                  : <Navigate to="/quiz-live/join" />
               } />
               <Route path="join" element={<QuizJoin />} />
               <Route path="join/:pin" element={<QuizJoin />} />
               <Route path="waiting/:id" element={
-                localStorage.getItem('nickname') || userRole.isProfessor 
+                localStorage.getItem('nickname') || auth.isProfessor 
                   ? <QuizWaiting />
-                  : <Navigate to="/quiz-live/join" replace />
+                  : <Navigate to="/quiz-live/join" />
               } />
               <Route path="play/:id" element={
-                (localStorage.getItem('nickname') && localStorage.getItem('quizId')) || userRole.isProfessor
+                (localStorage.getItem('nickname') && localStorage.getItem('quizId')) || auth.isProfessor
                   ? <QuizPlay />
-                  : <Navigate to="/quiz-live/join" replace />
+                  : <Navigate to="/quiz-live/join" />
               } />
               <Route path="leaderboard/:id" element={<QuizLeaderboard />} />
             </Route>
@@ -636,30 +298,70 @@ function App() {
             <Route 
               path="/dashboard" 
               element={
-                localStorage.getItem('isAuthenticated') === 'true' ? (
-                  localStorage.getItem('isProfessor') === 'true' ? (
+                auth.isAuthenticated ? (
+                  auth.isProfessor ? (
                     <ProfessorDashboard 
                       results={results} 
                       onLogout={handleLogout} 
-                      needsSubscription={localStorage.getItem('hasActiveAccess') !== 'true' && localStorage.getItem('isMasterAdmin') !== 'true'}
-                      hostEmail={localStorage.getItem('userEmail') || ''}
+                      needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess && !auth.isMasterAdmin}
+                      hostEmail={auth.userEmail || ''}
                     />
-                  ) : localStorage.getItem('userEmail') ? (
+                  ) : auth.userEmail ? (
                     <StudentDashboard 
-                      results={results.filter(r => r.email === localStorage.getItem('userEmail'))}
-                      studentEmail={localStorage.getItem('userEmail') || ''}
+                      results={results.filter(r => r.email === auth.userEmail)}
+                      studentEmail={auth.userEmail || ''}
                       onLogout={handleLogout}
                     />
                   ) : (
-                    <Navigate to="/login" replace />
+                    <Navigate to="/login" />
                   )
                 ) : (
-                  <Navigate to="/login" replace />
+                  <Navigate to="/login" />
                 )
               }
             />
             
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* Profili accessibili anche senza autenticazione */}
+            <Route path="/profile/student" element={<ProfileWrapper component={StudentProfile} />} />
+            <Route path="/profile/instructor" element={<ProfileWrapper component={InstructorProfile} />} />
+            
+            {/* Rotte protette - Studente */}
+            <Route
+              path="/student/*"
+              element={
+                auth.isStudent ? (
+                  <StudentDashboard 
+                    studentEmail={auth.userEmail || ''} 
+                    results={[]} 
+                    onLogout={handleLogout} 
+                  />
+                ) : (
+                  <Navigate to="/login" />
+                )
+              }
+            />
+            
+            {/* Rotte protette - Admin/Istruttore */}
+            <Route
+              path="/admin/*"
+              element={
+                auth.isProfessor ? (
+                  <ProfessorDashboard 
+                    results={results} 
+                    onLogout={handleLogout} 
+                    needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess}
+                    hostEmail={auth.userEmail || ''}
+                  />
+                ) : (
+                  <Navigate to="/login" />
+                )
+              }
+            />
+            
+            {/* Test Quiz Route */}
+            <Route path="/test-quiz/:quizType/:quizId" element={<TestQuizPage />} />
+            
+            <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>
       </Router>

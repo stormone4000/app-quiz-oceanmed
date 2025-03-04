@@ -131,7 +131,7 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
       );
     }
 
-    if (activeTab === 'stats') {
+    if (activeTab === 'stats' || activeTab === 'dashboard') {
       return (
         <div className="space-y-6">
           <h2 className="text-3xl font-light text-white mb-6">Le Tue Statistiche</h2>

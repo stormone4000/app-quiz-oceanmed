@@ -34,6 +34,20 @@ interface StudentNote {
   created_at: string;
 }
 
+interface SubscriptionHistoryItem {
+  id: string;
+  user_email: string;
+  plan_id: string;
+  status: string;
+  created_at: string;
+  expires_at?: string;
+  payment_id?: string;
+  change_type: 'created' | 'updated' | 'deleted';
+  old_plan?: string;
+  new_plan?: string;
+  date: string;
+}
+
 interface QuizResult {
   id: string;
   quiz_id: string;
@@ -59,7 +73,7 @@ interface StudentDetailsProps {
 
 export function StudentDetails({ student, onBack }: StudentDetailsProps) {
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
-  const [subscriptionHistory, setSubscriptionHistory] = useState<any[]>([]);
+  const [subscriptionHistory, setSubscriptionHistory] = useState<SubscriptionHistoryItem[]>([]);
   const [notes, setNotes] = useState<StudentNote[]>([]);
   const [newNote, setNewNote] = useState('');
   const [loading, setLoading] = useState(true);
@@ -331,173 +345,17 @@ export function StudentDetails({ student, onBack }: StudentDetailsProps) {
                         result.score >= 0.75 ? 'bg-green-100' : 'bg-red-100'
                       }`}>
                         {result.score >= 0.75 ? (
-                          <CheckCircle2 className={`w-5 h-5 ${
-                            result.score >= 0.75 ? 'text-green-600' : 'text-red-600'
-                          }`} />
+                          <CheckCircle2 className="w-5 h-5 text-green-600" />
                         ) : (
                           <XCircle className="w-5 h-5 text-red-600" />
                         )}
                       </div>
-                      <div>
-                        <h4 className="font-medium">
-                          {result.quiz_details?.title || result.category}
-                        </h4>
-                        <p className="text-sm text-gray-600">
-                          {formatDate(result.date)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-6">
-                      <div className="text-right">
-                        <p className={`font-bold ${
-                          result.score >= 0.75 ? 'text-green-600' : 'text-red-600'
-                        }`}>
-                          {(result.score * 100).toFixed(1)}%
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {formatTime(result.total_time)}
-                        </p>
-                      </div>
-                      {expandedQuiz === result.id ? (
-                        <ChevronUp className="w-5 h-5 text-gray-400" />
-                      ) : (
-                        <ChevronDown className="w-5 h-5 text-gray-400" />
-                      )}
                     </div>
                   </div>
                 </div>
-
-                {expandedQuiz === result.id && (
-                  <div className="p-4 border-t border-gray-200 bg-gray-50">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <h5 className="font-medium mb-2">Dettagli Quiz</h5>
-                        <div className="space-y-2 text-sm">
-                          <p><span className="text-gray-600">Tipo:</span> {result.quiz_details?.quiz_type === 'exam' ? 'Esame' : 'Apprendimento'}</p>
-                          <p><span className="text-gray-600">Categoria:</span> {result.category}</p>
-                          <p><span className="text-gray-600">Domande:</span> {result.answers.length}</p>
-                          <p><span className="text-gray-600">Tempo Limite:</span> {result.quiz_details?.duration_minutes || 'N/A'} minuti</p>
-                        </div>
-                      </div>
-                      <div>
-                        <h5 className="font-medium mb-2">Statistiche Risposte</h5>
-                        <div className="space-y-2 text-sm">
-                          <p><span className="text-gray-600">Risposte Corrette:</span> {result.answers.filter(Boolean).length}</p>
-                          <p><span className="text-gray-600">Risposte Errate:</span> {result.answers.filter(a => !a).length}</p>
-                          <p><span className="text-gray-600">Tempo Medio per Domanda:</span> {formatTime(Math.round(result.total_time / result.answers.length))}</p>
-                          <p><span className="text-gray-600">Tempo Totale:</span> {formatTime(result.total_time)}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h5 className="font-medium mb-2">Tempi per Domanda</h5>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                        {result.question_times.map((time, index) => (
-                          <div key={index} className="p-2 bg-white rounded border border-gray-200">
-                            <p className="text-xs text-gray-600">Domanda {index + 1}</p>
-                            <p className={`font-medium ${
-                              result.answers[index] ? 'text-green-600' : 'text-red-600'
-                            }`}>
-                              {formatTime(time)}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             ))}
           </div>
-        </div>
-      </div>
-
-      {/* Subscription History */}
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h3 className="text-lg font-semibold mb-4">Storico Abbonamenti</h3>
-        <div className="space-y-4">
-          {subscriptionHistory.map((change, index) => (
-            <div key={index} className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
-              <div className={`p-2 rounded-full ${
-                change.change_type === 'created' ? 'bg-green-100' :
-                change.change_type === 'updated' ? 'bg-blue-100' :
-                'bg-red-100'
-              }`}>
-                {change.change_type === 'created' ? (
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                ) : change.change_type === 'updated' ? (
-                  <Edit className="w-5 h-5 text-blue-600" />
-                ) : (
-                  <XCircle className="w-5 h-5 text-red-600" />
-                )}
-              </div>
-              <div className="flex-1">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-medium">
-                      {change.change_type === 'created' ? 'Abbonamento Attivato' :
-                       change.change_type === 'updated' ? 'Piano Modificato' :
-                       'Abbonamento Cancellato'}
-                    </p>
-                    {change.old_plan && change.new_plan && (
-                      <p className="text-sm text-gray-600">
-                        Da {change.old_plan} a {change.new_plan}
-                      </p>
-                    )}
-                  </div>
-                  <span className="text-sm text-gray-500">
-                    {formatDate(change.date)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Instructor Notes */}
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h3 className="text-lg font-semibold mb-4">Note dell'Istruttore</h3>
-        
-        <div className="mb-4">
-          <textarea
-            value={newNote}
-            onChange={(e) => setNewNote(e.target.value)}
-            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            rows={3}
-            placeholder="Aggiungi una nota..."
-          />
-          <div className="mt-2 flex justify-end">
-            <button
-              onClick={handleAddNote}
-              disabled={!newNote.trim()}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-            >
-              Aggiungi Nota
-            </button>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          {notes.map((note) => (
-            <div key={note.id} className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <p className="whitespace-pre-wrap">{note.content}</p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    {formatDate(note.created_at)}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleDeleteNote(note.id)}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     </div>

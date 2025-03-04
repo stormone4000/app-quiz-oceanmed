@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import { Plus, Book, GraduationCap, Users } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, Book, GraduationCap, Users, Filter, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 import { QuizCreator } from './QuizCreator';
 import { QuizList } from './QuizList';
 import { AssignQuiz } from './AssignQuiz';
 import { DeleteQuizModal } from './DeleteQuizModal';
-import type { QuizType, LiveQuizSession } from '../../types';
 import { QuizLive } from '../interactive/QuizLive';
 
 // Definizione dell'interfaccia Quiz che include tutti i tipi di quiz
@@ -14,19 +12,24 @@ interface Quiz {
   id: string;
   title: string;
   description: string;
-  quiz_type: QuizType;
+  quiz_type: 'exam' | 'learning' | 'interactive';
   category: string;
   question_count: number;
   duration_minutes: number;
   icon: string;
   icon_color: string;
-  visibility: string;
-  created_by: string;
+  visibility?: string;
+  created_by?: string;
   quiz_code?: string;
+  activations_count?: number;
 }
 
-export function QuizManager() {
-  const [activeTab, setActiveTab] = useState<QuizType>('learning');
+interface QuizManagerProps {
+  mode?: 'all' | 'manage';
+}
+
+export function QuizManager({ mode = 'manage' }: QuizManagerProps) {
+  const [activeTab, setActiveTab] = useState<'exam' | 'learning' | 'interactive'>('learning');
   const [showCreator, setShowCreator] = useState(false);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
@@ -35,45 +38,37 @@ export function QuizManager() {
   const [quizToDelete, setQuizToDelete] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
   const [isMaster, setIsMaster] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [regeneratingCode, setRegeneratingCode] = useState<string | null>(null);
+  const [filterMode, setFilterMode] = useState<'all' | 'my' | 'public' | 'private'>(
+    mode === 'all' ? 'all' : 'my'
+  );
 
-  useEffect(() => {
-    // Check if user is master admin and get email
-    const checkMasterStatus = async () => {
-      try {
-        const email = localStorage.getItem('userEmail');
-        setUserEmail(email);
-        setIsMaster(localStorage.getItem('isMasterAdmin') === 'true');
-      } catch (error) {
-        console.error('Error checking master status:', error);
-      }
-    };
-
-    checkMasterStatus();
-    loadQuizzes();
-  }, []);
-
-  useEffect(() => {
-    loadQuizzes();
-  }, [activeTab]);
-
-  const loadQuizzes = async () => {
+  const loadQuizzes = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      setIsCreating(false);
       
       const email = localStorage.getItem('userEmail');
       if (!email) {
-        throw new Error('Sessione utente non valida');
+        throw new Error('Email utente non trovata nel localStorage');
       }
 
-      console.log(`Caricamento quiz di tipo: ${activeTab}, email: ${email}, isMaster: ${isMaster}`);
+      // Ottieni l'ID dell'utente basato sull'email
+      const { data: userData, error: userError } = await supabase
+        .from('auth_users')
+        .select('id')
+        .eq('email', email)
+        .single();
 
-      // Build query based on user role
+      if (userError) {
+        console.error('Errore nel recuperare l\'ID utente:', userError);
+        throw userError;
+      }
+
+      const userId = userData.id;
+      console.log('ID utente recuperato:', userId);
+
       let query = supabase
         .from('quiz_templates')
         .select(`
@@ -90,12 +85,20 @@ export function QuizManager() {
         .eq('quiz_type', activeTab)
         .order('created_at', { ascending: false });
 
-      console.log(`Esecuzione query per ${activeTab} quiz`);
-
-      // Se non è un admin master, mostra i quiz creati dall'utente o quelli pubblici
-      if (!isMaster) {
-        query = query.or(`created_by.eq.${email},visibility.eq.public`);
-        console.log(`Filtro query per non-master: OR(created_by.eq.${email},visibility.eq.public)`);
+      // Applicazione dei filtri in base al ruolo e alle preferenze
+      if (isMaster) {
+        // Admin può filtrare in vari modi
+        if (filterMode === 'my') {
+          query = query.eq('created_by', userId);
+        } else if (filterMode === 'public') {
+          query = query.eq('visibility', 'public');
+        } else if (filterMode === 'private') {
+          query = query.eq('visibility', 'private');
+        }
+        // Se filterMode === 'all', non applichiamo filtri aggiuntivi
+      } else {
+        // Gli istruttori vedono solo i propri quiz
+        query = query.eq('created_by', userId);
       }
 
       const { data: quizzesData, error: quizzesError } = await query;
@@ -106,23 +109,109 @@ export function QuizManager() {
       }
       
       console.log(`Quiz trovati: ${quizzesData?.length || 0}`);
-      console.log('Quiz data:', quizzesData);
       
-      setQuizzes(quizzesData || []);
+      // Ottieni il conteggio delle attivazioni per ogni quiz
+      const quizzesWithActivations = await Promise.all((quizzesData || []).map(async (quiz) => {
+        if (quiz.quiz_code) {
+          try {
+            // Cerca nella tabella access_code_usage per contare gli studenti che hanno usato questo codice
+            const { data: accessCodes, error: accessCodesError } = await supabase
+              .from('access_codes')
+              .select('id')
+              .eq('code', quiz.quiz_code)
+              .single();
+              
+            if (accessCodesError) {
+              console.log(`Nessun codice di accesso trovato per il quiz_code: ${quiz.quiz_code}`);
+              return {
+                ...quiz,
+                activations_count: 0
+              };
+            }
+            
+            // Conta gli utilizzi del codice
+            const { count, error: countError } = await supabase
+              .from('access_code_usage')
+              .select('*', { count: 'exact', head: true })
+              .eq('code_id', accessCodes.id);
+              
+            if (countError) {
+              console.error('Errore nel conteggio utilizzi:', countError);
+              return {
+                ...quiz,
+                activations_count: 0
+              };
+            }
+            
+            return {
+              ...quiz,
+              activations_count: count || 0
+            };
+          } catch (error) {
+            console.error('Errore nel conteggio attivazioni:', error);
+            return {
+              ...quiz,
+              activations_count: 0
+            };
+          }
+        }
+        
+        return {
+          ...quiz,
+          activations_count: 0
+        };
+      }));
+      
+      setQuizzes(quizzesWithActivations);
     } catch (error) {
-      console.error('Error loading quizzes:', error);
+      console.error('Errore nel caricamento dei quiz:', error);
       setError('Errore durante il caricamento dei quiz');
+      setQuizzes([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab, isMaster, filterMode]);
 
-  const handleDeleteQuiz = (quiz: Quiz) => {
-    setQuizToDelete(quiz);
-    setShowDeleteModal(true);
-  };
+  useEffect(() => {
+    const checkMasterStatus = async () => {
+      try {
+        const email = localStorage.getItem('userEmail');
+        if (!email) return;
+        
+        const isMasterValue = localStorage.getItem('isMaster') === 'true';
+        console.log(`Stato admin master da localStorage: ${isMasterValue}`);
+        setIsMaster(isMasterValue);
+        
+        // Verifica isMaster da Supabase
+        const { data: userData, error: userError } = await supabase
+          .from('auth_users')
+          .select('is_master')
+          .eq('email', email)
+          .single();
+          
+        if (userError) {
+          console.error('Errore verifica stato admin:', userError);
+          return;
+        }
+        
+        if (userData) {
+          console.log(`Stato admin master da database: ${userData.is_master}`);
+          setIsMaster(userData.is_master);
+          localStorage.setItem('isMaster', userData.is_master ? 'true' : 'false');
+        }
+      } catch (error) {
+        console.error('Errore verifica stato admin:', error);
+      }
+    };
+    
+    checkMasterStatus();
+  }, []);
 
-  const confirmDeleteQuiz = async () => {
+  useEffect(() => {
+    loadQuizzes();
+  }, [loadQuizzes]);
+
+  const handleDeleteConfirm = async () => {
     if (!quizToDelete) return;
 
     try {
@@ -131,17 +220,25 @@ export function QuizManager() {
 
       const email = localStorage.getItem('userEmail');
       if (!email) {
-        throw new Error('Sessione utente non valida');
+        throw new Error('Email utente non trovata nel localStorage');
       }
 
-      // First, complete any active sessions for this quiz
-      const { data: activeSessions, error: sessionError } = await supabase
-        .from('live_quiz_sessions')
-        .select('*')
-        .eq('quiz_id', quizToDelete.id);
+      // Ottieni l'ID dell'utente basato sull'email
+      const { data: userData, error: userError } = await supabase
+        .from('auth_users')
+        .select('id')
+        .eq('email', email)
+        .single();
 
-      if (sessionError) throw sessionError;
+      if (userError) {
+        console.error('Errore nel recuperare l\'ID utente:', userError);
+        throw userError;
+      }
 
+      const userId = userData.id;
+      console.log('ID utente per la cancellazione:', userId);
+
+      // Delete related questions first
       const { error: questionsError } = await supabase
         .from('quiz_questions')
         .delete()
@@ -153,7 +250,7 @@ export function QuizManager() {
         .from('quiz_templates')
         .delete()
         .eq('id', quizToDelete.id)
-        .eq('created_by', email); // Only delete own quizzes
+        .eq('created_by', userId); // Only delete own quizzes
 
       if (quizError) throw quizError;
 
@@ -171,35 +268,31 @@ export function QuizManager() {
   const handleCreateQuiz = () => {
     setSelectedQuiz(null);
     setShowCreator(true);
-    setIsCreating(true);
   };
 
   const handleVisibilityChange = async (quizId: string, isPublic: boolean) => {
     try {
-      setLoading(true);
       setError(null);
-
+      
       const { error: updateError } = await supabase
         .from('quiz_templates')
         .update({ visibility: isPublic ? 'public' : 'private' })
         .eq('id', quizId);
-
+        
       if (updateError) throw updateError;
+      
       await loadQuizzes();
     } catch (error) {
       console.error('Error updating quiz visibility:', error);
-      setError('Errore durante l\'aggiornamento della visibilità del quiz');
-    } finally {
-      setLoading(false);
+      setError('Errore durante l\'aggiornamento della visibilità');
     }
   };
 
   const handleRegenerateCode = async (quizId: string) => {
     try {
-      setRegeneratingCode(quizId);
       setError(null);
 
-      const { data: result, error: regenerateError } = await supabase
+      const { error: regenerateError } = await supabase
         .rpc('regenerate_quiz_code', { quiz_id: quizId });
 
       if (regenerateError) throw regenerateError;
@@ -208,126 +301,193 @@ export function QuizManager() {
     } catch (error) {
       console.error('Error regenerating quiz code:', error);
       setError('Errore durante la rigenerazione del codice');
-    } finally {
-      setRegeneratingCode(null);
     }
   };
 
+  // Renderer per i controlli di filtro
+  const renderFilterControls = () => {
+    if (!isMaster) return null;
+    
+    return (
+      <div className="flex items-center gap-2 mb-4">
+        <Filter className="w-5 h-5 text-gray-400" />
+        <span className="text-sm text-gray-400">Filtro:</span>
+        <div className="flex gap-1">
+          <button
+            onClick={() => setFilterMode('all')}
+            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+              filterMode === 'all'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-600'
+            }`}
+          >
+            Tutti
+          </button>
+          <button
+            onClick={() => setFilterMode('my')}
+            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+              filterMode === 'my'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-600'
+            }`}
+          >
+            Miei
+          </button>
+          <button
+            onClick={() => setFilterMode('public')}
+            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+              filterMode === 'public'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-600'
+            }`}
+          >
+            <Eye className="w-3 h-3" />
+            Pubblici
+          </button>
+          <button
+            onClick={() => setFilterMode('private')}
+            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+              filterMode === 'private'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-600'
+            }`}
+          >
+            <EyeOff className="w-3 h-3" />
+            Privati
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Funzione per testare un quiz
+  const handleTestQuiz = (quiz: Quiz) => {
+    // Implementazione per testare un quiz senza influenzare le statistiche
+    // Questo potrebbe navigare a un percorso speciale o impostare un flag nella sessione
+    const testMode = true;
+    const quizId = quiz.id;
+    const quizType = quiz.quiz_type;
+    
+    // Qui potremmo navigare a una route di test specifica
+    // oppure salvare le informazioni nella sessionStorage e poi navigare
+    sessionStorage.setItem('testMode', 'true');
+    sessionStorage.setItem('testQuizId', quizId);
+    
+    // Utilizzo window.open per aprire in una nuova tab
+    window.open(`/test-quiz/${quizType}/${quizId}`, '_blank');
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-white">Gestione Quiz</h1>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-2xl font-bold text-white">
+          {mode === 'all' 
+            ? 'Tutti i Quiz Disponibili' 
+            : (isMaster ? 'Gestione Quiz Globale' : 'Gestione Quiz')}
+        </h1>
+        
+        {mode === 'manage' && (
+          <button
+            onClick={handleCreateQuiz}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 w-full sm:w-auto justify-center"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Crea Nuovo Quiz</span>
+          </button>
+        )}
+      </div>
+      
+      {renderFilterControls()}
+
+      <div className="flex justify-between border-b border-gray-200 dark:border-slate-700 mb-6">
         <button
-          onClick={handleCreateQuiz}
-          className="w-full sm:w-auto bg-white text-blue-600 px-6 py-3 rounded-lg shadow-md hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
+          className={`px-4 py-2 font-medium text-sm ${
+            activeTab === 'learning' 
+              ? 'border-b-2 border-blue-500 text-blue-500 dark:text-blue-400' 
+              : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300'
+          }`}
+          onClick={() => setActiveTab('learning')}
         >
-          <Plus className="w-5 h-5" />
-          Crea Nuovo Quiz
+          <div className="flex items-center gap-2">
+            <Book className="w-5 h-5" />
+            <span>Moduli di Apprendimento</span>
+          </div>
+        </button>
+        
+        <button
+          className={`px-4 py-2 font-medium text-sm ${
+            activeTab === 'exam' 
+              ? 'border-b-2 border-blue-500 text-blue-500 dark:text-blue-400' 
+              : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300'
+          }`}
+          onClick={() => setActiveTab('exam')}
+        >
+          <div className="flex items-center gap-2">
+            <GraduationCap className="w-5 h-5" />
+            <span>Quiz di Esame</span>
+          </div>
+        </button>
+        
+        <button
+          className={`px-4 py-2 font-medium text-sm ${
+            activeTab === 'interactive' 
+              ? 'border-b-2 border-blue-500 text-blue-500 dark:text-blue-400' 
+              : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300'
+          }`}
+          onClick={() => setActiveTab('interactive')}
+        >
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            <span>Quiz Interattivi</span>
+          </div>
         </button>
       </div>
 
-      <div className="bg-blue-900 dark:bg-slate-900 rounded-xl shadow-md overflow-hidden">
-        <div className="border-b border-gray-200 dark:border-slate-800 overflow-x-auto">
-          <nav className="flex whitespace-nowrap min-w-full">
-            <button
-              onClick={() => setActiveTab('exam')}
-              className={`flex-1 sm:flex-none px-4 sm:px-6 py-4 text-sm font-medium flex items-center justify-center gap-2 ${
-                activeTab === 'exam'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300'
-              }`}
-            >
-              <GraduationCap className="w-5 h-5" />
-              <span className="whitespace-nowrap text-sm font-semibold text-blue-300 dark:text-blue-300">Quiz di Esame</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('learning')}
-              className={`flex-1 sm:flex-none px-4 sm:px-6 py-4 text-sm font-medium flex items-center justify-center gap-2 ${
-                activeTab === 'learning'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300'
-              }`}
-            >
-              <Book className="w-5 h-5" />
-              <span className="whitespace-nowrap text-sm font-semibold text-blue-300 dark:text-blue-300">Moduli di Apprendimento</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('interactive')}
-              className={`flex-1 sm:flex-none px-4 sm:px-6 py-4 text-sm font-medium flex items-center justify-center gap-2 ${
-                activeTab === 'interactive'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300'
-              }`}
-            >
-              <Users className="w-5 h-5" />
-              <span className="whitespace-nowrap text-sm font-semibold text-blue-300 dark:text-blue-300">Quiz Interattivi</span>
-            </button>
-          </nav>
+      {error && (
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg mb-6">
+          {error}
         </div>
+      )}
 
-        <div className="p-4 sm:p-6 dark:bg-slate-900">
-          {error && (
-            <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg">
-              {error}
-            </div>
-          )}
-
-          {loading ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500 dark:text-slate-400">Caricamento quiz in corso...</p>
-            </div>
-          ) : activeTab === 'interactive' ? (
-            <QuizLive hostEmail={userEmail || ''} />
-          ) : quizzes.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500 dark:text-slate-400">
-                Nessun quiz {activeTab === 'exam' ? 'di esame' : activeTab === 'learning' ? 'di apprendimento' : 'interattivo'} creato.
-                Clicca su "Crea Nuovo Quiz" per iniziare.
-              </p>
-            </div>
-          ) : (
-            <QuizList
-              quizzes={quizzes}
-              quizType={activeTab as 'exam' | 'learning'}
-              onEdit={(quiz) => {
-                // Only allow editing if master admin or quiz creator
-                if (!isMaster && quiz.created_by !== userEmail) {
-                  setError('Non hai i permessi per modificare questo quiz');
-                  return;
-                }
-                setSelectedQuiz(quiz);
-                setShowCreator(true);
-              }}
-              onDelete={handleDeleteQuiz}
-              onAssign={(quiz) => {
-                // Only allow assigning if master admin or quiz creator
-                if (!isMaster && quiz.created_by !== userEmail) {
-                  setError('Non hai i permessi per assegnare questo quiz');
-                  return;
-                }
-                setSelectedQuiz(quiz);
-                setShowAssignModal(true);
-              }}
-              onRegenerateCode={handleRegenerateCode}
-              onVisibilityChange={handleVisibilityChange}
-              isMaster={isMaster}
-            />
-          )}
+      {loading ? (
+        <div className="flex justify-center py-10">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
         </div>
-      </div>
+      ) : quizzes.length === 0 ? (
+        <div className="text-center py-10 border border-dashed border-gray-300 dark:border-slate-700 rounded-lg">
+          <p className="text-gray-500 dark:text-slate-400">
+            Nessun quiz trovato. {mode === 'manage' ? 'Crea il tuo primo quiz!' : 'Cambia i filtri per trovare dei quiz.'}
+          </p>
+        </div>
+      ) : (
+        <QuizList
+          quizzes={quizzes}
+          onEdit={mode === 'manage' ? (quiz) => {
+            setSelectedQuiz(quiz);
+            setShowCreator(true);
+          } : undefined}
+          onDelete={mode === 'manage' ? (quiz) => {
+            setQuizToDelete(quiz);
+            setShowDeleteModal(true);
+          } : undefined}
+          onAssign={mode === 'manage' ? (quiz) => {
+            setSelectedQuiz(quiz);
+            setShowAssignModal(true);
+          } : undefined}
+          onVisibilityChange={handleVisibilityChange}
+          onRegenerateCode={handleRegenerateCode}
+          onTestQuiz={mode === 'all' ? handleTestQuiz : undefined}
+          isMaster={isMaster}
+          viewMode={mode}
+        />
+      )}
 
       {showCreator && (
         <QuizCreator
           quizType={activeTab}
-          editQuiz={selectedQuiz}
-          onClose={() => {
-            setShowCreator(false);
-            setSelectedQuiz(null);
-          }}
-          onSaveSuccess={() => {
-            console.log('Quiz salvato con successo, ricarico la lista');
-            loadQuizzes();
-          }}
+          editQuiz={selectedQuiz ?? undefined}
+          onClose={() => setShowCreator(false)}
+          onSaveSuccess={loadQuizzes}
         />
       )}
 
@@ -338,13 +498,14 @@ export function QuizManager() {
             setShowAssignModal(false);
             setSelectedQuiz(null);
           }}
+          onAssignSuccess={loadQuizzes}
         />
       )}
 
       {showDeleteModal && quizToDelete && (
         <DeleteQuizModal
           quiz={quizToDelete}
-          onConfirm={confirmDeleteQuiz}
+          onConfirm={handleDeleteConfirm}
           onCancel={() => {
             setShowDeleteModal(false);
             setQuizToDelete(null);

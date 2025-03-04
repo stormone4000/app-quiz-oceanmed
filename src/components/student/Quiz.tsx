@@ -9,6 +9,7 @@ interface QuizProps {
   quizId: string;
   onBack: () => void;
   studentEmail: string;
+  isTestMode?: boolean;
 }
 
 interface QuizData {
@@ -29,7 +30,7 @@ interface QuizData {
   }>;
 }
 
-export function Quiz({ quizId, onBack, studentEmail }: QuizProps) {
+export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizProps) {
   const [quiz, setQuiz] = useState<QuizData | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<boolean[]>([]);
@@ -59,7 +60,6 @@ export function Quiz({ quizId, onBack, studentEmail }: QuizProps) {
   useEffect(() => {
     if (quiz && !startTime) {
       setStartTime(new Date());
-      setQuestionStartTime(new Date());
       setRemainingTime(quiz.duration_minutes * 60);
     }
   }, [quiz]);
@@ -67,7 +67,7 @@ export function Quiz({ quizId, onBack, studentEmail }: QuizProps) {
   useEffect(() => {
     let timer: NodeJS.Timeout;
     
-    if (startTime && remainingTime !== null && remainingTime > 0 && !showResults) {
+    if (startTime && remainingTime !== null && remainingTime > 0 && !showFeedback) {
       timer = setInterval(() => {
         setRemainingTime(prev => {
           if (prev === null || prev <= 0) {
@@ -83,7 +83,7 @@ export function Quiz({ quizId, onBack, studentEmail }: QuizProps) {
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [startTime, remainingTime, showResults]);
+  }, [startTime, remainingTime, showFeedback]);
 
   const loadQuiz = async () => {
     try {
@@ -135,7 +135,6 @@ export function Quiz({ quizId, onBack, studentEmail }: QuizProps) {
       
       setQuiz(quizData);
       setStartTime(new Date());
-      setQuestionStartTime(new Date());
       setRemainingTime(quizData.duration_minutes * 60);
       setIsInitializing(false);
     } catch (error) {
@@ -145,20 +144,13 @@ export function Quiz({ quizId, onBack, studentEmail }: QuizProps) {
   };
 
   const handleAnswer = async (answerIndex: number) => {
-    if (!quiz?.questions || !questionStartTime) return;
+    if (!quiz?.questions) return;
 
     // Create a copy of existing answers array
     const newAnswers = [...answers];
     // Add new answer without overwriting existing ones
-    newAnswers[currentQuestion] = answerIndex === quiz.questions[currentQuestion].correct_answer;
+    newAnswers[currentQuestion] = answerIndex;
     setAnswers(newAnswers);
-
-    const questionTime = Math.floor((new Date().getTime() - questionStartTime.getTime()) / 1000);
-    const newQuestionTimes = [...questionTimes];
-    newQuestionTimes[currentQuestion] = questionTime;
-    setQuestionTimes(newQuestionTimes);
-
-    setSelectedAnswer(answerIndex);
 
     if (quiz.quiz_type === 'learning') {
       setShowFeedback(true);
@@ -171,11 +163,9 @@ export function Quiz({ quizId, onBack, studentEmail }: QuizProps) {
     if (!quiz) return;
 
     setShowFeedback(false);
-    setSelectedAnswer(null);
     
     if (currentQuestion < quiz.questions.length - 1) {
       setCurrentQuestion(prev => prev + 1);
-      setQuestionStartTime(new Date());
     } else {
       finishQuiz();
     }
@@ -183,7 +173,7 @@ export function Quiz({ quizId, onBack, studentEmail }: QuizProps) {
 
   const finishQuiz = async () => {
     if (!quiz || !startTime) return;
-
+    
     try {
       console.log("Iniziando finishQuiz...");
       const endTime = new Date();
@@ -193,7 +183,7 @@ export function Quiz({ quizId, onBack, studentEmail }: QuizProps) {
       const correctAnswers = answers.filter(Boolean).length;
       const score = Math.max(0, Math.min(1, correctAnswers / answers.length));
       console.log("Punteggio calcolato:", score, "Risposte corrette:", correctAnswers, "su", answers.length);
-
+      
       // Verifica che studentEmail sia definito e non vuoto
       if (!studentEmail) {
         console.error('Student email is missing');
@@ -215,6 +205,14 @@ export function Quiz({ quizId, onBack, studentEmail }: QuizProps) {
         lastName: ''
       };
       console.log("Oggetto quizResult creato:", JSON.stringify(quizResult));
+
+      // In modalità test, non salviamo i risultati ma mostriamo comunque il report
+      if (isTestMode) {
+        console.log("Modalità test attiva: non salvo i risultati");
+        setResult(quizResult);
+        setShowResults(true);
+        return;
+      }
 
       try {
         console.log("Tentativo di salvare il risultato...");
@@ -318,7 +316,7 @@ export function Quiz({ quizId, onBack, studentEmail }: QuizProps) {
   if (showResults && result) {
     return (
       <QuizDetailReport
-        result={result}
+        score={result.score}
         onBack={onBack}
         quizTitle={quiz.title}
       />
@@ -379,10 +377,10 @@ export function Quiz({ quizId, onBack, studentEmail }: QuizProps) {
                 <button
                   key={index}
                   onClick={() => handleAnswer(index)}
-                  disabled={selectedAnswer !== null}
+                  disabled={answers.includes(index)}
                   className={`w-full p-4 rounded-lg border text-lg font-semibold text-white dark:text-white transition-colors flex items-center gap-4 ${
-                    selectedAnswer === index
-                      ? selectedAnswer === currentQuestionData.correct_answer
+                    answers.includes(index)
+                      ? answers[currentQuestion] === currentQuestionData.correct_answer
                         ? 'bg-emerald-600 border-emerals-200' // domande corrette
                         : 'bg-rose-600 border-rose-200' // domande sbagliate
                       : 'border-gray-200 hover:bg-blue-700' // Hover Domande 
@@ -400,22 +398,22 @@ export function Quiz({ quizId, onBack, studentEmail }: QuizProps) {
 
         {showFeedback && (
           <div className={`p-4 rounded-lg mb-6 ${
-            selectedAnswer === currentQuestionData.correct_answer
+            answers.includes(currentQuestion) && answers[currentQuestion] === currentQuestionData.correct_answer
               ? 'bg-green-50'
               : 'bg-red-50'
           }`}>
             <div className="flex items-center gap-2">
-              {selectedAnswer === currentQuestionData.correct_answer ? (
+              {answers.includes(currentQuestion) && answers[currentQuestion] === currentQuestionData.correct_answer ? (
                 <CheckCircle className="w-5 h-5 text-green-600" />
               ) : (
                 <XCircle className="w-5 h-5 text-red-600" />
               )}
               <p className={
-                selectedAnswer === currentQuestionData.correct_answer
+                answers.includes(currentQuestion) && answers[currentQuestion] === currentQuestionData.correct_answer
                   ? 'text-green-700'
                   : 'text-red-700'
               }>
-                {selectedAnswer === currentQuestionData.correct_answer
+                {answers.includes(currentQuestion)
                   ? 'Risposta corretta!'
                   : 'Risposta errata. La risposta corretta era: ' + 
                     currentQuestionData.options[currentQuestionData.correct_answer]

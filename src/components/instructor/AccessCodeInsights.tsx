@@ -26,6 +26,15 @@ interface AccessCodeStats {
   };
 }
 
+// Importo l'interfaccia CodeUsage
+interface CodeUsage {
+  code: string;
+  type: 'master' | 'one_time';
+  used_at: string;
+  expires_at?: string;
+  is_active?: boolean;
+}
+
 export function AccessCodeInsights() {
   const [stats, setStats] = useState<AccessCodeStats>({
     totalCodes: 0,
@@ -71,7 +80,7 @@ export function AccessCodeInsights() {
           stats.usedCodes++;
           
           // Count usage by month
-          code.usage.forEach((use: any) => {
+          code.usage.forEach((use: CodeUsage) => {
             const month = new Date(use.used_at).toLocaleString('it-IT', { month: 'long', year: 'numeric' });
             stats.usageByMonth[month] = (stats.usageByMonth[month] || 0) + 1;
           });

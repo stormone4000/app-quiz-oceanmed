@@ -12,7 +12,7 @@ interface Category {
   color: keyof typeof COLORS;
 }
 
-const ICONS: { [key: string]: any } = {
+const ICONS: { [key: string]: React.ComponentType<React.SVGProps<SVGSVGElement>> } = {
   'compass': Compass,
   'shield': Shield,
   'cloud-sun': CloudSun,

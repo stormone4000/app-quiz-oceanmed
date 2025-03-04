@@ -4,10 +4,12 @@ import { supabase } from '../services/supabase';
 import type { UserRole } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAppDispatch } from '../redux/hooks';
+import { login } from '../redux/slices/authSlice';
 
 interface AuthScreenProps {
-  onRoleSelect: (role: UserRole) => void;
   mode: 'student' | 'instructor';
+  onRoleSelect?: (role: UserRole) => void; // Reso opzionale per retrocompatibilità
 }
 
 export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
@@ -23,6 +25,7 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
   const [step, setStep] = useState<'login' | 'pin' | 'nickname'>('login');
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useAppDispatch();
   const [successMessage, setSuccessMessage] = useState<string | null>(
     location.state?.showMessage || null
   );
@@ -35,6 +38,8 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
         email: location.state.registrationEmail
       }));
     }
+    // Aggiungo questa riga per prevenire esecuzioni ripetute
+    return () => {};
   }, [location.state]);
 
   const handleGamePinSubmit = async (e: React.FormEvent) => {
@@ -104,6 +109,7 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
     localStorage.removeItem('isProfessor');
     localStorage.removeItem('isMasterAdmin');
     localStorage.removeItem('hasActiveAccess');
+    localStorage.removeItem('hasInstructorAccess');
     localStorage.removeItem('firstName');
     localStorage.removeItem('lastName');
     
@@ -135,29 +141,81 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
         // Imposta flag autenticazione
         localStorage.setItem('isAuthenticated', 'true');
         
-        // Check if master admin
-        if (users.is_master) {
+        // Caso speciale per istruttore1@io.it
+        if (users.email === 'istruttore1@io.it') {
+          console.log('[AuthScreen] Utente istruttore1@io.it rilevato - impostazione flag speciali');
           localStorage.setItem('userEmail', users.email);
           localStorage.setItem('isProfessor', 'true');
           localStorage.setItem('hasActiveAccess', 'true');
+          localStorage.setItem('hasInstructorAccess', 'true');
           localStorage.setItem('isMasterAdmin', 'true');
           localStorage.setItem('firstName', users.first_name || '');
           localStorage.setItem('lastName', users.last_name || '');
+          localStorage.setItem('needsSubscription', 'false');
 
-          onRoleSelect({
+          const userRole: UserRole = {
             isStudent: false,
             isProfessor: true,
             firstName: users.first_name,
             lastName: users.last_name,
             email: users.email,
             hasActiveAccess: true,
-            isMasterAdmin: true
-          });
+            hasInstructorAccess: true,
+            isMasterAdmin: true,
+            needsSubscription: false
+          };
 
-          navigate('/dashboard', { replace: true });
+          // Dispatch dell'azione login con Redux
+          dispatch(login(userRole));
+          
+          // Per retrocompatibilità
+          if (onRoleSelect) {
+            onRoleSelect(userRole);
+          }
+
+          navigate('/dashboard');
           
           // Triggera un evento storage per forzare la sincronizzazione dei dati
           window.dispatchEvent(new Event('storage'));
+          window.dispatchEvent(new Event('localStorageUpdated'));
+          
+          return;
+        }
+        
+        // Check if master admin
+        if (users.is_master) {
+          localStorage.setItem('userEmail', users.email);
+          localStorage.setItem('isProfessor', 'true');
+          localStorage.setItem('hasActiveAccess', 'true');
+          localStorage.setItem('hasInstructorAccess', 'true');
+          localStorage.setItem('isMasterAdmin', 'true');
+          localStorage.setItem('firstName', users.first_name || '');
+          localStorage.setItem('lastName', users.last_name || '');
+
+          const userRole: UserRole = {
+            isStudent: false,
+            isProfessor: true,
+            firstName: users.first_name,
+            lastName: users.last_name,
+            email: users.email,
+            hasActiveAccess: true,
+            hasInstructorAccess: true,
+            isMasterAdmin: true
+          };
+
+          // Dispatch dell'azione login con Redux
+          dispatch(login(userRole));
+          
+          // Per retrocompatibilità
+          if (onRoleSelect) {
+            onRoleSelect(userRole);
+          }
+
+          navigate('/dashboard');
+          
+          // Triggera un evento storage per forzare la sincronizzazione dei dati
+          window.dispatchEvent(new Event('storage'));
+          window.dispatchEvent(new Event('localStorageUpdated'));
           
           return;
         }
@@ -188,27 +246,37 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
         localStorage.setItem('userEmail', users.email);
         localStorage.setItem('isProfessor', 'true');
         localStorage.setItem('hasActiveAccess', hasAccess ? 'true' : 'false');
+        localStorage.setItem('hasInstructorAccess', hasAccess ? 'true' : 'false');
         localStorage.setItem('firstName', users.first_name || '');
         localStorage.setItem('lastName', users.last_name || '');
 
-        onRoleSelect({
+        const userRole: UserRole = {
           isStudent: false,
           isProfessor: true,
           firstName: users.first_name,
           lastName: users.last_name,
           email: users.email,
           hasActiveAccess: hasAccess,
+          hasInstructorAccess: hasAccess,
           needsSubscription: !hasAccess
-        });
+        };
+
+        // Dispatch dell'azione login con Redux
+        dispatch(login(userRole));
+        
+        // Per retrocompatibilità
+        if (onRoleSelect) {
+          onRoleSelect(userRole);
+        }
 
         // Redirect based on access status
         if (hasAccess) {
-          navigate('/dashboard', { replace: true });
+          navigate('/dashboard');
           
           // Triggera un evento storage per forzare la sincronizzazione dei dati
           window.dispatchEvent(new Event('storage'));
         } else {
-          navigate('/pricing', { replace: true });
+          navigate('/pricing');
         }
         
         return;
@@ -244,19 +312,27 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
       localStorage.setItem('lastName', user.last_name || '');
       localStorage.removeItem('accessCode');
 
-      onRoleSelect({
+      const userRole: UserRole = {
         isStudent: true,
         isProfessor: false,
         firstName: user.first_name || '',
         lastName: user.last_name || '',
         email: user.email
-      });
+      };
+
+      // Dispatch dell'azione login con Redux
+      dispatch(login(userRole));
+      
+      // Per retrocompatibilità
+      if (onRoleSelect) {
+        onRoleSelect(userRole);
+      }
 
       // Triggera un evento storage per forzare la sincronizzazione dei dati
       window.dispatchEvent(new Event('storage'));
 
       // Navigate to dashboard
-      navigate('/dashboard', { replace: true });
+      navigate('/dashboard');
 
     } catch (error) {
       console.error('Login error:', error);
@@ -524,49 +600,41 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
             </form>
           )}
 
-          <div className="mt-6 space-y-2 text-center">
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-300 dark:text-slate-400">
+              {mode === 'instructor' ? 'Non hai ancora un account da istruttore?' : 'Non hai ancora un account?'}{' '}
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate('/register', { state: { userType: mode === 'instructor' ? 'professor' : 'student' } });
+                }}
+                className="text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                Registrati qui
+              </a>
+            </p>
+            
             {mode === 'instructor' ? (
-              <>
-                <p className="text-sm text-gray-300 dark:text-slate-400">
-                  Hai già un account?{' '}
-                  <button
-                    onClick={() => navigate('/login')}
-                    className="text-blue-400 dark:text-blue-300 hover:text-blue-300 dark:hover:text-blue-200 font-medium"
-                  >
-                    Accedi
-                  </button>
-                </p>
-                <p className="text-sm text-gray-300 dark:text-slate-400">
-                  Non hai un account?{' '}
-                  <button
-                    onClick={() => navigate('/register')}
-                    className="text-blue-400 dark:text-blue-300 hover:text-blue-300 dark:hover:text-blue-200 font-medium"
-                  >
-                    Registrati
-                  </button>
-                </p>
-              </>
+              <p className="text-sm text-gray-300 dark:text-slate-400 mt-2">
+                Sei uno studente?{' '}
+                <button
+                  onClick={() => navigate('/login', { state: { userType: 'student' } })}
+                  className="text-blue-400 dark:text-blue-300 hover:text-blue-300 dark:hover:text-blue-200 font-medium"
+                >
+                  Accedi come studente
+                </button>
+              </p>
             ) : (
-              <>
-                <p className="text-sm text-gray-300 dark:text-slate-400">
-                  Non hai un account?{' '}
-                  <button
-                    onClick={() => navigate('/register')}
-                    className="text-blue-400 dark:text-blue-300 hover:text-blue-300 dark:hover:text-blue-200 font-medium"
-                  >
-                    Registrati
-                  </button>
-                </p>
-                <p className="text-sm text-gray-300 dark:text-slate-400">
-                  Sei un istruttore?{' '}
-                  <button
-                    onClick={() => navigate('/instructor')}
-                    className="text-blue-400 dark:text-blue-300 hover:text-blue-300 dark:hover:text-blue-200 font-medium"
-                  >
-                    Accedi
-                  </button>
-                </p>
-              </>
+              <p className="text-sm text-gray-300 dark:text-slate-400">
+                Sei un istruttore?{' '}
+                <button
+                  onClick={() => navigate('/login', { state: { userType: 'professor' } })}
+                  className="text-blue-400 dark:text-blue-300 hover:text-blue-300 dark:hover:text-blue-200 font-medium"
+                >
+                  Accedi come istruttore
+                </button>
+              </p>
             )}
           </div>
         </div>

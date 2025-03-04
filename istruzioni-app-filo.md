@@ -198,8 +198,8 @@ L'applicazione utilizza le politiche di sicurezza a livello di riga di Supabase 
 
 #### Sidebar Istruttore
 - Dashboard
-- Tutti i Quiz (visualizzazione completa dei quiz disponibili)
-- Gestione Quiz (creazione e gestione dei propri quiz)
+- Tutti i Quiz (visualizzazione di tutti i quiz disponibili nel sistema, con possibilità di testarli)
+- Gestione Quiz (creazione e gestione dei propri quiz personali)
 - Quiz Interattivi
 - Gestione Alunni (monitoraggio degli studenti che hanno attivato i codici)
 - Statistiche dei propri quiz
@@ -220,9 +220,12 @@ L'applicazione utilizza le politiche di sicurezza a livello di riga di Supabase 
 - Ha accesso completo a tutte le statistiche e ai dati degli utenti
 
 #### Istruttore
-- Può creare e gestire i propri quiz
+- Ha due sezioni distinte per i quiz:
+  - **Tutti i Quiz**: Permette di visualizzare e testare tutti i quiz disponibili nel sistema senza influire sulle statistiche
+  - **Gestione Quiz**: Permette di creare, modificare ed eliminare solo i propri quiz personali
+- Può testare qualsiasi quiz tramite la modalità di test, che apre il quiz in una nuova scheda senza registrare risultati nelle statistiche
 - Ottiene codici quiz da distribuire agli studenti
-- Non può rendere pubblici o privati i quiz
+- Non può rendere pubblici o privati i quiz (a differenza dell'admin)
 - Può monitorare gli studenti che hanno attivato i codici attraverso la sezione "Gestione Alunni"
 - Può visualizzare statistiche relative solo ai propri quiz
 
@@ -559,6 +562,12 @@ Eseguire regolarmente i seguenti controlli di sicurezza:
 - **Formattazione dei codici di accesso**: ✅ RISOLTO! È stata implementata la formattazione automatica dei codici nel formato XXXXX-XXXXX-XXXXX per facilitare l'inserimento e ridurre gli errori.
 - **Visibilità dello stato dell'abbonamento**: ✅ RISOLTO! È stata aggiunta una sezione che mostra chiaramente lo stato attuale dell'abbonamento, inclusa la data di scadenza e il tipo di piano.
 - **Mancanza di cronologia dei codici utilizzati**: ✅ RISOLTO! Gli utenti possono ora visualizzare la cronologia completa dei codici di accesso che hanno utilizzato, con dettagli sul tipo di codice e la data di utilizzo.
+- **Istruttori visualizzano tutti i profili studenti**: ✅ RISOLTO! Gli istruttori vedevano tutti i profili studenti invece di vedere solo quelli che hanno attivato i loro codici specifici. Le modifiche includono:
+  - Correzione dei componenti `AccessCodeManager`, `StudentManagement`, `QuizManager` e `QuizCreator` per utilizzare l'ID utente (UUID) invece dell'email nel campo `created_by`.
+  - Implementazione di una query che recupera l'ID utente dalla tabella `auth_users` basandosi sull'email memorizzata nel localStorage.
+  - Aggiornamento dei filtri nelle query per utilizzare l'ID utente invece dell'email quando si filtra per `created_by`.
+  - Correzione delle query di eliminazione per garantire che gli istruttori possano eliminare solo i propri quiz.
+  - Miglioramento della sicurezza dei dati rispettando correttamente il modello relazionale dove il campo `created_by` è un UUID che fa riferimento a `auth.users(id)`.
 - **Problemi di attivazione per l'utente "istruttore1@io.it"**: ✅ RISOLTO! Sono state implementate correzioni per garantire che l'utente "istruttore1@io.it" venga riconosciuto correttamente come professore con accesso attivo. Le modifiche includono:
   - Miglioramento della funzione `checkActiveCode` per registrare correttamente l'utilizzo del codice.
   - Aggiunta di eventi storage per notificare i cambiamenti senza necessità di ricaricare la pagina.
@@ -572,6 +581,16 @@ Eseguire regolarmente i seguenti controlli di sicurezza:
   - Aggiunta di un controllo di autenticazione all'avvio dell'app che verifica e pulisce i dati utente se l'utente non è autenticato.
   - Miglioramento della funzione `handleSubmit` in `AuthScreen.tsx` per rimuovere tutti i dati di autenticazione prima di tentare un nuovo login.
   - Aggiunta di un controllo più rigoroso per le route protette, verificando esplicitamente il flag `isAuthenticated` prima di renderizzare la dashboard.
+- **Confusione tra "Tutti i Quiz" e "Gestione Quiz"**: ✅ RISOLTO! Gli istruttori avevano difficoltà a distinguere tra le due sezioni poiché entrambe utilizzavano lo stesso componente e mostravano le stesse funzionalità. Le modifiche includono:
+  - Differenziazione del componente `QuizManager` tramite una prop `mode` che può essere 'all' o 'manage'
+  - Aggiunta di un filtro automatico che mostra tutti i quiz nel modo 'all' e solo i quiz personali nel modo 'manage'
+  - Implementazione del pulsante di creazione quiz solo nella sezione "Gestione Quiz"
+  - Aggiunta della funzionalità "Test Quiz" che permette di testare qualsiasi quiz senza influenzare le statistiche
+  - Creazione di una pagina dedicata `TestQuizPage` che mostra il quiz in modalità test
+  - Modifiche al componente `Quiz` per supportare una modalità di test che non salva i risultati
+  - Aggiornamento del componente `QuizList` per mostrare pulsanti diversi in base alla modalità di visualizzazione
+  - Configurazione del routing in `App.tsx` per supportare la nuova pagina di test
+  - Aggiornamento della dashboard dell'istruttore per passare la modalità corretta a `QuizManager` in base alla tab selezionata
 - **Errore "Failed to save quiz result"**: ⚠️ IN ANALISI! Potrebbe essere causato da un problema di tipo dati nella colonna `quiz_id` della tabella `results`. È stato migliorato il logging degli errori per facilitare il debug. Possibili soluzioni:
   - Verificare che il tipo della colonna `quiz_id` in `results` sia compatibile con il tipo della colonna `id` in `quizzes`
   - Controllare che non ci siano vincoli di foreign key che impediscono l'inserimento
@@ -579,9 +598,141 @@ Eseguire regolarmente i seguenti controlli di sicurezza:
   - Verificare che i dati passati siano validi e del tipo corretto
 - **Problemi con i quiz interattivi**: Verificare che tutte le tabelle relative ai quiz interattivi (`interactive_quiz_templates`, `interactive_quiz_questions`, `live_quiz_sessions`, `live_quiz_participants`) abbiano politiche RLS appropriate.
 - **Utenti non autorizzati**: Assicurarsi che le informazioni dell'utente (email, ruolo) siano correttamente salvate nel localStorage dopo il login.
+- **Visualizzazione limitata della Cronologia Codici nel Profilo Istruttore**: ✅ RISOLTO! La sezione "Cronologia Codici Utilizzati" nel profilo istruttore mostrava informazioni limitate rispetto alla versione disponibile per gli amministratori. Le modifiche includono:
+  - Estensione della query per recuperare informazioni più dettagliate sui codici utilizzati (ID, data di creazione, data di scadenza, stato di attività, numero massimo di utilizzi, descrizione)
+  - Ridisegno dell'interfaccia utente per mostrare tutte le informazioni in modo chiaro e organizzato
+  - Aggiunta del supporto per visualizzare il tipo di codice "instructor" oltre ai tipi "master" e "one_time"
+  - Implementazione di un layout responsive che si adatta alle dimensioni dello schermo
+  - Visualizzazione di informazioni aggiuntive come la data di creazione e il numero massimo di utilizzi
+  - Miglioramento della coerenza visiva con l'interfaccia dell'amministratore
 
 ---
 
 Questo documento verrà aggiornato regolarmente per riflettere le modifiche e le nuove funzionalità dell'applicazione.
 
-Ultimo aggiornamento: 3 marzo 2025 
+Ultimo aggiornamento: 31 maggio 2024 
+
+## Gestione dello Stato con Redux
+
+### Panoramica dell'Implementazione Redux
+
+L'applicazione utilizza Redux come soluzione centralizzata per la gestione dello stato, in particolare per i dati di autenticazione e autorizzazione. Questo approccio risolve diversi problemi critici, tra cui la sincronizzazione del flag `hasInstructorAccess` in tutta l'applicazione.
+
+### Struttura Redux
+
+La configurazione Redux include:
+
+- **Store**: Il punto centrale che contiene tutto lo stato dell'applicazione
+- **Slices**: Porzioni specializzate dello stato globale (es. authSlice per l'autenticazione)
+- **Reducers**: Funzioni che definiscono come lo stato cambia in risposta alle azioni
+- **Actions**: Eventi che innescano le modifiche allo stato
+- **Selectors**: Funzioni per estrarre dati specifici dallo stato
+
+### Directory e File Principali
+
+```
+src/
+└── redux/
+    ├── store.ts             # Configurazione dello store Redux
+    ├── hooks.ts             # Custom hooks tipizzati (useAppDispatch, useAppSelector)
+    └── slices/
+        └── authSlice.ts     # Gestione dello stato di autenticazione
+```
+
+### Lo Slice di Autenticazione
+
+Il `authSlice.ts` implementa uno "slice" specifico per la gestione dell'autenticazione con le seguenti funzionalità:
+
+- **Stato**: Informazioni sull'utente autenticato, inclusi:
+  - `isAuthenticated`: Flag principale di autenticazione
+  - `isStudent` / `isProfessor`: Tipo di utente
+  - `hasInstructorAccess`: Permesso di accesso come istruttore
+  - `isMasterAdmin`: Permessi amministrativi
+  - `hasActiveAccess`: Accesso attivo alla piattaforma
+  - `needsSubscription`: Necessità di sottoscrizione
+
+- **Azioni**:
+  - `login`: Autentica l'utente e imposta tutti i flag relativi
+  - `logout`: Rimuove tutti i dati di autenticazione
+  - `updateInstructorAccess`: Aggiorna specificamente i permessi dell'istruttore
+  - `syncFromStorage`: Sincronizza lo stato Redux con localStorage
+
+- **Selettori**:
+  - Funzioni per accedere facilmente a porzioni specifiche dello stato di autenticazione
+
+### Integrazione con l'Applicazione Esistente
+
+Redux è integrato nell'applicazione mantenendo la compatibilità con il localStorage per garantire una transizione senza interruzioni:
+
+1. **Inizializzazione dello Stato**: Lo stato iniziale viene caricato dal localStorage per mantenere la persistenza
+2. **Sincronizzazione Bidirezionale**: Gli aggiornamenti a Redux vengono propagati al localStorage e viceversa
+3. **Eventi di Storage**: Gli eventi nativi `storage` e personalizzati `localStorageUpdated` vengono intercettati per mantenere sincronizzato lo stato
+
+### Componenti Aggiornati
+
+I seguenti componenti sono stati aggiornati per utilizzare Redux:
+
+- **UnifiedLoginCard**: Ora utilizza il dispatch di Redux per gestire l'autenticazione
+- **LandingPage**: Implementa il logout centralizzato tramite Redux
+- **App**: Aggiornato per utilizzare lo stato Redux invece del localStorage diretto
+
+### Vantaggi dell'Implementazione Redux
+
+1. **Stato Centralizzato**: Risolve il problema di coerenza dello stato tra componenti
+2. **Flusso Dati Prevedibile**: Rende le modifiche allo stato tracciabili e prevedibili
+3. **Debugging Migliorato**: Facilita l'identificazione e la risoluzione dei problemi
+4. **Tipizzazione Completa**: Integrazione con TypeScript per una migliore sicurezza del tipo
+5. **Gestione degli Eventi Migliorata**: Centralizza la risposta agli eventi di storage
+6. **Scalabilità**: Fornisce una base robusta per future estensioni dell'applicazione
+
+### Utilizzo nei Componenti
+
+Per utilizzare Redux nei componenti:
+
+```typescript
+import { useAppSelector, useAppDispatch } from '../redux/hooks';
+import { selectIsAuthenticated, login, logout } from '../redux/slices/authSlice';
+
+function MyComponent() {
+  // Accedi ai dati dello stato
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  
+  // Ottieni il dispatcher per inviare azioni
+  const dispatch = useAppDispatch();
+  
+  // Esempio di login
+  const handleLogin = (userData) => {
+    dispatch(login(userData));
+  };
+  
+  // Esempio di logout
+  const handleLogout = () => {
+    dispatch(logout());
+  };
+  
+  // Resto del componente...
+}
+```
+
+### Risoluzione del Problema di Sincronizzazione dell'Accesso Istruttore
+
+L'implementazione di Redux risolve specificamente il problema con il flag `hasInstructorAccess`:
+
+1. Lo stato di accesso è ora gestito centralmente in un unico punto
+2. Le modifiche all'accesso vengono propagate immediatamente a tutti i componenti
+3. Il sincronismo con localStorage è gestito in modo coerente
+4. Gli eventi di aggiornamento sono centralizzati
+
+Questo garantisce che, quando un istruttore attiva il proprio accesso, lo stato venga aggiornato correttamente in tutta l'applicazione senza necessità di ricaricare la pagina.
+
+### Manutenzione e Best Practices
+
+1. **Preferire i Selettori**: Utilizza i selettori esportati invece di accedere direttamente allo stato
+2. **Azioni Specifiche**: Crea azioni specifiche per modifiche semantiche dello stato
+3. **Evitare Mutazioni**: Non modificare direttamente lo stato Redux (usare dispatch)
+4. **Separazione delle Responsabilità**: Mantieni la logica di state management nei reducer, non nei componenti
+5. **Utilizzare i Custom Hooks**: Usa `useAppDispatch` e `useAppSelector` per mantenere la tipizzazione
+
+---
+
+// ... resto del documento ... 
