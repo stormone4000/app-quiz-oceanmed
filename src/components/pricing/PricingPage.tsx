@@ -143,7 +143,7 @@ export function PricingPage() {
       // Check if code exists and is valid
       const { data: codeData, error: codeError } = await supabase
         .from('access_codes')
-        .select('*')
+        .select('*, creator:auth_users!created_by(email)')
         .eq('code', accessCode.trim())
         .eq('is_active', true)
         .single();
@@ -175,13 +175,30 @@ export function PricingPage() {
       // Aggiorno il messaggio di successo
       setSuccess('Codice valido! Attivazione abbonamento in corso...');
 
-      // Record code usage
+      // Recupera informazioni sull'utente
+      const { data: userData, error: userError } = await supabase
+        .from('auth_users')
+        .select('first_name, last_name')
+        .eq('email', userEmail)
+        .single();
+
+      if (userError) {
+        console.warn('Errore nel recupero dei dati utente:', userError);
+      }
+
+      // Estrai l'email dell'istruttore che ha creato il codice
+      const instructorEmail = codeData.creator?.email || null;
+      
+      // Record code usage with instructor reference
       const { error: usageError } = await supabase
         .from('access_code_usage')
         .insert([{
           code_id: codeData.id,
           student_email: userEmail,
-          used_at: new Date().toISOString()
+          first_name: userData?.first_name || null,
+          last_name: userData?.last_name || null,
+          used_at: new Date().toISOString(),
+          instructor_email: instructorEmail // Registriamo l'email dell'istruttore che ha creato il codice
         }]);
 
       if (usageError) {
@@ -195,12 +212,13 @@ export function PricingPage() {
         .insert([{
           customer_email: userEmail,
           subscription_id: `sub_${Date.now()}`,
-          plan_id: STRIPE_CONFIG.prices.premium.month,
+          plan_id: STRIPE_CONFIG.prices.premium[selectedInterval],
           status: 'active',
           current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           cancel_at_period_end: false,
           billing_interval: 'month',
-          access_code_id: codeData.id
+          access_code_id: codeData.id,
+          instructor_email: instructorEmail // Aggiungiamo anche qui l'email dell'istruttore
         }]);
 
       if (subscriptionError) {
@@ -210,6 +228,21 @@ export function PricingPage() {
       
       // Update local storage
       localStorage.setItem('hasActiveAccess', 'true');
+      
+      // Associamo l'utente all'istruttore anche nella tabella student_instructor
+      if (instructorEmail) {
+        const { error: relationError } = await supabase
+          .from('student_instructor')
+          .upsert([{
+            student_email: userEmail,
+            instructor_email: instructorEmail,
+            created_at: new Date().toISOString()
+          }]);
+        
+        if (relationError) {
+          console.error('Errore nella creazione della relazione studente-istruttore:', relationError);
+        }
+      }
 
       setVerificationStep('success');
       setSuccess('Codice verificato con successo! Reindirizzamento alla dashboard...');

@@ -11,6 +11,7 @@ interface AccessCode {
   created_at: string;
   duration_months: number | null;
   duration_type: 'fixed' | 'unlimited' | null;
+  created_by: string | null;
   usage?: {
     student_email: string;
     first_name: string | null;
@@ -39,20 +40,49 @@ export function AccessCodeManager() {
     duration_months: 1,
     duration_type: 'fixed'
   });
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadAccessCodes();
+    // Carica l'ID dell'utente corrente
+    const fetchCurrentUserId = async () => {
+      const instructorEmail = localStorage.getItem('userEmail');
+      if (!instructorEmail) return;
+      
+      const { data, error } = await supabase
+        .from('auth_users')
+        .select('id')
+        .eq('email', instructorEmail)
+        .single();
+        
+      if (data && !error) {
+        setCurrentUserId(data.id);
+      }
+    };
+    
+    fetchCurrentUserId();
   }, []);
+
+  useEffect(() => {
+    if (currentUserId) {
+      loadAccessCodes();
+    }
+  }, [currentUserId]);
 
   const loadAccessCodes = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Prima query: carica tutti i codici di accesso
+      if (!currentUserId) {
+        setError('Utente non identificato. Effettua nuovamente il login.');
+        return;
+      }
+
+      // Prima query: carica solo i codici di accesso creati dall'istruttore corrente
       const { data: accessCodes, error: codesError } = await supabase
         .from('access_codes')
         .select('*')
+        .eq('created_by', currentUserId)
         .order('created_at', { ascending: false });
 
       if (codesError) throw codesError;
@@ -91,26 +121,9 @@ export function AccessCodeManager() {
     try {
       setError(null);
       
-      // Get current instructor email
-      const instructorEmail = localStorage.getItem('userEmail');
-      if (!instructorEmail) {
-        throw new Error('Email dell\'istruttore non trovata');
+      if (!currentUserId) {
+        throw new Error('Sessione utente non valida. Effettua nuovamente il login.');
       }
-      
-      // Ottieni l'ID dell'utente dalla sua email
-      const { data: userData, error: userError } = await supabase
-        .from('auth_users')
-        .select('id')
-        .eq('email', instructorEmail)
-        .single();
-        
-      if (userError || !userData) {
-        console.error('Errore nel recupero dell\'ID utente:', userError);
-        throw new Error('Impossibile recuperare l\'ID dell\'utente');
-      }
-      
-      const userId = userData.id;
-      console.log('Codice creato dall\'utente con ID:', userId);
       
       // Generate a random 6-digit code if not provided
       const code = form.code || Math.floor(100000 + Math.random() * 900000).toString();
@@ -132,7 +145,7 @@ export function AccessCodeManager() {
           is_active: true,
           duration_months: form.duration_months,
           duration_type: form.duration_type,
-          created_by: userId // Utilizzo l'ID utente invece dell'email
+          created_by: currentUserId
         }]);
 
       if (insertError) throw insertError;
