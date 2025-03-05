@@ -32,15 +32,20 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
 
   const loadQuizData = async () => {
     try {
-      // Load quiz questions
-      const { data: quizData, error: quizError } = await supabase
-        .from('quiz_questions')
-        .select('*')
-        .eq('quiz_id', result.quizId)
-        .order('created_at', { ascending: true });
+      // Se le domande sono già incluse nel risultato, usale direttamente
+      if (result.questions && result.questions.length > 0) {
+        setQuestions(result.questions);
+      } else {
+        // Altrimenti, carica le domande dal database
+        const { data: quizData, error: quizError } = await supabase
+          .from('quiz_questions')
+          .select('*')
+          .eq('quiz_id', result.quizId)
+          .order('created_at', { ascending: true });
 
-      if (quizError) throw quizError;
-      setQuestions(quizData || []);
+        if (quizError) throw quizError;
+        setQuestions(quizData || []);
+      }
 
       // Load previous results for comparison
       const { data: prevResults, error: prevError } = await supabase

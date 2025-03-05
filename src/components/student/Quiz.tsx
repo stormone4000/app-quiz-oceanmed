@@ -192,8 +192,8 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
       
       // Calculate score and ensure it's a valid number between 0 and 1
       const correctAnswers = booleanAnswers.filter(Boolean).length;
-      const score = Math.max(0, Math.min(1, correctAnswers / answers.length));
-      console.log("Punteggio calcolato:", score, "Risposte corrette:", correctAnswers, "su", answers.length);
+      const score = Math.max(0, Math.min(1, correctAnswers / quiz.questions.length));
+      console.log("Punteggio calcolato:", score, "Risposte corrette:", correctAnswers, "su", quiz.questions.length);
       
       // Verifica che studentEmail sia definito e non vuoto
       if (!studentEmail) {
@@ -213,7 +213,8 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
         date: new Date().toISOString(),
         category: quiz.category || quiz.quiz_type,
         firstName: '',
-        lastName: ''
+        lastName: '',
+        questions: quiz.questions
       };
       console.log("Oggetto quizResult creato:", JSON.stringify(quizResult));
 
@@ -391,9 +392,13 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
                   disabled={answeredQuestions[currentQuestion]}
                   className={`w-full p-4 rounded-lg border text-lg font-semibold text-white dark:text-white transition-colors flex items-center gap-4 ${
                     answeredQuestions[currentQuestion]
-                      ? answers[currentQuestion] === currentQuestionData.correct_answer
-                        ? 'bg-emerald-600 border-emerals-200' // domande corrette
-                        : 'bg-rose-600 border-rose-200' // domande sbagliate
+                      ? index === answers[currentQuestion]
+                        ? answers[currentQuestion] === currentQuestionData.correct_answer
+                          ? 'bg-emerald-600 border-emerals-200' // risposta selezionata e corretta
+                          : 'bg-rose-600 border-rose-200' // risposta selezionata ma sbagliata
+                        : index === currentQuestionData.correct_answer
+                          ? 'bg-emerald-600/40 border-emerals-200' // risposta non selezionata ma corretta
+                          : 'bg-gray-700 border-gray-600' // risposta non selezionata e non corretta
                       : 'border-gray-200 hover:bg-blue-700' // Hover Domande 
                   }`}
                 >
