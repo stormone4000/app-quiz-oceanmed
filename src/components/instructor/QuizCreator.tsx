@@ -357,9 +357,15 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
         duration_minutes: duration,
         icon,
         icon_color: iconColor,
-        created_by: userId, // Utilizzo l'ID utente invece dell'email
-        host_email: quizType === 'interactive' ? hostEmail || userEmail : null
+        created_by: userId // Utilizzo l'ID utente invece dell'email
       };
+
+      // Aggiungi host_email solo per i quiz interattivi
+      if (quizType === 'interactive') {
+        Object.assign(quizData, {
+          host_email: hostEmail || userEmail
+        });
+      }
 
       console.log(`Quiz template data for ${quizType} quiz:`, quizData);
       let quizId;
