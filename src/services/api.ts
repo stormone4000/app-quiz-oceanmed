@@ -1,5 +1,10 @@
 import { supabase } from './supabase';
-import type { Question, QuizResult } from '../types';
+import type { 
+  Question, 
+  QuizResult, 
+  LiveQuizSession, 
+  LiveQuizParticipant 
+} from '../types';
 
 export async function getQuestions(): Promise<Question[]> {
   try {
@@ -252,51 +257,104 @@ export async function saveQuizResult(result: QuizResult): Promise<void> {
   }
 }
 
-export async function getQuizResults(email?: string): Promise<QuizResult[]> {
+export const getQuizResults = async (studentEmail?: string): Promise<QuizResult[]> => {
   try {
+    console.log('Caricamento risultati quiz per email:', studentEmail);
+    
     let query = supabase
       .from('results')
       .select(`
         *,
-        quiz:quizzes(
-          title,
-          description
-        )
-      `)
-      .order('date', { ascending: false });
+        quiz:quizzes(title, description)
+      `);
     
-    // Se è stata fornita un'email, filtra i risultati per quella email
-    if (email) {
-      query = query.eq('student_email', email);
+    if (studentEmail) {
+      query = query.eq('student_email', studentEmail);
     }
     
     const { data: results, error } = await query;
-
+    
     if (error) {
-      console.error('Error fetching quiz results:', error);
+      console.error('Errore nel caricamento dei risultati:', error);
       return [];
     }
-
-    // Se non ci sono risultati, restituisci un array vuoto
+    
     if (!results || results.length === 0) {
-      console.log('Nessun risultato trovato' + (email ? ` per l'email ${email}` : ''));
+      console.log('Nessun risultato trovato');
       return [];
     }
-
-    return results.map((result: any) => ({
-      email: result.student_email,
-      score: result.score,
-      totalTime: result.total_time,
-      answers: result.answers,
-      questionTimes: result.question_times,
-      date: result.date,
-      category: result.category,
-      quizId: result.quiz_id,
-      firstName: result.first_name,
-      lastName: result.last_name
-    }));
+    
+    console.log(`Trovati ${results.length} risultati`);
+    
+    const formattedResults: QuizResult[] = await Promise.all(
+      results.map(async (result) => {
+        const formattedResult: QuizResult = {
+          studentId: result.user_id,
+          email: result.student_email,
+          score: result.score,
+          totalTime: result.total_time,
+          answers: result.answers,
+          questionTimes: result.question_times,
+          date: result.date,
+          category: result.category,
+          quizId: result.quiz_id,
+          firstName: result.first_name,
+          lastName: result.last_name,
+          questions: [] // Inizializziamo questions come un array vuoto
+        };
+        
+        // Caricamento delle domande associate a questo risultato
+        const { data: questions, error: questionsError } = await supabase
+          .from('quiz_questions')
+          .select('*')
+          .eq('quiz_id', result.quiz_id);
+          
+        if (questionsError) {
+          console.error('Errore nel caricamento delle domande:', questionsError);
+        } else if (questions && questions.length > 0) {
+          console.log(`Trovate ${questions.length} domande per il quiz ID: ${result.quiz_id}`);
+          // Convertiamo ogni domanda al tipo Question corretto
+          formattedResult.questions = questions.map((q: any) => ({
+            id: q.id,
+            question: q.question,
+            options: q.options,
+            correctAnswer: q.correct_answer,
+            category: q.category,
+            timeLimit: q.time_limit
+          }));
+        } else {
+          console.log(`Nessuna domanda trovata per il quiz ID: ${result.quiz_id}, tentativo alternativo...`);
+          
+          // Tentativo alternativo: cerca le domande nel template del quiz
+          const { data: quizTemplate, error: templateError } = await supabase
+            .from('quizzes')
+            .select('*, quiz_questions(*)')
+            .eq('id', result.quiz_id)
+            .single();
+            
+          if (templateError) {
+            console.error('Errore nel caricamento del template del quiz:', templateError);
+          } else if (quizTemplate && quizTemplate.quiz_questions) {
+            console.log(`Trovate ${quizTemplate.quiz_questions.length} domande dal template del quiz`);
+            // Convertiamo ogni domanda dal template al tipo Question corretto
+            formattedResult.questions = quizTemplate.quiz_questions.map((q: any) => ({
+              id: q.id,
+              question: q.question,
+              options: q.options,
+              correctAnswer: q.correct_answer,
+              category: q.category,
+              timeLimit: q.time_limit
+            }));
+          }
+        }
+        
+        return formattedResult;
+      })
+    );
+    
+    return formattedResults;
   } catch (error) {
-    console.error('Error in getQuizResults:', error);
+    console.error('Errore durante il recupero dei risultati:', error);
     return [];
   }
-}
+};
