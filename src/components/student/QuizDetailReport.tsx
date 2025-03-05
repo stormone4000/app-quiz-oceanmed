@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Clock, Target, CheckCircle2, XCircle, AlertTriangle, Trophy, BookOpen, Star } from 'lucide-react';
+import { ArrowLeft, Clock, Target, CheckCircle2, XCircle, AlertTriangle, Trophy, BookOpen, Star, RefreshCw } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 import type { QuizResult } from '../../types';
 
@@ -13,25 +13,44 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
   const [questions, setQuestions] = React.useState<any[]>([]);
   const [previousResults, setPreviousResults] = React.useState<QuizResult[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [loadingError, setLoadingError] = React.useState<string | null>(null);
+  const [loadAttempts, setLoadAttempts] = React.useState(0);
 
   React.useEffect(() => {
     loadQuizData();
-  }, [result.quizId]);
+  }, [result.quizId, loadAttempts]);
 
   const loadQuizData = async () => {
     try {
+      setLoading(true);
+      setLoadingError(null);
+      
       console.log('Loading quiz data with:', { 
         quizId: result.quizId, 
         hasQuestions: result.questions && result.questions.length > 0,
         answers: result.answers ? result.answers.length : 0, 
-        resultObject: JSON.stringify(result)
+        resultObject: JSON.stringify(result),
+        loadAttempt: loadAttempts + 1
       });
       
       // Se le domande sono già incluse nel risultato, usale direttamente
       if (result.questions && result.questions.length > 0) {
         console.log('Using embedded questions:', result.questions.length);
         console.log('First question sample:', JSON.stringify(result.questions[0]));
-        setQuestions(result.questions);
+        
+        // Normalizziamo le domande per assicurarci che abbiano tutti i campi necessari
+        const normalizedQuestions = result.questions.map((q: any) => ({
+          id: q.id || Math.random().toString(36).substring(2, 9),
+          question_text: q.question_text || q.question || "",
+          options: q.options || [],
+          correct_answer: q.correct_answer !== undefined ? q.correct_answer : (q.correctAnswer !== undefined ? q.correctAnswer : 0),
+          explanation: q.explanation || "",
+          image_url: q.image_url || "",
+          category: q.category || result.category || ""
+        }));
+        
+        console.log('Normalized questions:', normalizedQuestions.length);
+        setQuestions(normalizedQuestions);
       } else {
         console.log('Attempting to load questions from database for quizId:', result.quizId);
         
@@ -45,7 +64,18 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
         // Altrimenti, carica le domande dal database
         const { data: quizData, error: quizError } = await supabase
           .from('quiz_questions')
-          .select('*')
+          .select(`
+            id, 
+            question_text,
+            question,
+            options,
+            correct_answer,
+            explanation,
+            image_url,
+            category,
+            time_limit,
+            created_at
+          `)
           .eq('quiz_id', result.quizId)
           .order('created_at', { ascending: true });
 
@@ -57,32 +87,99 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
         console.log(`Loaded ${quizData?.length || 0} questions from database`);
         if (quizData && quizData.length > 0) {
           console.log('First question sample from database:', JSON.stringify(quizData[0]));
-        }
-        
-        // Se non abbiamo trovato domande con questa query, proviamo un approccio alternativo
-        if (!quizData || quizData.length === 0) {
+          
+          // Normalizziamo le domande dal database
+          const normalizedQuestions = quizData.map((q: any) => ({
+            id: q.id || Math.random().toString(36).substring(2, 9),
+            question_text: q.question_text || q.question || "",
+            options: q.options || [],
+            correct_answer: q.correct_answer !== undefined ? q.correct_answer : 0,
+            explanation: q.explanation || "",
+            image_url: q.image_url || "",
+            category: q.category || result.category || ""
+          }));
+          
+          setQuestions(normalizedQuestions);
+        } else {
+          // Se non abbiamo trovato domande con questa query, proviamo un approccio alternativo
           console.log('No questions found with quiz_id, trying to load quiz template');
           
           // Proviamo a caricare il template del quiz per ottenere le domande
           const { data: quizTemplate, error: templateError } = await supabase
             .from('quizzes')
-            .select('*, quiz_questions(*)')
+            .select(`
+              id,
+              title,
+              description,
+              quiz_type,
+              category,
+              quiz_questions (
+                id, 
+                question_text,
+                question,
+                options,
+                correct_answer,
+                explanation,
+                image_url,
+                category,
+                time_limit,
+                created_at
+              )
+            `)
             .eq('id', result.quizId)
             .single();
             
           if (templateError) {
             console.error('Error loading quiz template:', templateError);
-          } else if (quizTemplate && quizTemplate.quiz_questions) {
+          } else if (quizTemplate && quizTemplate.quiz_questions && quizTemplate.quiz_questions.length > 0) {
             console.log(`Loaded ${quizTemplate.quiz_questions.length} questions from quiz template`);
             if (quizTemplate.quiz_questions.length > 0) {
               console.log('First question sample from template:', JSON.stringify(quizTemplate.quiz_questions[0]));
+              
+              // Normalizziamo le domande dal template
+              const normalizedQuestions = quizTemplate.quiz_questions.map((q: any) => ({
+                id: q.id || Math.random().toString(36).substring(2, 9),
+                question_text: q.question_text || q.question || "",
+                options: q.options || [],
+                correct_answer: q.correct_answer !== undefined ? q.correct_answer : 0,
+                explanation: q.explanation || "",
+                image_url: q.image_url || "",
+                category: q.category || result.category || ""
+              }));
+              
+              setQuestions(normalizedQuestions);
             }
-            setQuestions(quizTemplate.quiz_questions);
           } else {
-            console.error('No questions found in database or template');
+            // Ultimo tentativo: carica direttamente dalla tabella quizzes
+            console.log('Final attempt: loading directly from quizzes table');
+            
+            const { data: quizData, error: quizDataError } = await supabase
+              .from('quizzes')
+              .select('*')
+              .eq('id', result.quizId)
+              .single();
+              
+            if (quizDataError) {
+              console.error('Error loading quiz:', quizDataError);
+            } else if (quizData && quizData.questions && quizData.questions.length > 0) {
+              console.log(`Found embedded questions in quiz`);
+              
+              // Normalizziamo le domande incorporate
+              const normalizedQuestions = quizData.questions.map((q: any) => ({
+                id: q.id || Math.random().toString(36).substring(2, 9),
+                question_text: q.question_text || q.question || "",
+                options: q.options || [],
+                correct_answer: q.correct_answer !== undefined ? q.correct_answer : (q.correctAnswer !== undefined ? q.correctAnswer : 0),
+                explanation: q.explanation || "",
+                image_url: q.image_url || "",
+                category: q.category || result.category || ""
+              }));
+              
+              setQuestions(normalizedQuestions);
+            } else {
+              console.error('No questions found after all attempts');
+            }
           }
-        } else {
-          setQuestions(quizData);
         }
       }
 
@@ -99,6 +196,7 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
       setPreviousResults(prevResults || []);
     } catch (error) {
       console.error('Error loading quiz data:', error);
+      setLoadingError(`Errore durante il caricamento delle domande: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`);
     } finally {
       setLoading(false);
     }
@@ -217,13 +315,21 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
         <div className="divide-y divide-gray-200">
           {questions.length > 0 ? (
             questions.map((question, index) => {
+              // Verifichiamo che l'indice sia valido per l'array delle risposte
+              const hasValidAnswerIndex = index < result.answers.length;
+              const isAnswerCorrect = hasValidAnswerIndex ? result.answers[index] : false;
+              
               // Determiniamo un'opzione incorretta "simulata" per rappresentare la scelta dell'utente
               // quando ha sbagliato (poiché non abbiamo l'informazione effettiva)
-              const correctAnswerIndex = question.correct_answer !== undefined ? question.correct_answer : question.correctAnswer;
+              const correctAnswerIndex = 
+                question.correct_answer !== undefined 
+                  ? question.correct_answer 
+                  : (question.correctAnswer !== undefined ? question.correctAnswer : 0);
+              
               let simulatedWrongAnswer = -1;
               
               // Solo se la risposta è sbagliata, selezioniamo un'opzione diversa da quella corretta
-              if (!result.answers[index] && question.options && question.options.length > 0) {
+              if (hasValidAnswerIndex && !isAnswerCorrect && question.options && question.options.length > 0) {
                 // Simuliamo la scelta dell'utente con un'opzione diversa da quella corretta
                 const availableWrongOptions = Array.from(
                   { length: question.options.length }, 
@@ -241,7 +347,7 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
                   <div className="flex items-start gap-4">
                     <div className="flex-1">
                       <h3 className="text-lg font-medium text-slate-950 dark:text-slate-100 mb-2"> 
-                        Domanda {index + 1} {!result.answers[index] && <span className="text-rose-600 font-semibold">(Risposta Errata)</span>}
+                        Domanda {index + 1} {hasValidAnswerIndex && !isAnswerCorrect && <span className="text-rose-600 font-semibold">(Risposta Errata)</span>}
                       </h3>
                       <p className="text-slate-950 dark:text-slate-100 mb-4">
                         {question.question_text || question.question || ""}
@@ -250,15 +356,9 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
                       {/* Options */}
                       <div className="space-y-2 text-slate-950 dark:text-slate-900 mb-4">
                         {(question.options || []).map((option: string, optionIndex: number) => {
-                          // Supporta entrambi i formati di indice della risposta corretta
-                          const correctAnswerIndex = 
-                            question.correct_answer !== undefined 
-                              ? question.correct_answer 
-                              : question.correctAnswer;
-                          
                           const isCorrectAnswer = optionIndex === correctAnswerIndex;
                           // Evidenziamo in rosso solo l'opzione che simula la scelta errata dell'utente
-                          const isSimulatedWrongAnswer = !result.answers[index] && optionIndex === simulatedWrongAnswer;
+                          const isSimulatedWrongAnswer = hasValidAnswerIndex && !isAnswerCorrect && optionIndex === simulatedWrongAnswer;
                           
                           return (
                             <div
@@ -293,7 +393,7 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
                         })}
                       </div>
 
-                      {!result.answers[index] && (
+                      {hasValidAnswerIndex && !isAnswerCorrect && (
                         <div className="mb-4 p-3 bg-gray-100 text-gray-800 rounded-lg">
                           <span className="font-medium">Rivedi la risposta corretta evidenziata in verde.</span>
                         </div>
@@ -303,7 +403,7 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
                       <div className="flex items-center gap-6 text-sm text-slate-750 dark:text-slate-100 mb-4">
                         <span className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />
-                          Tempo: {formatTime(result.questionTimes[index] || 0)}
+                          Tempo: {formatTime(result.questionTimes && index < result.questionTimes.length ? result.questionTimes[index] : 0)}
                         </span>
                       </div>
 
@@ -324,7 +424,26 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
             })
           ) : (
             <div className="p-6 text-center">
-              <p className="text-gray-500">Nessuna domanda disponibile per questo quiz</p>
+              <p className="text-gray-500 mb-4">Nessuna domanda disponibile per questo quiz</p>
+              <p className="text-gray-400 mt-2">ID Quiz: {result.quizId || 'Non disponibile'}</p>
+              <p className="text-gray-400">Categoria: {result.category || 'Non disponibile'}</p>
+              <p className="text-gray-400 mb-6">Data: {formatDate(result.date)}</p>
+              
+              {loadingError && (
+                <p className="text-rose-500 mb-4">{loadingError}</p>
+              )}
+              
+              <button 
+                onClick={() => setLoadAttempts(prev => prev + 1)}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Riprova a caricare le domande
+              </button>
+              
+              <p className="text-gray-400 mt-4 text-sm">
+                Se il problema persiste, contatta l'assistenza tecnica fornendo l'ID Quiz.
+              </p>
             </div>
           )}
         </div>
