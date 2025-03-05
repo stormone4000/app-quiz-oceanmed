@@ -22,11 +22,11 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
   }, [result.quizId, loadAttempts]);
 
   const loadQuizData = async () => {
+    setLoading(true);
+    setLoadingError(null);
+    setDebugInfo(null);
+    
     try {
-      setLoading(true);
-      setLoadingError(null);
-      setDebugInfo(null);
-      
       console.log('Loading quiz data with:', { 
         quizId: result.quizId, 
         hasQuestions: result.questions && result.questions.length > 0,
@@ -51,192 +51,119 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
           category: q.category || result.category || ""
         }));
         
-        console.log('Normalized questions:', normalizedQuestions.length);
         setQuestions(normalizedQuestions);
-      } else {
-        console.log('Attempting to load questions from database for quizId:', result.quizId);
-        
-        // Verifichiamo che quizId sia definito
-        if (!result.quizId) {
-          console.error('No quizId available, cannot load questions');
-          setLoadingError('ID Quiz non disponibile, impossibile caricare le domande');
+        setLoading(false);
+        return;
+      }
+      
+      if (!result.quizId) {
+        console.error("Quiz ID non disponibile nel risultato");
+        setLoadingError("ID del quiz non disponibile");
+        setLoading(false);
+        return;
+      }
+      
+      console.log(`Tentativo di caricamento domande per quiz_id: ${result.quizId}`);
+      
+      // PRIMO TENTATIVO: Carica direttamente da quiz_questions
+      try {
+        console.log(`1. Caricamento da quiz_questions per quiz_id: ${result.quizId}`);
+        const { data: questionData, error: questionError } = await supabase
+          .from('quiz_questions')
+          .select('*')
+          .eq('quiz_id', result.quizId);
+          
+        if (questionError) {
+          console.error("Errore nel caricamento delle domande:", questionError);
+        } else if (questionData && questionData.length > 0) {
+          console.log(`Domande trovate in quiz_questions: ${questionData.length}`);
+          setQuestions(questionData);
           setLoading(false);
           return;
-        }
-        
-        // Raccogliamo informazioni di debug
-        let debugData = `Quiz ID: ${result.quizId}\n`;
-        debugData += `Categoria: ${result.category}\n`;
-        debugData += `Data: ${result.date}\n`;
-        debugData += `Risposte: ${result.answers ? result.answers.length : 0}\n`;
-        
-        // Altrimenti, carica le domande dal database
-        const { data: quizData, error: quizError } = await supabase
-          .from('quiz_questions')
-          .select(`
-            id, 
-            question_text,
-            question,
-            options,
-            correct_answer,
-            explanation,
-            image_url,
-            category,
-            time_limit,
-            created_at
-          `)
-          .eq('quiz_id', result.quizId)
-          .order('created_at', { ascending: true });
-
-        if (quizError) {
-          console.error('Error loading quiz questions:', quizError);
-          debugData += `Errore quiz_questions: ${quizError.message}\n`;
-        }
-        
-        console.log(`Loaded ${quizData?.length || 0} questions from database`);
-        debugData += `Domande caricate da quiz_questions: ${quizData?.length || 0}\n`;
-        
-        if (quizData && quizData.length > 0) {
-          console.log('First question sample from database:', JSON.stringify(quizData[0]));
-          
-          // Normalizziamo le domande dal database
-          const normalizedQuestions = quizData.map((q: any) => ({
-            id: q.id || Math.random().toString(36).substring(2, 9),
-            question_text: q.question_text || q.question || "",
-            options: q.options || [],
-            correct_answer: q.correct_answer !== undefined ? q.correct_answer : 0,
-            explanation: q.explanation || "",
-            image_url: q.image_url || "",
-            category: q.category || result.category || ""
-          }));
-          
-          setQuestions(normalizedQuestions);
         } else {
-          // Se non abbiamo trovato domande con questa query, proviamo un approccio alternativo
-          console.log('No questions found with quiz_id, trying to load quiz template');
-          debugData += `Nessuna domanda trovata in quiz_questions, tentativo con quizzes\n`;
-          
-          // Proviamo a caricare il template del quiz per ottenere le domande
-          const { data: quizTemplate, error: templateError } = await supabase
-            .from('quizzes')
-            .select(`
-              id,
-              title,
-              description,
-              quiz_type,
-              category,
-              questions,
-              quiz_questions (
-                id, 
-                question_text,
-                question,
-                options,
-                correct_answer,
-                explanation,
-                image_url,
-                category,
-                time_limit,
-                created_at
-              )
-            `)
-            .eq('id', result.quizId)
-            .single();
-            
-          if (templateError) {
-            console.error('Error loading quiz template:', templateError);
-            debugData += `Errore quizzes: ${templateError.message}\n`;
-          } else if (quizTemplate && quizTemplate.questions && quizTemplate.questions.length > 0) {
-            console.log(`Loaded ${quizTemplate.questions.length} questions from quiz template questions field`);
-            debugData += `Domande caricate da quizzes.questions: ${quizTemplate.questions.length}\n`;
-            
-            // Normalizziamo le domande dal template
-            const normalizedQuestions = quizTemplate.questions.map((q: any) => ({
-              id: q.id || Math.random().toString(36).substring(2, 9),
-              question_text: q.question_text || q.question || "",
-              options: q.options || [],
-              correct_answer: q.correct_answer !== undefined ? q.correct_answer : 0,
-              explanation: q.explanation || "",
-              image_url: q.image_url || "",
-              category: q.category || result.category || ""
-            }));
-            
-            setQuestions(normalizedQuestions);
-          } else if (quizTemplate && quizTemplate.quiz_questions && quizTemplate.quiz_questions.length > 0) {
-            console.log(`Loaded ${quizTemplate.quiz_questions.length} questions from quiz template`);
-            debugData += `Domande caricate da quizzes.quiz_questions: ${quizTemplate.quiz_questions.length}\n`;
-            
-            if (quizTemplate.quiz_questions.length > 0) {
-              console.log('First question sample from template:', JSON.stringify(quizTemplate.quiz_questions[0]));
-              
-              // Normalizziamo le domande dal template
-              const normalizedQuestions = quizTemplate.quiz_questions.map((q: any) => ({
-                id: q.id || Math.random().toString(36).substring(2, 9),
-                question_text: q.question_text || q.question || "",
-                options: q.options || [],
-                correct_answer: q.correct_answer !== undefined ? q.correct_answer : 0,
-                explanation: q.explanation || "",
-                image_url: q.image_url || "",
-                category: q.category || result.category || ""
-              }));
-              
-              setQuestions(normalizedQuestions);
-            }
-          } else {
-            // Ultimo tentativo: carica direttamente dalla tabella quiz_templates
-            console.log('Final attempt: loading from quiz_templates table');
-            debugData += `Tentativo finale: caricamento da quiz_templates\n`;
-            
-            const { data: templateData, error: templateDataError } = await supabase
-              .from('quiz_templates')
-              .select('questions')
-              .eq('id', result.quizId)
-              .single();
-              
-            if (templateDataError) {
-              console.error('Error loading from quiz_templates:', templateDataError);
-              debugData += `Errore quiz_templates: ${templateDataError.message}\n`;
-            } else if (templateData && templateData.questions && templateData.questions.length > 0) {
-              console.log(`Found ${templateData.questions.length} questions in quiz_templates`);
-              debugData += `Domande caricate da quiz_templates: ${templateData.questions.length}\n`;
-              
-              // Normalizziamo le domande incorporate
-              const normalizedQuestions = templateData.questions.map((q: any) => ({
-                id: q.id || Math.random().toString(36).substring(2, 9),
-                question_text: q.question_text || q.question || "",
-                options: q.options || [],
-                correct_answer: q.correct_answer !== undefined ? q.correct_answer : (q.correctAnswer !== undefined ? q.correctAnswer : 0),
-                explanation: q.explanation || "",
-                image_url: q.image_url || "",
-                category: q.category || result.category || ""
-              }));
-              
-              setQuestions(normalizedQuestions);
-            } else {
-              console.error('No questions found after all attempts');
-              debugData += `Nessuna domanda trovata dopo tutti i tentativi\n`;
-              setDebugInfo(debugData);
-            }
-          }
+          console.log("Nessuna domanda trovata in quiz_questions");
         }
+      } catch (err) {
+        console.error("Errore durante il caricamento da quiz_questions:", err);
       }
-
-      // Load previous results for comparison
-      const { data: prevResults, error: prevError } = await supabase
-        .from('results')
-        .select('*')
-        .eq('student_email', result.email)
-        .eq('category', result.category)
-        .order('date', { ascending: false })
-        .limit(5);
-
-      if (prevError) {
-        console.error('Error loading previous results:', prevError);
-        throw prevError;
+      
+      // SECONDO TENTATIVO: Carica dal quiz template
+      try {
+        console.log(`2. Caricamento del quiz template con ID: ${result.quizId}`);
+        const { data: quizData, error: quizError } = await supabase
+          .from('quiz_templates')
+          .select('*')
+          .eq('id', result.quizId)
+          .single();
+          
+        if (quizError) {
+          console.error("Errore nel caricamento del quiz template:", quizError);
+        } else if (quizData && quizData.questions && quizData.questions.length > 0) {
+          console.log(`Domande trovate nel quiz template: ${quizData.questions.length}`);
+          setQuestions(quizData.questions);
+          setLoading(false);
+          return;
+        } else {
+          console.log("Nessuna domanda trovata nel quiz template");
+        }
+      } catch (err) {
+        console.error("Errore durante il caricamento del quiz template:", err);
       }
-      setPreviousResults(prevResults || []);
+      
+      // TERZO TENTATIVO: Carica da quizzes
+      try {
+        console.log(`3. Caricamento da quizzes con ID: ${result.quizId}`);
+        const { data: quizzesData, error: quizzesError } = await supabase
+          .from('quizzes')
+          .select('*')
+          .eq('id', result.quizId)
+          .single();
+          
+        if (quizzesError) {
+          console.error("Errore nel caricamento da quizzes:", quizzesError);
+        } else if (quizzesData && quizzesData.questions && quizzesData.questions.length > 0) {
+          console.log(`Domande trovate in quizzes: ${quizzesData.questions.length}`);
+          setQuestions(quizzesData.questions);
+          setLoading(false);
+          return;
+        } else {
+          console.log("Nessuna domanda trovata in quizzes");
+        }
+      } catch (err) {
+        console.error("Errore durante il caricamento da quizzes:", err);
+      }
+      
+      // QUARTO TENTATIVO: Carica direttamente le domande con una query RPC personalizzata
+      try {
+        console.log(`4. Tentativo con RPC get_quiz_questions per quiz_id: ${result.quizId}`);
+        const { data: rpcData, error: rpcError } = await supabase
+          .rpc('get_quiz_questions', { quiz_id: result.quizId });
+          
+        if (rpcError) {
+          console.error("Errore nella chiamata RPC:", rpcError);
+        } else if (rpcData && rpcData.length > 0) {
+          console.log(`Domande trovate tramite RPC: ${rpcData.length}`);
+          setQuestions(rpcData);
+          setLoading(false);
+          return;
+        } else {
+          console.log("Nessuna domanda trovata tramite RPC");
+        }
+      } catch (err) {
+        console.error("Errore durante la chiamata RPC:", err);
+      }
+      
+      // Se arriviamo qui, non abbiamo trovato domande
+      console.error("Nessuna domanda trovata dopo tutti i tentativi");
+      setLoadingError("Nessuna domanda disponibile per questo quiz");
+      setDebugInfo({
+        quizId: result.quizId,
+        category: result.category,
+        date: formatDate(result.date)
+      } as any);
     } catch (error) {
-      console.error('Error loading quiz data:', error);
-      setLoadingError(`Errore durante il caricamento delle domande: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`);
+      console.error("Errore imprevisto nel caricamento dei dati:", error);
+      setLoadingError(`Errore imprevisto: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setLoading(false);
     }
@@ -276,6 +203,27 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
     ((30 - avgTimePerQuestion) / 30) * 0.5 + (1 - successRate) * 0.5,
     1
   );
+
+  // Correggo gli errori di sintassi nella funzione di caricamento dei risultati precedenti
+  const loadPreviousResults = async () => {
+    try {
+      const { data: prevResults, error: prevError } = await supabase
+        .from('results')
+        .select('*')
+        .eq('student_email', result.email)
+        .eq('category', result.category)
+        .order('date', { ascending: false })
+        .limit(5);
+
+      if (prevError) {
+        console.error('Error loading previous results:', prevError);
+        throw prevError;
+      }
+      setPreviousResults(prevResults || []);
+    } catch (error) {
+      console.error("Errore nel caricamento dei risultati precedenti:", error);
+    }
+  };
 
   if (loading) {
     return (
