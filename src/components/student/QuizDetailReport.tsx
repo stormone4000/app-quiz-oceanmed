@@ -99,16 +99,17 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
             description,
             category
           `)
-          .eq('id', result.quizId)
-          .single();
+          .eq('id', result.quizId);
           
         if (templateError) {
           console.error("Errore nel caricamento diretto da quiz_templates:", templateError);
-        } else if (templateData) {
-          console.log(`Template trovato in quiz_templates: ${templateData.id}`);
+        } else if (templateData && templateData.length > 0) {
+          const template = templateData[0];
+          console.log(`Template trovato in quiz_templates: ${template.id}`);
           
           // Ora facciamo una query separata per ottenere le domande
           try {
+            console.log(`Tentativo di caricamento domande da quiz_templates_questions per template_id: ${result.quizId}`);
             const { data: questionsData, error: questionsError } = await supabase
               .from('quiz_templates_questions')
               .select(`
@@ -124,6 +125,85 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
               
             if (questionsError) {
               console.error("Errore nel caricamento delle domande da quiz_templates_questions:", questionsError);
+              
+              // Se la tabella non esiste o c'è un altro errore, proviamo con quiz_questions
+              console.log(`Tentativo alternativo con quiz_questions per quiz_id: ${result.quizId}`);
+              const { data: directQuestions, error: directError } = await supabase
+                .from('quiz_questions')
+                .select(`
+                  id,
+                  question_text,
+                  options,
+                  correct_answer,
+                  explanation,
+                  image_url
+                `)
+                .eq('quiz_id', result.quizId);
+                
+              if (directError) {
+                console.error("Errore nel caricamento diretto da quiz_questions:", directError);
+              } else if (directQuestions && directQuestions.length > 0) {
+                console.log(`Domande trovate direttamente in quiz_questions: ${directQuestions.length}`);
+                
+                // Normalizziamo le domande
+                const normalizedQuestions = directQuestions.map((q: any) => ({
+                  id: q.id || Math.random().toString(36).substring(2, 9),
+                  question_text: q.question_text || q.question || "",
+                  options: q.options || [],
+                  correct_answer: q.correct_answer !== undefined ? q.correct_answer : (q.correctAnswer !== undefined ? q.correctAnswer : 0),
+                  explanation: q.explanation || "",
+                  image_url: q.image_url || "",
+                  category: q.category || template.category || result.category || ""
+                }));
+                
+                setQuestions(normalizedQuestions);
+                setLoading(false);
+                return;
+              } else {
+                console.log("Nessuna domanda trovata in quiz_questions");
+                
+                // Ultimo tentativo: cerchiamo in quiz_templates_questions usando quiz_id invece di quiz_template_id
+                console.log(`Ultimo tentativo: cerco in quiz_templates_questions usando quiz_id: ${result.quizId}`);
+                try {
+                  const { data: altQuestions, error: altError } = await supabase
+                    .from('quiz_templates_questions')
+                    .select(`
+                      id,
+                      question_text,
+                      options,
+                      correct_answer,
+                      explanation,
+                      image_url,
+                      category
+                    `)
+                    .eq('quiz_id', result.quizId);
+                    
+                  if (altError) {
+                    console.error("Errore nell'ultimo tentativo con quiz_templates_questions:", altError);
+                  } else if (altQuestions && altQuestions.length > 0) {
+                    console.log(`Domande trovate in quiz_templates_questions con quiz_id: ${altQuestions.length}`);
+                    
+                    // Normalizziamo le domande
+                    const normalizedQuestions = altQuestions.map((q: any) => ({
+                      id: q.id || Math.random().toString(36).substring(2, 9),
+                      question_text: q.question_text || q.question || "",
+                      options: q.options || [],
+                      correct_answer: q.correct_answer !== undefined ? q.correct_answer : (q.correctAnswer !== undefined ? q.correctAnswer : 0),
+                      explanation: q.explanation || "",
+                      image_url: q.image_url || "",
+                      category: q.category || template.category || result.category || ""
+                    }));
+                    
+                    setQuestions(normalizedQuestions);
+                    setLoading(false);
+                    return;
+                  } else {
+                    console.log("Nessuna domanda trovata in quiz_templates_questions con quiz_id");
+                  }
+                } catch (err) {
+                  console.error("Errore durante l'ultimo tentativo con quiz_templates_questions:", err);
+                }
+              }
             } else if (questionsData && questionsData.length > 0) {
               console.log(`Domande trovate in quiz_templates_questions: ${questionsData.length}`);
               
@@ -135,7 +215,7 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
                 correct_answer: q.correct_answer !== undefined ? q.correct_answer : (q.correctAnswer !== undefined ? q.correctAnswer : 0),
                 explanation: q.explanation || "",
                 image_url: q.image_url || "",
-                category: q.category || templateData.category || result.category || ""
+                category: q.category || template.category || result.category || ""
               }));
               
               setQuestions(normalizedQuestions);
@@ -148,7 +228,7 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
             console.error("Errore durante il caricamento delle domande da quiz_templates_questions:", err);
           }
         } else {
-          console.log("Nessun template trovato in quiz_templates");
+          console.log("Nessun template trovato in quiz_templates per ID:", result.quizId);
         }
       } catch (err) {
         console.error("Errore durante il caricamento diretto da quiz_templates:", err);
