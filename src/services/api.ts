@@ -257,39 +257,53 @@ export async function saveQuizResult(result: QuizResult): Promise<void> {
   }
 }
 
-export const getQuizResults = async (studentEmail?: string): Promise<QuizResult[]> => {
+export const getQuizResults = async (email?: string): Promise<QuizResult[]> => {
+  console.log(`[${new Date().toISOString()}] Caricamento risultati quiz per email: ${email || 'non specificata'}`);
+  
   try {
-    console.log('Caricamento risultati quiz per email:', studentEmail);
-    
     let query = supabase
       .from('results')
       .select(`
         *,
-        quiz:quizzes(title, description)
+        quizzes (
+          id,
+          title,
+          description
+        )
       `);
-    
-    if (studentEmail) {
-      query = query.eq('student_email', studentEmail);
+
+    if (email) {
+      query = query.eq('student_email', email);
     }
-    
+
     const { data: results, error } = await query;
-    
+
     if (error) {
       console.error('Errore nel caricamento dei risultati:', error);
       return [];
     }
-    
+
     if (!results || results.length === 0) {
-      console.log('Nessun risultato trovato');
+      console.log('Nessun risultato trovato per email:', email);
       return [];
     }
+
+    console.log(`Trovati ${results.length} risultati per email: ${email}`);
     
-    console.log(`Trovati ${results.length} risultati`);
-    
+    // Esempio di un risultato per debug
+    if (results.length > 0) {
+      console.log('Esempio di risultato:', JSON.stringify(results[0], null, 2).substring(0, 500) + '...');
+    }
+
     const formattedResults: QuizResult[] = await Promise.all(
       results.map(async (result) => {
+        console.log(`[${new Date().toISOString()}] Elaborazione risultato con ID: ${result.id}, Quiz ID: ${result.quiz_id}`);
+        
         const formattedResult: QuizResult = {
+          id: result.id,
           studentId: result.user_id,
+          firstName: result.first_name,
+          lastName: result.last_name,
           email: result.student_email,
           score: result.score,
           totalTime: result.total_time,
@@ -298,99 +312,122 @@ export const getQuizResults = async (studentEmail?: string): Promise<QuizResult[
           date: result.date,
           category: result.category,
           quizId: result.quiz_id,
-          firstName: result.first_name,
-          lastName: result.last_name,
-          questions: [] // Inizializziamo questions come un array vuoto
+          questions: [] // Inizializziamo con un array vuoto
         };
-        
-        // Caricamento delle domande associate a questo risultato
-        const { data: questions, error: questionsError } = await supabase
-          .from('quiz_questions')
-          .select(`
-            id, 
-            question_text,
-            question,
-            options,
-            correct_answer,
-            explanation,
-            image_url,
-            category,
-            time_limit,
-            created_at
-          `)
-          .eq('quiz_id', result.quiz_id)
-          .order('created_at', { ascending: true });
-          
-        if (questionsError) {
-          console.error('Errore nel caricamento delle domande:', questionsError);
-        } else if (questions && questions.length > 0) {
-          console.log(`Trovate ${questions.length} domande per il quiz ID: ${result.quiz_id}`);
-          // Convertiamo ogni domanda al tipo Question corretto usando i nomi dei campi attesi da QuizDetailReport
-          formattedResult.questions = questions.map((q: any) => ({
-            id: q.id,
-            question_text: q.question_text || q.question, // Supporta entrambi i formati
-            options: q.options,
-            correct_answer: q.correct_answer,
-            explanation: q.explanation,
-            image_url: q.image_url,
-            category: q.category,
-            // Manteniamo i campi aggiuntivi che potrebbero essere utili
-            timeLimit: q.time_limit
-          }));
-        } else {
-          console.log(`Nessuna domanda trovata per il quiz ID: ${result.quiz_id}, tentativo alternativo...`);
-          
-          // Tentativo alternativo: cerca le domande nel template del quiz
-          const { data: quizTemplate, error: templateError } = await supabase
-            .from('quizzes')
-            .select(`
-              id,
-              title,
-              description,
-              quiz_type,
-              category,
-              quiz_questions (
-                id, 
-                question_text,
-                question,
-                options,
-                correct_answer,
-                explanation,
-                image_url,
-                category,
-                time_limit,
-                created_at
-              )
-            `)
-            .eq('id', result.quiz_id)
-            .single();
+
+        // Caricamento delle domande associate al quiz
+        if (result.quiz_id) {
+          try {
+            console.log(`[${new Date().toISOString()}] Tentativo 1: Caricamento domande da quiz_questions per quiz_id: ${result.quiz_id}`);
             
-          if (templateError) {
-            console.error('Errore nel caricamento del template del quiz:', templateError);
-          } else if (quizTemplate && quizTemplate.quiz_questions) {
-            console.log(`Trovate ${quizTemplate.quiz_questions.length} domande dal template del quiz`);
-            // Convertiamo ogni domanda dal template al tipo Question corretto
-            formattedResult.questions = quizTemplate.quiz_questions.map((q: any) => ({
-              id: q.id,
-              question_text: q.question_text || q.question, // Supporta entrambi i formati
-              options: q.options,
-              correct_answer: q.correct_answer,
-              explanation: q.explanation,
-              image_url: q.image_url,
-              category: q.category,
-              // Manteniamo i campi aggiuntivi che potrebbero essere utili
-              timeLimit: q.time_limit
-            }));
+            // Tentativo 1: Caricare le domande dalla tabella quiz_questions
+            const { data: questionData, error: questionError } = await supabase
+              .from('quiz_questions')
+              .select('*')
+              .eq('quiz_id', result.quiz_id);
+
+            if (questionError) {
+              console.error(`Errore nel caricamento delle domande per quiz_id ${result.quiz_id}:`, questionError);
+            }
+
+            if (questionData && questionData.length > 0) {
+              console.log(`Trovate ${questionData.length} domande nella tabella quiz_questions`);
+              formattedResult.questions = questionData;
+            } else {
+              console.log(`Nessuna domanda trovata nella tabella quiz_questions per quiz_id: ${result.quiz_id}`);
+              
+              // Tentativo 2: Caricare le domande dal template del quiz
+              console.log(`[${new Date().toISOString()}] Tentativo 2: Caricamento domande dal template per quiz_id: ${result.quiz_id}`);
+              const { data: quizData, error: quizError } = await supabase
+                .from('quizzes')
+                .select('template_id')
+                .eq('id', result.quiz_id)
+                .single();
+
+              if (quizError) {
+                console.error(`Errore nel caricamento del template_id per quiz_id ${result.quiz_id}:`, quizError);
+              }
+
+              if (quizData && quizData.template_id) {
+                console.log(`Trovato template_id: ${quizData.template_id} per quiz_id: ${result.quiz_id}`);
+                
+                const { data: templateQuestions, error: templateError } = await supabase
+                  .from('quiz_templates')
+                  .select('questions')
+                  .eq('id', quizData.template_id)
+                  .single();
+
+                if (templateError) {
+                  console.error(`Errore nel caricamento delle domande dal template ${quizData.template_id}:`, templateError);
+                }
+
+                if (templateQuestions && templateQuestions.questions && templateQuestions.questions.length > 0) {
+                  console.log(`Trovate ${templateQuestions.questions.length} domande nel template`);
+                  formattedResult.questions = templateQuestions.questions;
+                } else {
+                  console.log(`Nessuna domanda trovata nel template per template_id: ${quizData.template_id}`);
+                  
+                  // Tentativo 3: Caricare le domande direttamente dalla tabella quizzes
+                  console.log(`[${new Date().toISOString()}] Tentativo 3: Caricamento domande direttamente dalla tabella quizzes per quiz_id: ${result.quiz_id}`);
+                  const { data: directQuizData, error: directQuizError } = await supabase
+                    .from('quizzes')
+                    .select('questions')
+                    .eq('id', result.quiz_id)
+                    .single();
+
+                  if (directQuizError) {
+                    console.error(`Errore nel caricamento diretto delle domande per quiz_id ${result.quiz_id}:`, directQuizError);
+                  }
+
+                  if (directQuizData && directQuizData.questions && directQuizData.questions.length > 0) {
+                    console.log(`Trovate ${directQuizData.questions.length} domande direttamente nella tabella quizzes`);
+                    formattedResult.questions = directQuizData.questions;
+                  } else {
+                    console.log(`Nessuna domanda trovata direttamente nella tabella quizzes per quiz_id: ${result.quiz_id}`);
+                    
+                    // Tentativo 4: Ultimo tentativo - cercare nella tabella quiz_templates direttamente con l'ID del quiz
+                    console.log(`[${new Date().toISOString()}] Tentativo 4: Caricamento domande da quiz_templates usando direttamente quiz_id: ${result.quiz_id}`);
+                    const { data: fallbackTemplateData, error: fallbackTemplateError } = await supabase
+                      .from('quiz_templates')
+                      .select('questions')
+                      .eq('id', result.quiz_id)
+                      .single();
+
+                    if (fallbackTemplateError) {
+                      console.error(`Errore nel tentativo fallback per quiz_id ${result.quiz_id}:`, fallbackTemplateError);
+                    }
+
+                    if (fallbackTemplateData && fallbackTemplateData.questions && fallbackTemplateData.questions.length > 0) {
+                      console.log(`Trovate ${fallbackTemplateData.questions.length} domande nel tentativo fallback`);
+                      formattedResult.questions = fallbackTemplateData.questions;
+                    } else {
+                      console.log(`Nessuna domanda trovata in nessun tentativo per quiz_id: ${result.quiz_id}`);
+                      formattedResult.questions = [];
+                    }
+                  }
+                }
+              } else {
+                console.log(`Nessun template_id trovato per quiz_id: ${result.quiz_id}`);
+                formattedResult.questions = [];
+              }
+            }
+          } catch (error) {
+            console.error(`Errore durante il caricamento delle domande per quiz_id ${result.quiz_id}:`, error);
+            formattedResult.questions = [];
           }
+        } else {
+          console.log('quiz_id non definito per questo risultato');
+          formattedResult.questions = [];
         }
-        
+
+        console.log(`Numero finale di domande caricate per quiz_id ${result.quiz_id}: ${formattedResult.questions ? formattedResult.questions.length : 0}`);
         return formattedResult;
       })
     );
-    
+
     return formattedResults;
   } catch (error) {
-    console.error('Errore durante il recupero dei risultati:', error);
+    console.error('Errore durante l\'esecuzione di getQuizResults:', error);
     return [];
   }
 };

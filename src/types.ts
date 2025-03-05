@@ -34,6 +34,7 @@ export interface QuizState {
 }
 
 export interface QuizResult {
+  id?: string;
   studentId?: string;
   firstName?: string;
   lastName?: string;
