@@ -104,11 +104,28 @@ export async function saveQuizResult(result: QuizResult): Promise<void> {
     console.log("Verifica esistenza quiz con ID:", result.quizId);
     const { data: quizExists, error: quizError } = await supabase
       .from('quizzes')
-      .select('id')
+      .select('id, questions')
       .eq('id', result.quizId)
       .single();
 
-    if (quizError) {
+    // Se il quiz esiste ma non ha domande, aggiorniamo le domande
+    if (!quizError && quizExists && result.questions && result.questions.length > 0) {
+      if (!quizExists.questions || quizExists.questions.length === 0) {
+        console.log("Il quiz esiste ma non ha domande. Aggiorniamo le domande...");
+        const { error: updateError } = await supabase
+          .from('quizzes')
+          .update({ questions: result.questions })
+          .eq('id', result.quizId);
+          
+        if (updateError) {
+          console.error("Errore nell'aggiornamento delle domande:", updateError);
+        } else {
+          console.log("Domande aggiornate con successo nel quiz esistente");
+        }
+      } else {
+        console.log("Il quiz esiste e ha già domande. Non aggiorniamo.");
+      }
+    } else if (quizError) {
       console.warn('Quiz non trovato nella tabella quizzes, verifica l\'ID:', result.quizId);
       console.warn('Errore:', quizError);
       
@@ -127,13 +144,15 @@ export async function saveQuizResult(result: QuizResult): Promise<void> {
         try {
           console.log("Creazione di un nuovo record nella tabella quizzes...");
           const newQuizData = {
+            id: result.quizId, // Usiamo lo stesso ID per mantenere la coerenza
             title: quizTemplate.title || 'Quiz importato',
             description: `Quiz importato da template ${result.quizId}`,
             type_id: null, // Non abbiamo questa informazione
             created_by: null, // Non abbiamo questa informazione
             is_active: true,
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            questions: result.questions || [] // Salviamo le domande se disponibili
           };
           
           console.log("Dati per il nuovo quiz:", newQuizData);
@@ -157,9 +176,39 @@ export async function saveQuizResult(result: QuizResult): Promise<void> {
         }
       } else {
         console.log("Quiz non trovato in quiz_templates, utilizziamo l'ID originale");
+        
+        // Se non troviamo il quiz in nessuna tabella, creiamo un nuovo record
+        if (result.questions && result.questions.length > 0) {
+          console.log("Creazione di un nuovo quiz con le domande fornite...");
+          try {
+            const newQuizData = {
+              id: result.quizId, // Usiamo lo stesso ID per mantenere la coerenza
+              title: 'Quiz ' + result.category,
+              description: `Quiz generato automaticamente per la categoria ${result.category}`,
+              type_id: null,
+              created_by: null,
+              is_active: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              questions: result.questions
+            };
+            
+            const { data: newQuiz, error: insertError } = await supabase
+              .from('quizzes')
+              .insert([newQuizData])
+              .select('id')
+              .single();
+              
+            if (insertError) {
+              console.error("Errore nella creazione del nuovo quiz:", insertError);
+            } else if (newQuiz) {
+              console.log("Nuovo quiz creato con ID:", newQuiz.id);
+            }
+          } catch (insertError) {
+            console.error("Errore durante l'inserimento del nuovo quiz:", insertError);
+          }
+        }
       }
-    } else {
-      console.log("Quiz trovato nella tabella quizzes:", quizExists);
     }
 
     const resultData = {
@@ -268,7 +317,8 @@ export const getQuizResults = async (email?: string): Promise<QuizResult[]> => {
         quizzes (
           id,
           title,
-          description
+          description,
+          questions
         )
       `);
 
@@ -293,6 +343,13 @@ export const getQuizResults = async (email?: string): Promise<QuizResult[]> => {
     // Esempio di un risultato per debug
     if (results.length > 0) {
       console.log('Esempio di risultato:', JSON.stringify(results[0], null, 2).substring(0, 500) + '...');
+      
+      // Verifichiamo se il quiz ha domande incorporate
+      if (results[0].quizzes && results[0].quizzes.questions && results[0].quizzes.questions.length > 0) {
+        console.log(`Il quiz ha ${results[0].quizzes.questions.length} domande incorporate`);
+      } else {
+        console.log('Il quiz non ha domande incorporate');
+      }
     }
 
     const formattedResults: QuizResult[] = await Promise.all(
@@ -314,6 +371,13 @@ export const getQuizResults = async (email?: string): Promise<QuizResult[]> => {
           quizId: result.quiz_id,
           questions: [] // Inizializziamo con un array vuoto
         };
+
+        // Verifichiamo se il quiz ha domande incorporate
+        if (result.quizzes && result.quizzes.questions && result.quizzes.questions.length > 0) {
+          console.log(`Utilizzando ${result.quizzes.questions.length} domande incorporate nel quiz`);
+          formattedResult.questions = result.quizzes.questions;
+          return formattedResult;
+        }
 
         // Caricamento delle domande associate al quiz
         if (result.quiz_id) {
@@ -340,7 +404,7 @@ export const getQuizResults = async (email?: string): Promise<QuizResult[]> => {
               console.log(`[${new Date().toISOString()}] Tentativo 2: Caricamento domande dal template per quiz_id: ${result.quiz_id}`);
               const { data: quizData, error: quizError } = await supabase
                 .from('quizzes')
-                .select('template_id')
+                .select('template_id, questions')
                 .eq('id', result.quiz_id)
                 .single();
 
@@ -348,7 +412,11 @@ export const getQuizResults = async (email?: string): Promise<QuizResult[]> => {
                 console.error(`Errore nel caricamento del template_id per quiz_id ${result.quiz_id}:`, quizError);
               }
 
-              if (quizData && quizData.template_id) {
+              // Verifichiamo se il quiz ha domande incorporate
+              if (quizData && quizData.questions && quizData.questions.length > 0) {
+                console.log(`Trovate ${quizData.questions.length} domande incorporate nel quiz`);
+                formattedResult.questions = quizData.questions;
+              } else if (quizData && quizData.template_id) {
                 console.log(`Trovato template_id: ${quizData.template_id} per quiz_id: ${result.quiz_id}`);
                 
                 const { data: templateQuestions, error: templateError } = await supabase
@@ -402,7 +470,26 @@ export const getQuizResults = async (email?: string): Promise<QuizResult[]> => {
                       formattedResult.questions = fallbackTemplateData.questions;
                     } else {
                       console.log(`Nessuna domanda trovata in nessun tentativo per quiz_id: ${result.quiz_id}`);
-                      formattedResult.questions = [];
+                      
+                      // Tentativo 5: Cercare nella tabella quiz_templates usando il campo quiz_id
+                      console.log(`[${new Date().toISOString()}] Tentativo 5: Caricamento domande da quiz_templates usando il campo quiz_id: ${result.quiz_id}`);
+                      const { data: quizIdTemplateData, error: quizIdTemplateError } = await supabase
+                        .from('quiz_templates')
+                        .select('questions')
+                        .eq('quiz_id', result.quiz_id)
+                        .single();
+
+                      if (quizIdTemplateError) {
+                        console.error(`Errore nel tentativo con quiz_id per quiz_id ${result.quiz_id}:`, quizIdTemplateError);
+                      }
+
+                      if (quizIdTemplateData && quizIdTemplateData.questions && quizIdTemplateData.questions.length > 0) {
+                        console.log(`Trovate ${quizIdTemplateData.questions.length} domande nel tentativo con quiz_id`);
+                        formattedResult.questions = quizIdTemplateData.questions;
+                      } else {
+                        console.log(`Nessuna domanda trovata in nessun tentativo per quiz_id: ${result.quiz_id}`);
+                        formattedResult.questions = [];
+                      }
                     }
                   }
                 }

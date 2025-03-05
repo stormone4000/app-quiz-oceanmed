@@ -15,6 +15,7 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
   const [loading, setLoading] = React.useState(true);
   const [loadingError, setLoadingError] = React.useState<string | null>(null);
   const [loadAttempts, setLoadAttempts] = React.useState(0);
+  const [debugInfo, setDebugInfo] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     loadQuizData();
@@ -24,6 +25,7 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
     try {
       setLoading(true);
       setLoadingError(null);
+      setDebugInfo(null);
       
       console.log('Loading quiz data with:', { 
         quizId: result.quizId, 
@@ -57,9 +59,16 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
         // Verifichiamo che quizId sia definito
         if (!result.quizId) {
           console.error('No quizId available, cannot load questions');
+          setLoadingError('ID Quiz non disponibile, impossibile caricare le domande');
           setLoading(false);
           return;
         }
+        
+        // Raccogliamo informazioni di debug
+        let debugData = `Quiz ID: ${result.quizId}\n`;
+        debugData += `Categoria: ${result.category}\n`;
+        debugData += `Data: ${result.date}\n`;
+        debugData += `Risposte: ${result.answers ? result.answers.length : 0}\n`;
         
         // Altrimenti, carica le domande dal database
         const { data: quizData, error: quizError } = await supabase
@@ -81,10 +90,12 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
 
         if (quizError) {
           console.error('Error loading quiz questions:', quizError);
-          throw quizError;
+          debugData += `Errore quiz_questions: ${quizError.message}\n`;
         }
         
         console.log(`Loaded ${quizData?.length || 0} questions from database`);
+        debugData += `Domande caricate da quiz_questions: ${quizData?.length || 0}\n`;
+        
         if (quizData && quizData.length > 0) {
           console.log('First question sample from database:', JSON.stringify(quizData[0]));
           
@@ -103,6 +114,7 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
         } else {
           // Se non abbiamo trovato domande con questa query, proviamo un approccio alternativo
           console.log('No questions found with quiz_id, trying to load quiz template');
+          debugData += `Nessuna domanda trovata in quiz_questions, tentativo con quizzes\n`;
           
           // Proviamo a caricare il template del quiz per ottenere le domande
           const { data: quizTemplate, error: templateError } = await supabase
@@ -113,6 +125,7 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
               description,
               quiz_type,
               category,
+              questions,
               quiz_questions (
                 id, 
                 question_text,
@@ -131,8 +144,27 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
             
           if (templateError) {
             console.error('Error loading quiz template:', templateError);
+            debugData += `Errore quizzes: ${templateError.message}\n`;
+          } else if (quizTemplate && quizTemplate.questions && quizTemplate.questions.length > 0) {
+            console.log(`Loaded ${quizTemplate.questions.length} questions from quiz template questions field`);
+            debugData += `Domande caricate da quizzes.questions: ${quizTemplate.questions.length}\n`;
+            
+            // Normalizziamo le domande dal template
+            const normalizedQuestions = quizTemplate.questions.map((q: any) => ({
+              id: q.id || Math.random().toString(36).substring(2, 9),
+              question_text: q.question_text || q.question || "",
+              options: q.options || [],
+              correct_answer: q.correct_answer !== undefined ? q.correct_answer : 0,
+              explanation: q.explanation || "",
+              image_url: q.image_url || "",
+              category: q.category || result.category || ""
+            }));
+            
+            setQuestions(normalizedQuestions);
           } else if (quizTemplate && quizTemplate.quiz_questions && quizTemplate.quiz_questions.length > 0) {
             console.log(`Loaded ${quizTemplate.quiz_questions.length} questions from quiz template`);
+            debugData += `Domande caricate da quizzes.quiz_questions: ${quizTemplate.quiz_questions.length}\n`;
+            
             if (quizTemplate.quiz_questions.length > 0) {
               console.log('First question sample from template:', JSON.stringify(quizTemplate.quiz_questions[0]));
               
@@ -150,22 +182,25 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
               setQuestions(normalizedQuestions);
             }
           } else {
-            // Ultimo tentativo: carica direttamente dalla tabella quizzes
-            console.log('Final attempt: loading directly from quizzes table');
+            // Ultimo tentativo: carica direttamente dalla tabella quiz_templates
+            console.log('Final attempt: loading from quiz_templates table');
+            debugData += `Tentativo finale: caricamento da quiz_templates\n`;
             
-            const { data: quizData, error: quizDataError } = await supabase
-              .from('quizzes')
-              .select('*')
+            const { data: templateData, error: templateDataError } = await supabase
+              .from('quiz_templates')
+              .select('questions')
               .eq('id', result.quizId)
               .single();
               
-            if (quizDataError) {
-              console.error('Error loading quiz:', quizDataError);
-            } else if (quizData && quizData.questions && quizData.questions.length > 0) {
-              console.log(`Found embedded questions in quiz`);
+            if (templateDataError) {
+              console.error('Error loading from quiz_templates:', templateDataError);
+              debugData += `Errore quiz_templates: ${templateDataError.message}\n`;
+            } else if (templateData && templateData.questions && templateData.questions.length > 0) {
+              console.log(`Found ${templateData.questions.length} questions in quiz_templates`);
+              debugData += `Domande caricate da quiz_templates: ${templateData.questions.length}\n`;
               
               // Normalizziamo le domande incorporate
-              const normalizedQuestions = quizData.questions.map((q: any) => ({
+              const normalizedQuestions = templateData.questions.map((q: any) => ({
                 id: q.id || Math.random().toString(36).substring(2, 9),
                 question_text: q.question_text || q.question || "",
                 options: q.options || [],
@@ -178,6 +213,8 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
               setQuestions(normalizedQuestions);
             } else {
               console.error('No questions found after all attempts');
+              debugData += `Nessuna domanda trovata dopo tutti i tentativi\n`;
+              setDebugInfo(debugData);
             }
           }
         }
@@ -192,7 +229,10 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
         .order('date', { ascending: false })
         .limit(5);
 
-      if (prevError) throw prevError;
+      if (prevError) {
+        console.error('Error loading previous results:', prevError);
+        throw prevError;
+      }
       setPreviousResults(prevResults || []);
     } catch (error) {
       console.error('Error loading quiz data:', error);
@@ -444,6 +484,15 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
               <p className="text-gray-400 mt-4 text-sm">
                 Se il problema persiste, contatta l'assistenza tecnica fornendo l'ID Quiz.
               </p>
+              
+              {debugInfo && (
+                <div className="mt-6 p-4 bg-gray-100 dark:bg-gray-800 rounded-md text-left">
+                  <p className="text-gray-500 mb-2 font-semibold">Informazioni di debug:</p>
+                  <pre className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
+                    {debugInfo}
+                  </pre>
+                </div>
+              )}
             </div>
           )}
         </div>
