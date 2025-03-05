@@ -1,19 +1,7 @@
 import React from 'react';
-import { ArrowLeft, Clock, Target, CheckCircle2, XCircle, AlertTriangle, Trophy, BookOpen, TrendingUp, Star } from 'lucide-react';
+import { ArrowLeft, Clock, Target, CheckCircle2, XCircle, AlertTriangle, Trophy, BookOpen, Star } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 import type { QuizResult } from '../../types';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
-import { Bar } from 'react-chartjs-2';
-
-ChartJS.register(
-  ArcElement,
-  Tooltip,
-  Legend,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title
-);
 
 interface QuizDetailReportProps {
   result: QuizResult;
@@ -32,10 +20,25 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
 
   const loadQuizData = async () => {
     try {
+      console.log('Loading quiz data with:', { 
+        quizId: result.quizId, 
+        hasQuestions: result.questions && result.questions.length > 0 
+      });
+      
       // Se le domande sono già incluse nel risultato, usale direttamente
       if (result.questions && result.questions.length > 0) {
+        console.log('Using embedded questions:', result.questions.length);
         setQuestions(result.questions);
       } else {
+        console.log('Attempting to load questions from database for quizId:', result.quizId);
+        
+        // Verifichiamo che quizId sia definito
+        if (!result.quizId) {
+          console.error('No quizId available, cannot load questions');
+          setLoading(false);
+          return;
+        }
+        
         // Altrimenti, carica le domande dal database
         const { data: quizData, error: quizError } = await supabase
           .from('quiz_questions')
@@ -43,8 +46,33 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
           .eq('quiz_id', result.quizId)
           .order('created_at', { ascending: true });
 
-        if (quizError) throw quizError;
-        setQuestions(quizData || []);
+        if (quizError) {
+          console.error('Error loading quiz questions:', quizError);
+          throw quizError;
+        }
+        
+        console.log(`Loaded ${quizData?.length || 0} questions from database`);
+        
+        // Se non abbiamo trovato domande con questa query, proviamo un approccio alternativo
+        if (!quizData || quizData.length === 0) {
+          console.log('No questions found with quiz_id, trying to load quiz template');
+          
+          // Proviamo a caricare il template del quiz per ottenere le domande
+          const { data: quizTemplate, error: templateError } = await supabase
+            .from('quizzes')
+            .select('*, quiz_questions(*)')
+            .eq('id', result.quizId)
+            .single();
+            
+          if (templateError) {
+            console.error('Error loading quiz template:', templateError);
+          } else if (quizTemplate && quizTemplate.quiz_questions) {
+            console.log(`Loaded ${quizTemplate.quiz_questions.length} questions from quiz template`);
+            setQuestions(quizTemplate.quiz_questions);
+          }
+        } else {
+          setQuestions(quizData);
+        }
       }
 
       // Load previous results for comparison
@@ -81,45 +109,24 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
     });
   };
 
+  // Calcolo statistiche base ancora necessarie
   const correctAnswers = result.answers.filter(Boolean).length;
   const totalQuestions = result.answers.length;
   const successRate = correctAnswers / totalQuestions;
 
-  // Calculate difficulty level based on average time and success rate
-  const avgTimePerQuestion = result.totalTime / totalQuestions;
-  const difficultyScore = Math.min(
-    ((30 - avgTimePerQuestion) / 30) * 0.5 + (1 - successRate) * 0.5,
-    1
-  );
+  // Calcolo difficoltà
   const getDifficultyLevel = () => {
     if (difficultyScore > 0.8) return 'Avanzato';
     if (difficultyScore > 0.6) return 'Intermedio';
     return 'Base';
   };
 
-  // Calculate performance trend
-  const performanceTrend = previousResults.length > 1
-    ? (result.score - previousResults[1].score) * 100
-    : 0;
-
-  // Determine badges
-  const badges = [
-    { name: 'Precisione', icon: Target, earned: successRate >= 0.9 },
-    { name: 'Velocità', icon: Clock, earned: avgTimePerQuestion < 20 },
-    { name: 'Costanza', icon: TrendingUp, earned: performanceTrend > 0 },
-  ];
-
-  // Prepare chart data for time distribution
-  const timeData = {
-    labels: questions.map((_, i) => `Domanda ${i + 1}`),
-    datasets: [{
-      label: 'Tempo impiegato (secondi)',
-      data: result.questionTimes,
-      backgroundColor: '#3b82f6',
-      borderColor: '#2563eb',
-      borderWidth: 1,
-    }]
-  };
+  // Queste variabili sono ancora necessarie per il calcolo del livello di difficoltà
+  const avgTimePerQuestion = result.totalTime / totalQuestions;
+  const difficultyScore = Math.min(
+    ((30 - avgTimePerQuestion) / 30) * 0.5 + (1 - successRate) * 0.5,
+    1
+  );
 
   if (loading) {
     return (
@@ -190,94 +197,6 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
         </div>
       </div>
 
-      {/* Performance Analysis */}
-      <div className="bg-white dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 rounded-xl shadow-lg p-6">
-        <h2 className="text-xl font-bold mb-6 dark:text-slate-100">Analisi della Performance</h2>
-        
-        <div className="space-y-6">
-          {/* Time Distribution Chart */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Distribuzione Tempi di Risposta</h3>
-            <Bar
-              data={timeData}
-              options={{
-                responsive: true,
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    title: {
-                      display: true,
-                      text: 'Secondi'
-                    }
-                  }
-                }
-              }}
-            />
-          </div>
-
-          {/* Badges */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Badge e Riconoscimenti</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {badges.map(badge => {
-                const Icon = badge.icon;
-                return (
-                  <div
-                    key={badge.name}
-                    className={`p-4 rounded-lg border ${
-                      badge.earned
-                        ? 'border-green-200 bg-green-50'
-                        : 'border-gray-200 bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Icon className={`w-5 h-5 ${
-                        badge.earned ? 'text-green-600' : 'text-gray-400'
-                      }`} />
-                      <span className={badge.earned ? 'text-green-800' : 'text-gray-600'}>
-                        {badge.name}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Trend Analysis */}
-          {previousResults.length > 1 && (
-            <div>
-              <h3 className="text-lg font-semibold text-slate-950 dark:text-slate-100 mb-4">Trend di Miglioramento</h3>
-              <div className={`p-4 rounded-lg ${
-                performanceTrend > 0
-                  ? 'text-lg font-light text-emerald-950 dark:text-emerald-300'
-                  : performanceTrend < 0
-                    ? 'text-lg font-light text-rose-950 dark:text-rose-300'
-                    : 'text-lg font-light text-slate-950 dark:text-slate-300'
-              }`}>
-                <div className="flex items-center gap-2">
-                  <TrendingUp className={`w-5 h-5 ${
-                    performanceTrend > 0
-                      ? 'text-green-600'
-                      : performanceTrend < 0
-                        ? 'text-lg font-light text-rose-950 dark:text-rose-300'
-                        : 'text-lg font-light text-slate-950 dark:text-slate-300'
-                  }`} />
-                  <span>
-                    {performanceTrend > 0
-                      ? `Miglioramento del ${performanceTrend.toFixed(1)}% rispetto al tentativo precedente`
-                      : performanceTrend < 0
-                        ? `Diminuzione del ${Math.abs(performanceTrend).toFixed(1)}% rispetto al tentativo precedente`
-                        : 'Prestazione stabile rispetto al tentativo precedente'
-                    }
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Detailed Question Analysis */}
       <div className="bg-white dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 rounded-xl shadow-lg p-6">
         <div className="p-6 border-b border-gray-200">
@@ -286,72 +205,106 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
 
         <div className="divide-y divide-gray-200">
           {questions.length > 0 ? (
-            questions.map((question, index) => (
-              <div key={index} className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className={`p-2 rounded-full ${
-                    result.answers[index]
-                      ? 'text-lg font-semibold text-white dark:text-slate-100'
-                      : 'text-lg font-semibold text-rose-950 dark:text-rose-300'
-                  }`}>
-                    {result.answers[index] ? (
-                      <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-                    ) : (
-                      <XCircle className="w-6 h-6 text-rose-600" />
-                    )}
-                  </div>
+            questions.map((question, index) => {
+              // Determiniamo un'opzione incorretta "simulata" per rappresentare la scelta dell'utente
+              // quando ha sbagliato (poiché non abbiamo l'informazione effettiva)
+              const correctAnswerIndex = question.correct_answer !== undefined ? question.correct_answer : question.correctAnswer;
+              let simulatedWrongAnswer = -1;
+              
+              // Solo se la risposta è sbagliata, selezioniamo un'opzione diversa da quella corretta
+              if (!result.answers[index] && question.options && question.options.length > 0) {
+                // Simuliamo la scelta dell'utente con un'opzione diversa da quella corretta
+                const availableWrongOptions = Array.from(
+                  { length: question.options.length }, 
+                  (_, i) => i
+                ).filter(i => i !== correctAnswerIndex);
+                
+                if (availableWrongOptions.length > 0) {
+                  // Prendiamo la prima opzione errata disponibile per avere un comportamento deterministico
+                  simulatedWrongAnswer = availableWrongOptions[0];
+                }
+              }
+              
+              return (
+                <div key={index} className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-medium text-slate-950 dark:text-slate-100 mb-2"> 
+                        Domanda {index + 1} {!result.answers[index] && <span className="text-rose-600 font-semibold">(Risposta Errata)</span>}
+                      </h3>
+                      <p className="text-slate-950 dark:text-slate-100 mb-4">
+                        {question.question_text || question.question || ""}
+                      </p>
 
-                  <div className="flex-1">
-                    <h3 className="text-lg font-medium text-slate-950 dark:text-slate-100 mb-2"> 
-                      Domanda {index + 1}
-                    </h3>
-                    <p className="text-slate-950 dark:text-slate-100 mb-4">
-                      {question.question_text || question.question || ""}
-                    </p>
-
-                    {/* Options */}
-                    <div className="space-y-2 text-slate-950 dark:text-slate-900 mb-4">
-                      {(question.options || []).map((option: string, optionIndex: number) => (
-                        <div
-                          key={optionIndex}
-                          className={`p-3 rounded-lg ${
-                            optionIndex === (question.correct_answer !== undefined ? question.correct_answer : question.correctAnswer)
-                              ? 'bg-green-50 border border-green-200'
-                              : 'bg-gray-50 border border-gray-200'
-                          }`}
-                        >
-                          {option}
-                          {optionIndex === (question.correct_answer !== undefined ? question.correct_answer : question.correctAnswer) && (
-                            <span className="ml-2 text-emerald-600 text-sm">
-                              (Risposta corretta)
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Question Stats */}
-                    <div className="flex items-center gap-6 text-sm text-slate-750 dark:text-slate-100 mb-4">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        Tempo: {formatTime(result.questionTimes[index] || 0)}
-                      </span>
-                    </div>
-
-                    {/* Explanation */}
-                    {question.explanation && (
-                      <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
-                          <BookOpen className="w-4 h-4 text-blue-600" />
-                          <span className="font-medium text-blue-800">Spiegazione</span>
-                        </div>
-                        <p className="text-blue-900">{question.explanation}</p>
+                      {/* Options */}
+                      <div className="space-y-2 text-slate-950 dark:text-slate-900 mb-4">
+                        {(question.options || []).map((option: string, optionIndex: number) => {
+                          const isCorrectAnswer = optionIndex === correctAnswerIndex;
+                          // Evidenziamo in rosso solo l'opzione che simula la scelta errata dell'utente
+                          const isSimulatedWrongAnswer = !result.answers[index] && optionIndex === simulatedWrongAnswer;
+                          
+                          return (
+                            <div
+                              key={optionIndex}
+                              className={`p-3 rounded-lg ${
+                                isCorrectAnswer
+                                  ? 'bg-emerald-600 text-white border border-emerald-700'
+                                  : isSimulatedWrongAnswer
+                                    ? 'bg-rose-600 text-white border border-rose-700'
+                                    : 'bg-gray-50 border border-gray-200'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>{option}</div>
+                                <div>
+                                  {isCorrectAnswer && (
+                                    <span className="ml-2 text-white font-medium flex items-center">
+                                      <CheckCircle2 className="w-4 h-4 mr-1" />
+                                      Risposta corretta
+                                    </span>
+                                  )}
+                                  {isSimulatedWrongAnswer && (
+                                    <span className="ml-2 text-white font-medium flex items-center">
+                                      <XCircle className="w-4 h-4 mr-1" />
+                                      Risposta selezionata (errata)
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    )}
+
+                      {!result.answers[index] && (
+                        <div className="mb-4 p-3 bg-gray-100 text-gray-800 rounded-lg">
+                          <span className="font-medium">Rivedi la risposta corretta evidenziata in verde.</span>
+                        </div>
+                      )}
+
+                      {/* Question Stats */}
+                      <div className="flex items-center gap-6 text-sm text-slate-750 dark:text-slate-100 mb-4">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-4 h-4" />
+                          Tempo: {formatTime(result.questionTimes[index] || 0)}
+                        </span>
+                      </div>
+
+                      {/* Explanation */}
+                      {question.explanation && (
+                        <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                          <div className="flex items-center gap-2 mb-2">
+                            <BookOpen className="w-4 h-4 text-blue-600" />
+                            <span className="font-medium text-blue-800">Spiegazione</span>
+                          </div>
+                          <p className="text-blue-900">{question.explanation}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             <div className="p-6 text-center">
               <p className="text-gray-500">Nessuna domanda disponibile per questo quiz</p>
