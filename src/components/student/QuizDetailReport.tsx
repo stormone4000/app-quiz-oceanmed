@@ -285,70 +285,78 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
         </div>
 
         <div className="divide-y divide-gray-200">
-          {questions.map((question, index) => (
-            <div key={index} className="p-6">
-              <div className="flex items-start gap-4">
-                <div className={`p-2 rounded-full ${
-                  result.answers[index]
-                    ? 'text-lg font-semibold text-white dark:text-slate-100'
-                    : 'text-lg font-semibold text-rose-950 dark:text-rose-300'
-                }`}>
-                  {result.answers[index] ? (
-                    <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-                  ) : (
-                    <XCircle className="w-6 h-6 text-rose-600" />
-                  )}
-                </div>
-
-                <div className="flex-1">
-                  <h3 className="text-lg font-medium text-slate-950 dark:text-slate-100 mb-2"> 
-                    Domanda {index + 1}
-                  </h3>
-                  <p className="text-slate-950 dark:text-slate-100 mb-4">{question.question_text}</p>
-
-                  {/* Options */}
-                  <div className="space-y-2 text-slate-950 dark:text-slate-900 mb-4">
-                    {question.options.map((option: string, optionIndex: number) => (
-                      <div
-                        key={optionIndex}
-                        className={`p-3 rounded-lg ${
-                          optionIndex === question.correct_answer
-                            ? 'bg-green-50 border border-green-200'
-                            : 'bg-gray-50 border border-gray-200'
-                        }`}
-                      >
-                        {option}
-                        {optionIndex === question.correct_answer && (
-                          <span className="ml-2 text-emerald-600 text-sm">
-                            (Risposta corretta)
-                          </span>
-                        )}
-                      </div>
-                    ))}
+          {questions.length > 0 ? (
+            questions.map((question, index) => (
+              <div key={index} className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className={`p-2 rounded-full ${
+                    result.answers[index]
+                      ? 'text-lg font-semibold text-white dark:text-slate-100'
+                      : 'text-lg font-semibold text-rose-950 dark:text-rose-300'
+                  }`}>
+                    {result.answers[index] ? (
+                      <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                    ) : (
+                      <XCircle className="w-6 h-6 text-rose-600" />
+                    )}
                   </div>
 
-                  {/* Question Stats */}
-                  <div className="flex items-center gap-6 text-sm text-slate-750 dark:text-slate-100 mb-4">
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      Tempo: {formatTime(result.questionTimes[index])}
-                    </span>
-                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-medium text-slate-950 dark:text-slate-100 mb-2"> 
+                      Domanda {index + 1}
+                    </h3>
+                    <p className="text-slate-950 dark:text-slate-100 mb-4">
+                      {question.question_text || question.question || ""}
+                    </p>
 
-                  {/* Explanation */}
-                  {question.explanation && (
-                    <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                      <div className="flex items-center gap-2 mb-2">
-                        <BookOpen className="w-4 h-4 text-blue-600" />
-                        <span className="font-medium text-blue-800">Spiegazione</span>
-                      </div>
-                      <p className="text-blue-900">{question.explanation}</p>
+                    {/* Options */}
+                    <div className="space-y-2 text-slate-950 dark:text-slate-900 mb-4">
+                      {(question.options || []).map((option: string, optionIndex: number) => (
+                        <div
+                          key={optionIndex}
+                          className={`p-3 rounded-lg ${
+                            optionIndex === (question.correct_answer !== undefined ? question.correct_answer : question.correctAnswer)
+                              ? 'bg-green-50 border border-green-200'
+                              : 'bg-gray-50 border border-gray-200'
+                          }`}
+                        >
+                          {option}
+                          {optionIndex === (question.correct_answer !== undefined ? question.correct_answer : question.correctAnswer) && (
+                            <span className="ml-2 text-emerald-600 text-sm">
+                              (Risposta corretta)
+                            </span>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  )}
+
+                    {/* Question Stats */}
+                    <div className="flex items-center gap-6 text-sm text-slate-750 dark:text-slate-100 mb-4">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        Tempo: {formatTime(result.questionTimes[index] || 0)}
+                      </span>
+                    </div>
+
+                    {/* Explanation */}
+                    {question.explanation && (
+                      <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <BookOpen className="w-4 h-4 text-blue-600" />
+                          <span className="font-medium text-blue-800">Spiegazione</span>
+                        </div>
+                        <p className="text-blue-900">{question.explanation}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
+            ))
+          ) : (
+            <div className="p-6 text-center">
+              <p className="text-gray-500">Nessuna domanda disponibile per questo quiz</p>
             </div>
-          ))}
+          )}
         </div>
       </div>
 
