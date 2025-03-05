@@ -33,7 +33,8 @@ interface QuizData {
 export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizProps) {
   const [quiz, setQuiz] = useState<QuizData | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState<boolean[]>([]);
+  const [answers, setAnswers] = useState<number[]>([]);
+  const [answeredQuestions, setAnsweredQuestions] = useState<boolean[]>([]);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [startTime, setStartTime] = useState<Date | null>(null);
@@ -146,11 +147,15 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
   const handleAnswer = async (answerIndex: number) => {
     if (!quiz?.questions) return;
 
-    // Create a copy of existing answers array
+    // Salva la risposta dell'utente
     const newAnswers = [...answers];
-    // Add new answer without overwriting existing ones
     newAnswers[currentQuestion] = answerIndex;
     setAnswers(newAnswers);
+    
+    // Segna questa domanda come risposta
+    const newAnsweredQuestions = [...answeredQuestions];
+    newAnsweredQuestions[currentQuestion] = true;
+    setAnsweredQuestions(newAnsweredQuestions);
 
     if (quiz.quiz_type === 'learning') {
       setShowFeedback(true);
@@ -179,8 +184,14 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
       const endTime = new Date();
       const totalTime = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
       
+      // Converti le risposte numeriche in booleani (corrette/non corrette)
+      const booleanAnswers = answers.map((answer, index) => {
+        const question = quiz.questions[index];
+        return answer === question.correct_answer;
+      });
+      
       // Calculate score and ensure it's a valid number between 0 and 1
-      const correctAnswers = answers.filter(Boolean).length;
+      const correctAnswers = booleanAnswers.filter(Boolean).length;
       const score = Math.max(0, Math.min(1, correctAnswers / answers.length));
       console.log("Punteggio calcolato:", score, "Risposte corrette:", correctAnswers, "su", answers.length);
       
@@ -197,7 +208,7 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
         quizId: quiz.id,
         score: score,
         totalTime: totalTime,
-        answers: answers,
+        answers: booleanAnswers,
         questionTimes: questionTimes,
         date: new Date().toISOString(),
         category: quiz.category || quiz.quiz_type,
@@ -316,7 +327,7 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
   if (showResults && result) {
     return (
       <QuizDetailReport
-        score={result.score}
+        result={result}
         onBack={onBack}
         quizTitle={quiz.title}
       />
@@ -377,9 +388,9 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
                 <button
                   key={index}
                   onClick={() => handleAnswer(index)}
-                  disabled={answers.includes(index)}
+                  disabled={answeredQuestions[currentQuestion]}
                   className={`w-full p-4 rounded-lg border text-lg font-semibold text-white dark:text-white transition-colors flex items-center gap-4 ${
-                    answers.includes(index)
+                    answeredQuestions[currentQuestion]
                       ? answers[currentQuestion] === currentQuestionData.correct_answer
                         ? 'bg-emerald-600 border-emerals-200' // domande corrette
                         : 'bg-rose-600 border-rose-200' // domande sbagliate
@@ -398,22 +409,22 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
 
         {showFeedback && (
           <div className={`p-4 rounded-lg mb-6 ${
-            answers.includes(currentQuestion) && answers[currentQuestion] === currentQuestionData.correct_answer
+            answers[currentQuestion] === currentQuestionData.correct_answer
               ? 'bg-green-50'
               : 'bg-red-50'
           }`}>
             <div className="flex items-center gap-2">
-              {answers.includes(currentQuestion) && answers[currentQuestion] === currentQuestionData.correct_answer ? (
+              {answers[currentQuestion] === currentQuestionData.correct_answer ? (
                 <CheckCircle className="w-5 h-5 text-green-600" />
               ) : (
                 <XCircle className="w-5 h-5 text-red-600" />
               )}
               <p className={
-                answers.includes(currentQuestion) && answers[currentQuestion] === currentQuestionData.correct_answer
+                answers[currentQuestion] === currentQuestionData.correct_answer
                   ? 'text-green-700'
                   : 'text-red-700'
               }>
-                {answers.includes(currentQuestion)
+                {answers[currentQuestion] === currentQuestionData.correct_answer
                   ? 'Risposta corretta!'
                   : 'Risposta errata. La risposta corretta era: ' + 
                     currentQuestionData.options[currentQuestionData.correct_answer]
