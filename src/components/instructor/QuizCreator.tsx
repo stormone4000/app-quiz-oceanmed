@@ -336,7 +336,11 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
 
       if (userError) {
         console.error('Errore nel recuperare l\'ID utente:', userError);
-        throw userError;
+        throw new Error(`Errore nel recuperare l'ID utente: ${userError.message}`);
+      }
+
+      if (!userData) {
+        throw new Error('Utente non trovato nel database');
       }
 
       const userId = userData.id;
@@ -371,7 +375,10 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
           .update(quizData)
           .eq('id', editQuiz.id);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('Errore nell\'aggiornamento del quiz:', updateError);
+          throw new Error(`Errore nell'aggiornamento del quiz: ${updateError.message}`);
+        }
         quizId = editQuiz.id;
 
         console.log('Deleting old questions for quiz:', quizId);
@@ -384,7 +391,10 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
           .delete()
           .eq('quiz_id', quizId);
 
-        if (deleteError) throw deleteError;
+        if (deleteError) {
+          console.error('Errore nell\'eliminazione delle domande esistenti:', deleteError);
+          throw new Error(`Errore nell'eliminazione delle domande esistenti: ${deleteError.message}`);
+        }
       } else {
         console.log('Creating new quiz');
         const { data: newQuiz, error: insertError } = await supabaseAdmin
@@ -393,8 +403,11 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
           .select()
           .single();
 
-        if (insertError) throw insertError;
-        if (!newQuiz) throw new Error('No quiz data returned after insert');
+        if (insertError) {
+          console.error('Errore nella creazione del quiz:', insertError);
+          throw new Error(`Errore nella creazione del quiz: ${insertError.message}`);
+        }
+        if (!newQuiz) throw new Error('Nessun dato restituito dopo l\'inserimento del quiz');
         quizId = newQuiz.id;
         console.log('New quiz created with ID:', quizId);
       }
@@ -420,7 +433,10 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
           .from(questionsTableName)
           .insert(questionsData);
 
-        if (questionsError) throw questionsError;
+        if (questionsError) {
+          console.error('Errore nel salvataggio delle domande:', questionsError);
+          throw new Error(`Errore nel salvataggio delle domande: ${questionsError.message}`);
+        }
         console.log('Questions saved successfully');
       }
 
@@ -432,7 +448,10 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
         .select('*')
         .eq('quiz_id', quizId);
 
-      if (verifyError) throw verifyError;
+      if (verifyError) {
+        console.error('Errore nella verifica delle domande salvate:', verifyError);
+        throw new Error(`Errore nella verifica delle domande salvate: ${verifyError.message}`);
+      }
       console.log('Verification - Saved questions:', savedQuestions?.length || 0);
       
       // Mostra un messaggio di conferma
@@ -450,7 +469,10 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
       onClose();
     } catch (error: unknown) {
       console.error('Error saving quiz:', error);
-      setError(error instanceof Error ? error.message : 'Errore durante il salvataggio del quiz');
+      const errorMessage = error instanceof Error 
+        ? `Errore durante il salvataggio del quiz: ${error.message}` 
+        : 'Errore durante il salvataggio del quiz';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
