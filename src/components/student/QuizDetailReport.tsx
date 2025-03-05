@@ -65,51 +65,6 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
       
       console.log(`Tentativo di caricamento domande per quiz_id: ${result.quizId}`);
       
-      // PRIMO TENTATIVO: Carica direttamente da quiz_questions
-      try {
-        console.log(`1. Caricamento da quiz_questions per quiz_id: ${result.quizId}`);
-        const { data: questionData, error: questionError } = await supabase
-          .from('quiz_questions')
-          .select('*')
-          .eq('quiz_id', result.quizId);
-          
-        if (questionError) {
-          console.error("Errore nel caricamento delle domande:", questionError);
-        } else if (questionData && questionData.length > 0) {
-          console.log(`Domande trovate in quiz_questions: ${questionData.length}`);
-          setQuestions(questionData);
-          setLoading(false);
-          return;
-        } else {
-          console.log("Nessuna domanda trovata in quiz_questions");
-        }
-      } catch (err) {
-        console.error("Errore durante il caricamento da quiz_questions:", err);
-      }
-      
-      // SECONDO TENTATIVO: Carica dal quiz template
-      try {
-        console.log(`2. Caricamento del quiz template con ID: ${result.quizId}`);
-        const { data: quizData, error: quizError } = await supabase
-          .from('quiz_templates')
-          .select('*')
-          .eq('id', result.quizId)
-          .single();
-          
-        if (quizError) {
-          console.error("Errore nel caricamento del quiz template:", quizError);
-        } else if (quizData && quizData.questions && quizData.questions.length > 0) {
-          console.log(`Domande trovate nel quiz template: ${quizData.questions.length}`);
-          setQuestions(quizData.questions);
-          setLoading(false);
-          return;
-        } else {
-          console.log("Nessuna domanda trovata nel quiz template");
-        }
-      } catch (err) {
-        console.error("Errore durante il caricamento del quiz template:", err);
-      }
-      
       // TERZO TENTATIVO: Carica da quizzes
       try {
         console.log(`3. Caricamento da quizzes con ID: ${result.quizId}`);
@@ -133,24 +88,74 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
         console.error("Errore durante il caricamento da quizzes:", err);
       }
       
-      // QUARTO TENTATIVO: Carica direttamente le domande con una query RPC personalizzata
+      // TENTATIVO FINALE: Carica direttamente dalla tabella quiz_templates con una query più specifica
       try {
-        console.log(`4. Tentativo con RPC get_quiz_questions per quiz_id: ${result.quizId}`);
-        const { data: rpcData, error: rpcError } = await supabase
-          .rpc('get_quiz_questions', { quiz_id: result.quizId });
+        console.log(`4. Tentativo finale con query diretta a quiz_templates per ID: ${result.quizId}`);
+        const { data: templateData, error: templateError } = await supabase
+          .from('quiz_templates')
+          .select(`
+            id,
+            title,
+            description,
+            category,
+            questions
+          `)
+          .eq('id', result.quizId)
+          .single();
           
-        if (rpcError) {
-          console.error("Errore nella chiamata RPC:", rpcError);
-        } else if (rpcData && rpcData.length > 0) {
-          console.log(`Domande trovate tramite RPC: ${rpcData.length}`);
-          setQuestions(rpcData);
+        if (templateError) {
+          console.error("Errore nel caricamento diretto da quiz_templates:", templateError);
+        } else if (templateData && templateData.questions && Array.isArray(templateData.questions) && templateData.questions.length > 0) {
+          console.log(`Domande trovate in quiz_templates.questions: ${templateData.questions.length}`);
+          
+          // Normalizziamo le domande per assicurarci che abbiano tutti i campi necessari
+          const normalizedQuestions = templateData.questions.map((q: any) => ({
+            id: q.id || Math.random().toString(36).substring(2, 9),
+            question_text: q.question_text || q.question || "",
+            options: q.options || [],
+            correct_answer: q.correct_answer !== undefined ? q.correct_answer : (q.correctAnswer !== undefined ? q.correctAnswer : 0),
+            explanation: q.explanation || "",
+            image_url: q.image_url || "",
+            category: q.category || templateData.category || result.category || ""
+          }));
+          
+          setQuestions(normalizedQuestions);
           setLoading(false);
           return;
         } else {
-          console.log("Nessuna domanda trovata tramite RPC");
+          console.log("Nessuna domanda trovata in quiz_templates.questions");
         }
       } catch (err) {
-        console.error("Errore durante la chiamata RPC:", err);
+        console.error("Errore durante il caricamento diretto da quiz_templates:", err);
+      }
+      
+      // TENTATIVO ALTERNATIVO: Carica le domande direttamente dalla tabella quiz_questions
+      try {
+        console.log(`5. Tentativo alternativo con query diretta a quiz_questions per quiz_id: ${result.quizId}`);
+        const { data: directQuestions, error: directError } = await supabase
+          .from('quiz_questions')
+          .select(`
+            id,
+            question_text,
+            options,
+            correct_answer,
+            explanation,
+            image_url
+          `)
+          .eq('quiz_id', result.quizId);
+          
+        if (directError) {
+          console.error("Errore nel caricamento diretto da quiz_questions:", directError);
+        } else if (directQuestions && directQuestions.length > 0) {
+          console.log(`Domande trovate direttamente in quiz_questions: ${directQuestions.length}`);
+          setQuestions(directQuestions);
+          setLoading(false);
+          return;
+        } else {
+          console.log("Nessuna domanda trovata con query diretta a quiz_questions");
+        }
+      } catch (err) {
+        console.error("Errore durante il caricamento diretto da quiz_questions:", err);
       }
       
       // Se arriviamo qui, non abbiamo trovato domande
@@ -160,7 +165,7 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
         quizId: result.quizId,
         category: result.category,
         date: formatDate(result.date)
-      } as any);
+      } as any); // Utilizzo un cast temporaneo per risolvere l'errore del linter
     } catch (error) {
       console.error("Errore imprevisto nel caricamento dei dati:", error);
       setLoadingError(`Errore imprevisto: ${error instanceof Error ? error.message : String(error)}`);
