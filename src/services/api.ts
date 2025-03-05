@@ -306,20 +306,35 @@ export const getQuizResults = async (studentEmail?: string): Promise<QuizResult[
         // Caricamento delle domande associate a questo risultato
         const { data: questions, error: questionsError } = await supabase
           .from('quiz_questions')
-          .select('*')
-          .eq('quiz_id', result.quiz_id);
+          .select(`
+            id, 
+            question_text,
+            question,
+            options,
+            correct_answer,
+            explanation,
+            image_url,
+            category,
+            time_limit,
+            created_at
+          `)
+          .eq('quiz_id', result.quiz_id)
+          .order('created_at', { ascending: true });
           
         if (questionsError) {
           console.error('Errore nel caricamento delle domande:', questionsError);
         } else if (questions && questions.length > 0) {
           console.log(`Trovate ${questions.length} domande per il quiz ID: ${result.quiz_id}`);
-          // Convertiamo ogni domanda al tipo Question corretto
+          // Convertiamo ogni domanda al tipo Question corretto usando i nomi dei campi attesi da QuizDetailReport
           formattedResult.questions = questions.map((q: any) => ({
             id: q.id,
-            question: q.question,
+            question_text: q.question_text || q.question, // Supporta entrambi i formati
             options: q.options,
-            correctAnswer: q.correct_answer,
+            correct_answer: q.correct_answer,
+            explanation: q.explanation,
+            image_url: q.image_url,
             category: q.category,
+            // Manteniamo i campi aggiuntivi che potrebbero essere utili
             timeLimit: q.time_limit
           }));
         } else {
@@ -328,7 +343,25 @@ export const getQuizResults = async (studentEmail?: string): Promise<QuizResult[
           // Tentativo alternativo: cerca le domande nel template del quiz
           const { data: quizTemplate, error: templateError } = await supabase
             .from('quizzes')
-            .select('*, quiz_questions(*)')
+            .select(`
+              id,
+              title,
+              description,
+              quiz_type,
+              category,
+              quiz_questions (
+                id, 
+                question_text,
+                question,
+                options,
+                correct_answer,
+                explanation,
+                image_url,
+                category,
+                time_limit,
+                created_at
+              )
+            `)
             .eq('id', result.quiz_id)
             .single();
             
@@ -339,10 +372,13 @@ export const getQuizResults = async (studentEmail?: string): Promise<QuizResult[
             // Convertiamo ogni domanda dal template al tipo Question corretto
             formattedResult.questions = quizTemplate.quiz_questions.map((q: any) => ({
               id: q.id,
-              question: q.question,
+              question_text: q.question_text || q.question, // Supporta entrambi i formati
               options: q.options,
-              correctAnswer: q.correct_answer,
+              correct_answer: q.correct_answer,
+              explanation: q.explanation,
+              image_url: q.image_url,
               category: q.category,
+              // Manteniamo i campi aggiuntivi che potrebbero essere utili
               timeLimit: q.time_limit
             }));
           }

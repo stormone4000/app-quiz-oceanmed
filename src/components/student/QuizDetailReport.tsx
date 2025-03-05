@@ -22,12 +22,15 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
     try {
       console.log('Loading quiz data with:', { 
         quizId: result.quizId, 
-        hasQuestions: result.questions && result.questions.length > 0 
+        hasQuestions: result.questions && result.questions.length > 0,
+        answers: result.answers ? result.answers.length : 0, 
+        resultObject: JSON.stringify(result)
       });
       
       // Se le domande sono già incluse nel risultato, usale direttamente
       if (result.questions && result.questions.length > 0) {
         console.log('Using embedded questions:', result.questions.length);
+        console.log('First question sample:', JSON.stringify(result.questions[0]));
         setQuestions(result.questions);
       } else {
         console.log('Attempting to load questions from database for quizId:', result.quizId);
@@ -52,6 +55,9 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
         }
         
         console.log(`Loaded ${quizData?.length || 0} questions from database`);
+        if (quizData && quizData.length > 0) {
+          console.log('First question sample from database:', JSON.stringify(quizData[0]));
+        }
         
         // Se non abbiamo trovato domande con questa query, proviamo un approccio alternativo
         if (!quizData || quizData.length === 0) {
@@ -68,7 +74,12 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
             console.error('Error loading quiz template:', templateError);
           } else if (quizTemplate && quizTemplate.quiz_questions) {
             console.log(`Loaded ${quizTemplate.quiz_questions.length} questions from quiz template`);
+            if (quizTemplate.quiz_questions.length > 0) {
+              console.log('First question sample from template:', JSON.stringify(quizTemplate.quiz_questions[0]));
+            }
             setQuestions(quizTemplate.quiz_questions);
+          } else {
+            console.error('No questions found in database or template');
           }
         } else {
           setQuestions(quizData);
@@ -239,6 +250,12 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
                       {/* Options */}
                       <div className="space-y-2 text-slate-950 dark:text-slate-900 mb-4">
                         {(question.options || []).map((option: string, optionIndex: number) => {
+                          // Supporta entrambi i formati di indice della risposta corretta
+                          const correctAnswerIndex = 
+                            question.correct_answer !== undefined 
+                              ? question.correct_answer 
+                              : question.correctAnswer;
+                          
                           const isCorrectAnswer = optionIndex === correctAnswerIndex;
                           // Evidenziamo in rosso solo l'opzione che simula la scelta errata dell'utente
                           const isSimulatedWrongAnswer = !result.answers[index] && optionIndex === simulatedWrongAnswer;
