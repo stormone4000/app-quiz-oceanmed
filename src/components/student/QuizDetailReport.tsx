@@ -15,7 +15,7 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
   const [loading, setLoading] = React.useState(true);
   const [loadingError, setLoadingError] = React.useState<string | null>(null);
   const [loadAttempts, setLoadAttempts] = React.useState(0);
-  const [debugInfo, setDebugInfo] = React.useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = React.useState<{quizId?: string, category?: string, date?: string} | null>(null);
 
   React.useEffect(() => {
     loadQuizData();
@@ -165,7 +165,7 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
         quizId: result.quizId,
         category: result.category,
         date: formatDate(result.date)
-      } as any); // Utilizzo un cast temporaneo per risolvere l'errore del linter
+      });
     } catch (error) {
       console.error("Errore imprevisto nel caricamento dei dati:", error);
       setLoadingError(`Errore imprevisto: ${error instanceof Error ? error.message : String(error)}`);
@@ -442,7 +442,7 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
                 <div className="mt-6 p-4 bg-gray-100 dark:bg-gray-800 rounded-md text-left">
                   <p className="text-gray-500 mb-2 font-semibold">Informazioni di debug:</p>
                   <pre className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
-                    {debugInfo}
+                    {JSON.stringify(debugInfo, null, 2)}
                   </pre>
                 </div>
               )}
