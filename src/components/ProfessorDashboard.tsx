@@ -68,6 +68,8 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
   const [isCodeDeactivated, setIsCodeDeactivated] = useState(false);
   const [needsSubscription, setNeedsSubscription] = useState(propNeedsSubscription || false);
   const [totalInstructors, setTotalInstructors] = useState(0);
+  const [dbTotalStudents, setDbTotalStudents] = useState(0);
+  const [dbTotalAttempts, setDbTotalAttempts] = useState(0);
   
   // Utilizziamo Redux per ottenere lo stato dell'utente
   const isMaster = useSelector(selectIsMasterAdmin);
@@ -157,15 +159,17 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
   useEffect(() => {
     if (isMaster && activeTab === 'dashboard') {
       loadTotalInstructors();
+      loadTotalStudents();
+      loadTotalAttempts();
     }
   }, [isMaster, activeTab]);
 
   const loadTotalInstructors = async () => {
     try {
       // Utilizziamo una query per contare gli utenti con is_instructor = true
-      const { count, error } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
+      const { data, error } = await supabase
+        .from('auth_users')
+        .select('count')
         .eq('is_instructor', true);
       
       if (error) {
@@ -173,9 +177,56 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
         return;
       }
       
-      setTotalInstructors(count || 0);
+      if (data && data.length > 0) {
+        setTotalInstructors(data[0].count);
+        console.log('Numero totale di istruttori:', data[0].count);
+      }
     } catch (error) {
       console.error('Errore nel caricamento del numero di istruttori:', error);
+    }
+  };
+
+  const loadTotalStudents = async () => {
+    try {
+      // Utilizziamo una query per contare gli utenti che non sono istruttori e non sono admin
+      const { data, error } = await supabase
+        .from('auth_users')
+        .select('count')
+        .eq('is_instructor', false)
+        .eq('is_master', false);
+      
+      if (error) {
+        console.error('Errore nel caricamento del numero di studenti:', error);
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        setDbTotalStudents(data[0].count);
+        console.log('Numero totale di studenti:', data[0].count);
+      }
+    } catch (error) {
+      console.error('Errore nel caricamento del numero di studenti:', error);
+    }
+  };
+
+  // Funzione per caricare il numero totale di tentativi
+  const loadTotalAttempts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('results')
+        .select('count');
+      
+      if (error) {
+        console.error('Errore nel caricamento del numero di tentativi:', error);
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        setDbTotalAttempts(data[0].count);
+        console.log('Numero totale di tentativi:', data[0].count);
+      }
+    } catch (error) {
+      console.error('Errore nel caricamento del numero di tentativi:', error);
     }
   };
   
@@ -318,11 +369,13 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
   };
 
   const renderDashboard = () => {
-    const totalAttempts = results.length;
-    const averageScore = results.reduce((acc, curr) => acc + curr.score, 0) / totalAttempts;
+    // Utilizziamo i dati dal database se siamo admin, altrimenti calcoliamo dai risultati
+    const totalAttempts = isMaster ? dbTotalAttempts : results.length;
+    const averageScore = results.length > 0 ? results.reduce((acc, curr) => acc + curr.score, 0) / results.length : 0;
     const passedAttempts = results.filter(r => r.score >= 0.75).length;
-    const failedAttempts = totalAttempts - passedAttempts;
-    const totalStudents = new Set(results.map(r => r.email)).size;
+    const failedAttempts = results.length - passedAttempts;
+    // Utilizziamo i dati dal database se siamo admin, altrimenti calcoliamo dai risultati
+    const totalStudents = isMaster ? dbTotalStudents : new Set(results.map(r => r.email)).size;
 
     // Get top 5 students
     const studentScores = results.reduce((acc: { [key: string]: { score: number, attempts: number, name: string } }, curr) => {
