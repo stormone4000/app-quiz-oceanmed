@@ -248,363 +248,104 @@ L'applicazione utilizza le politiche di sicurezza a livello di riga di Supabase 
 - **Repository GitHub**: Il codice sorgente è ospitato su GitHub (https://github.com/stormone4000/globalquiz)
 - **Deploy Automatico**: Utilizziamo Vercel per il deploy automatico dell'applicazione
   - Ogni push al branch main attiva automaticamente un nuovo deploy
-  - L'applicazione è accessibile online all'URL fornito da Vercel
-- **Database Remoto**: Utilizziamo un'istanza Supabase remota per il database
-  - Tutte le modifiche SQL vengono applicate direttamente al database di produzione
-  - Non è necessario effettuare migrazioni separate
 
-## Infrastruttura e Deployment
+## Risoluzione Problemi di Salvataggio Quiz
 
-### Piattaforme Utilizzate
-- **GitHub**: Repository del codice sorgente
-  - URL: https://github.com/stormone4000/globalquiz
-  - Branch principale: main
-  - Ogni push al branch main attiva automaticamente un nuovo deploy su Vercel
+### Problemi Risolti
 
-- **Vercel**: Piattaforma di hosting e deployment
-  - URL dell'applicazione: https://globalquiz-beta.vercel.app/
-  - Dashboard: https://vercel.com/dashboard
-  - Configurazione automatica del build process basato su Vite
-  - Supporto per variabili d'ambiente e domini personalizzati
+#### 1. Errore 404 per RPC `get_quiz_questions`
+- **Problema**: L'applicazione generava un errore 404 quando tentava di chiamare una funzione RPC inesistente.
+- **Soluzione**: Ristrutturazione della funzione `loadQuizData` per rimuovere la chiamata RPC problematica e implementare query dirette alle tabelle `quiz_templates` e `quiz_questions`.
+- **Miglioramenti**: Implementazione di tentativi di caricamento multipli e isolati con gestione degli errori migliorata.
 
-- **Supabase**: Database e backend
-  - Dashboard: https://app.supabase.com/
-  - Project ID: uqutbomzymeklyowfewp
-  - Fornisce database PostgreSQL, autenticazione e storage
+#### 2. Errore di rendering in `QuizDetailReport`
+- **Problema**: Errore "Objects are not valid as a React child" quando si tentava di renderizzare direttamente un oggetto.
+- **Soluzione**: Modifica del componente per formattare correttamente l'oggetto `debugInfo` prima del rendering.
 
-### Processo di Deployment
-1. **Sviluppo locale** con `npm run dev`
-2. **Test locale** per verificare le funzionalità
-3. **Commit e push** su GitHub:
-   ```bash
-   git add .
-   git commit -m "Descrizione delle modifiche"
-   git push
-   ```
-4. **Deploy automatico** su Vercel:
-   - Vercel rileva automaticamente il push su GitHub
-   - Esegue il build dell'applicazione
-   - Pubblica l'applicazione all'URL https://globalquiz-beta.vercel.app/
-5. **Verifica del deployment** visitando l'URL dell'applicazione
+#### 3. Errore "Could not find the 'category' column of 'quizzes'"
+- **Problema**: La colonna 'category' non esisteva nella tabella 'quizzes'.
+- **Soluzione**: Modifica del codice in `Quiz.tsx` per rimuovere il campo 'category' non esistente o aggiunta della colonna al database.
 
-### Monitoraggio e Manutenzione
-- **Logs**: Accessibili dal dashboard di Vercel
-- **Analytics**: Disponibili nel dashboard di Vercel e Supabase
-- **Rollback**: Possibile tramite il dashboard di Vercel in caso di problemi
-- **Aggiornamenti**: Effettuati tramite push su GitHub
+#### 4. Errore "Could not find the 'questions' column of 'quizzes'"
+- **Problema**: La colonna 'questions' non esisteva nella tabella 'quizzes'.
+- **Soluzione**: Modifica del codice in `Quiz.tsx` per rimuovere il campo 'questions' non esistente o aggiunta della colonna al database.
 
-### Troubleshooting Comune
-- **Errore 404 "DEPLOYMENT_NOT_FOUND"**: Verificare l'URL corretto (https://globalquiz-beta.vercel.app/)
-- **Problemi di build**: Controllare i logs di build su Vercel
-- **Problemi di connessione al database**: Verificare le variabili d'ambiente su Vercel
+#### 5. Errore "invalid input syntax for type uuid: 'exam'"
+- **Problema**: Il campo 'type_id' nella tabella 'quizzes' è di tipo UUID, ma veniva inserita la stringa 'exam'.
+- **Soluzione**: 
+  - Implementazione di una ricerca di un type_id valido dalla tabella `quiz_types` invece di usare una stringa fissa.
+  - Mappatura corretta dei tipi di quiz interni ('exam', 'learning', 'interactive') ai nomi dei tipi nel database ('Esame Standardizzato', 'Modulo di Apprendimento', 'Quiz Interattivo').
+  - Aggiunta della proprietà `quiz_type` all'interfaccia `QuizResult` in `types.ts`.
 
-### Processo di Sviluppo Completo
-1. **Sviluppo Locale**
-   ```bash
-   # Avvia il server di sviluppo locale
-   npm run dev
-   ```
-   - Modifica i file nel tuo editor preferito
-   - Testa l'applicazione all'indirizzo http://localhost:5173
-   - Verifica che le modifiche funzionino correttamente
+### Implementazione della Soluzione
 
-2. **Caricamento su GitHub**
-   ```bash
-   # Verifica quali file sono stati modificati
-   git status
-   
-   # Aggiungi tutti i file modificati
-   git add .
-   
-   # Crea un commit con un messaggio descrittivo
-   git commit -m "Descrizione delle modifiche effettuate"
-   
-   # Carica le modifiche su GitHub
-   git push
-   ```
+#### In `Quiz.tsx`:
+```typescript
+// Mappiamo il tipo di quiz interno ai nomi dei tipi nel database
+let quizTypeName = 'Esame Standardizzato'; // Default per 'exam'
+if (quiz.quiz_type === 'learning') {
+  quizTypeName = 'Modulo di Apprendimento';
+} else if (quiz.quiz_type === 'interactive') {
+  quizTypeName = 'Quiz Interattivo';
+}
 
-3. **Deploy Automatico su Vercel**
-   - Vercel rileva automaticamente le modifiche al branch main
-   - Inizia il processo di build utilizzando la configurazione Vite
-   - Esegue il deploy dell'applicazione aggiornata
-   - L'applicazione è accessibile all'URL: https://globalquiz.vercel.app
-
-4. **Verifica dell'Applicazione Online**
-   - Visita l'URL dell'applicazione su Vercel
-   - Controlla che le modifiche siano state applicate correttamente
-   - Testa le funzionalità in ambiente di produzione
-
-### Configurazione Vercel e Supabase
-
-Per garantire che Vercel utilizzi il database Supabase corretto durante il deploy, abbiamo configurato le seguenti impostazioni:
-
-1. **File `.env.local`**
-   - Questo file contiene le variabili d'ambiente necessarie per la connessione a Supabase
-   - È incluso nel repository (non ignorato da .gitignore) in modo che Vercel possa accedervi
-   - Contiene le credenziali per il database Supabase con ID: `uqutbomzymeklyowfewp`
-
-2. **Variabili d'ambiente su Vercel**
-   - Le stesse variabili sono configurate anche nel pannello di controllo di Vercel:
-     1. Vai su [vercel.com](https://vercel.com) e accedi al tuo account
-     2. Seleziona il progetto "globalquiz"
-     3. Vai su "Settings" > "Environment Variables"
-     4. Verifica che siano presenti le seguenti variabili:
-        - `VITE_SUPABASE_URL`: https://uqutbomzymeklyowfewp.supabase.co
-        - `VITE_SUPABASE_ANON_KEY`: [chiave anonima]
-        - `SUPABASE_SERVICE_KEY`: [chiave di servizio]
-
-3. **Verifica della connessione**
-   - L'applicazione esegue automaticamente un test di connessione a Supabase all'avvio
-   - Puoi verificare nei log di Vercel che la connessione sia stabilita correttamente
-   - In caso di problemi, controlla i log di build e runtime su Vercel
-
-4. **Risoluzione dei problemi**
-   - Se la connessione a Supabase fallisce:
-     1. Verifica che le variabili d'ambiente siano configurate correttamente
-     2. Controlla che il database Supabase sia attivo e accessibile
-     3. Verifica che le politiche RLS permettano le operazioni necessarie
-     4. Controlla i log di Vercel per messaggi di errore specifici
-
-### Funzioni RPC Personalizzate
-
-L'applicazione utilizza diverse funzioni RPC (Remote Procedure Call) personalizzate per migliorare l'accesso ai dati e bypassare le policy RLS (Row Level Security) quando necessario. Queste funzioni sono definite nel database Supabase e possono essere chiamate dall'applicazione.
-
-#### Funzioni Principali
-
-1. **get_all_users()**
-   - **Scopo**: Recupera tutti gli utenti del sistema
-   - **Accesso**: Solo amministratori (utenti con flag `is_master`)
-   - **Utilizzo**: Nella gestione utenti per visualizzare e modificare gli account
-
-2. **get_dashboard_stats()**
-   - **Scopo**: Ottiene statistiche aggregate per la dashboard
-   - **Accesso**: Solo amministratori e istruttori
-   - **Utilizzo**: Nella dashboard per visualizzare metriche di utilizzo
-
-3. **get_all_videos()**
-   - **Scopo**: Recupera tutte le categorie video e i video associati
-   - **Accesso**: Amministratori e istruttori
-   - **Utilizzo**: Nella sezione video lezioni per la gestione dei contenuti
-
-4. **get_student_videos()**
-   - **Scopo**: Recupera solo le categorie e i video pubblici
-   - **Accesso**: Tutti gli utenti autenticati
-   - **Utilizzo**: Nella sezione video lezioni per gli studenti
-
-#### Implementazione
-
-Le funzioni RPC sono implementate come funzioni SQL con l'attributo `SECURITY DEFINER`, che permette loro di essere eseguite con i privilegi dell'utente che ha creato la funzione, bypassando così le policy RLS.
-
-Esempio di implementazione:
-
-```sql
-CREATE OR REPLACE FUNCTION public.get_all_videos()
-RETURNS TABLE (
-  category_id uuid,
-  category_title text,
-  -- altri campi
-) 
-SECURITY DEFINER
-SET search_path = public
-LANGUAGE plpgsql
-AS $$
-DECLARE
-  is_admin boolean;
-  is_instructor boolean;
-BEGIN
-  -- Verifica dei permessi
-  SELECT 
-    coalesce(auth.jwt() ->> 'app_metadata'::text, '{}')::jsonb -> 'is_master' = 'true'::jsonb,
-    coalesce(auth.jwt() ->> 'app_metadata'::text, '{}')::jsonb -> 'is_instructor' = 'true'::jsonb
-  INTO is_admin, is_instructor;
+// Cerchiamo un type_id che corrisponda al tipo del quiz corrente
+const { data: quizTypes, error: typesError } = await supabase
+  .from('quiz_types')
+  .select('id, name')
+  .eq('name', quizTypeName);
   
-  -- Solo gli amministratori e gli istruttori possono accedere
-  IF NOT (is_admin OR is_instructor) THEN
-    RAISE EXCEPTION 'Accesso non autorizzato';
-  END IF;
-  
-  -- Query principale
-  RETURN QUERY
-  SELECT -- campi da selezionare
-  FROM -- tabelle
-  WHERE -- condizioni;
-END;
-$$;
+let validTypeId;
+
+if (typesError || !quizTypes || quizTypes.length === 0) {
+  // Fallback: prendiamo il primo tipo disponibile
+  const { data: anyTypes } = await supabase
+    .from('quiz_types')
+    .select('id')
+    .limit(1);
+    
+  validTypeId = anyTypes[0].id;
+} else {
+  validTypeId = quizTypes[0].id;
+}
+
+// Usiamo il type_id valido nel quiz
+const { data: newQuiz, error: quizError } = await supabase
+  .from('quizzes')
+  .insert([{
+    // ...altri campi
+    type_id: validTypeId,
+    // ...altri campi
+  }])
 ```
 
-#### Gestione degli Errori
+#### In `api.ts`:
+Implementazione simile per la funzione `saveQuizResult` che ora cerca un type_id valido dalla tabella `quiz_types` invece di usare la stringa 'exam'.
 
-L'applicazione è progettata per gestire gli errori nelle chiamate RPC in modo robusto:
+#### In `types.ts`:
+```typescript
+export interface QuizResult {
+  // ...altri campi
+  quiz_type?: QuizType;
+}
 
-1. Tenta prima di caricare i dati tramite query dirette
-2. Se fallisce, prova a utilizzare la funzione RPC appropriata
-3. Se anche questo fallisce, utilizza dati mock per garantire che l'interfaccia utente rimanga funzionale
-
-Questo approccio a più livelli garantisce che l'applicazione continui a funzionare anche in caso di problemi di connessione o permessi.
-
-### Comandi Git Utili
-```bash
-# Verifica lo stato delle modifiche
-git status
-
-# Visualizza le differenze tra i file modificati
-git diff
-
-# Scarica eventuali modifiche dal repository remoto
-git pull
-
-# Crea un nuovo branch per sviluppare una nuova funzionalità
-git checkout -b nome-nuova-funzionalita
-
-# Torna al branch principale
-git checkout main
-
-# Unisci le modifiche da un branch al branch principale
-git merge nome-nuova-funzionalita
+export type QuizType = 'exam' | 'learning' | 'interactive';
 ```
 
-### Best Practices
-- Effettua commit frequenti con messaggi chiari e descrittivi
-- Testa sempre localmente prima di caricare su GitHub
-- Utilizza branch separati per funzionalità diverse o complesse
-- Controlla sempre il deploy dopo il push per verificare che tutto funzioni
-- Documenta le modifiche importanti nel file di documentazione
-- Fai sempre backup del database prima di modifiche strutturali
+### Vantaggi della Soluzione
+1. **Robustezza**: L'applicazione ora gestisce correttamente i tipi di quiz e i vincoli di chiave esterna.
+2. **Coerenza dei dati**: I risultati dei quiz sono associati al tipo di quiz corretto.
+3. **Flessibilità**: Supporta diversi tipi di quiz (exam, learning, interactive).
+4. **Diagnostica migliorata**: Logging dettagliato per facilitare il debug.
 
-### Gestione del Database Supabase
-- Per modifiche al database, applica le query SQL direttamente tramite la console Supabase
-- Documenta tutte le modifiche al database nei messaggi di commit o in file SQL dedicati
-- Testa le query SQL nella console Supabase prima di implementarle nell'applicazione
-- Verifica che le politiche RLS funzionino correttamente dopo ogni modifica
-
-### Sicurezza del Database
-
-#### Avvisi di Sicurezza
-
-1. **Funzioni con Search Path Mutabile**
-   - **Problema**: Molte funzioni SQL non hanno un `search_path` esplicitamente impostato, il che rappresenta un rischio di sicurezza poiché un utente malintenzionato potrebbe manipolare il search path per eseguire codice dannoso.
-   - **Soluzione**: Sono stati creati tre file di migrazione per correggere tutte le funzioni:
-     - `supabase_backup/migrations/20240626_fix_search_path.sql`: Corregge le funzioni principali come `get_dashboard_stats`, `get_all_users`, ecc.
-     - `supabase_backup/migrations/20240626_fix_search_path_additional.sql`: Corregge funzioni aggiuntive come `is_holiday`, `can_manage_holidays`, ecc.
-     - `supabase_backup/migrations/20240626_fix_search_path_final.sql`: Corregge le funzioni rimanenti come `register_attendance_v2`, `get_all_videos`, ecc.
-   - **Implementazione**: Eseguire questi script SQL nella console Supabase per applicare le correzioni.
-
-2. **Protezione Password Debole**
-   - **Problema**: La protezione contro password compromesse è disabilitata.
-   - **Impatto**: Gli utenti potrebbero utilizzare password che sono state compromesse in violazioni di dati precedenti.
-   - **Soluzione**: Abilitare la verifica delle password tramite HaveIBeenPwned.org nelle impostazioni di autenticazione di Supabase.
-   - **Implementazione**: Accedere alla dashboard di Supabase > Authentication > Settings > Password Auth e abilitare "Enable Leaked Password Protection".
-
-3. **Scadenza OTP Lunga**
-   - **Problema**: La scadenza dei codici OTP è impostata a più di un'ora.
-   - **Impatto**: Un codice OTP con una lunga scadenza aumenta il rischio di accessi non autorizzati.
-   - **Soluzione**: Ridurre il tempo di scadenza OTP a meno di un'ora nelle impostazioni di autenticazione.
-   - **Implementazione**: Accedere alla dashboard di Supabase > Authentication > Settings > Email Auth e modificare "OTP Expiry" a un valore inferiore a 3600 secondi (1 ora).
-
-#### Best Practices per le Funzioni SQL
-
-Quando si creano nuove funzioni SQL, seguire sempre queste linee guida:
-
-```sql
-CREATE OR REPLACE FUNCTION nome_funzione(parametri)
-RETURNS tipo_ritorno
-SECURITY DEFINER                 -- Usa SECURITY DEFINER per funzioni che accedono a dati sensibili
-SET search_path = public         -- Imposta SEMPRE il search_path a public
-LANGUAGE plpgsql                 -- O altro linguaggio appropriato
-AS $$
-BEGIN
-  -- Verifica dei permessi dell'utente se necessario
-  IF NOT (condizione_permesso) THEN
-    RAISE EXCEPTION 'Messaggio di errore';
-  END IF;
-  
-  -- Corpo della funzione
-END;
-$$;
-
--- Concedi i permessi minimi necessari
-GRANT EXECUTE ON FUNCTION nome_funzione(parametri) TO ruolo_appropriato;
-```
-
-#### Audit di Sicurezza Periodici
-
-Eseguire regolarmente i seguenti controlli di sicurezza:
-
-1. Verificare gli avvisi nella dashboard di Supabase
-2. Controllare le politiche RLS per assicurarsi che proteggano adeguatamente i dati
-3. Rivedere i permessi delle funzioni per garantire che seguano il principio del privilegio minimo
-4. Verificare che non ci siano credenziali o chiavi sensibili esposte nel codice
-
-### Vantaggi del Nuovo Flusso
-- Ambiente di test identico a quello di produzione
-- Nessuna necessità di migrazioni separate
-- Facilità di collaborazione tramite GitHub
-- Tracciabilità completa delle modifiche
-- Deploy rapido e automatico
-
-### Precauzioni
-- Effettuare sempre backup del database prima di modifiche importanti
-- Testare accuratamente le modifiche SQL prima di applicarle
-- Utilizzare branch separati per sviluppare nuove funzionalità
-- Documentare tutte le modifiche nei messaggi di commit
-
-## Funzionalità Future Pianificate
-- Supporto per domande a risposta aperta
-- Funzionalità di importazione/esportazione quiz
-- Integrazione con sistemi LMS esterni
-- Modalità offline per l'utilizzo senza connessione
-- Supporto per quiz in più lingue
-
-## Problemi Noti e Soluzioni
-- **Errore nel salvare i risultati del quiz**: ✅ RISOLTO! Il problema era dovuto alla mancanza della colonna `student_email` nella tabella `results` e all'assenza di politiche RLS. È stata aggiunta la colonna e configurate le politiche appropriate.
-- **Errore nella visualizzazione dei risultati**: ✅ RISOLTO! È stato riscontrato un problema di relazione tra le tabelle `results` e `quiz_templates`. La query in `api.ts` è stata modificata per utilizzare la tabella `quizzes` invece di `quiz_templates`.
-- **Feedback insufficiente durante la verifica dei codici**: ✅ RISOLTO! Sono stati implementati indicatori visivi e messaggi dettagliati durante il processo di verifica dei codici di accesso, migliorando significativamente l'esperienza utente.
-- **Formattazione dei codici di accesso**: ✅ RISOLTO! È stata implementata la formattazione automatica dei codici nel formato XXXXX-XXXXX-XXXXX per facilitare l'inserimento e ridurre gli errori.
-- **Visibilità dello stato dell'abbonamento**: ✅ RISOLTO! È stata aggiunta una sezione che mostra chiaramente lo stato attuale dell'abbonamento, inclusa la data di scadenza e il tipo di piano.
-- **Mancanza di cronologia dei codici utilizzati**: ✅ RISOLTO! Gli utenti possono ora visualizzare la cronologia completa dei codici di accesso che hanno utilizzato, con dettagli sul tipo di codice e la data di utilizzo.
-- **Istruttori visualizzano tutti i profili studenti**: ✅ RISOLTO! Gli istruttori vedevano tutti i profili studenti invece di vedere solo quelli che hanno attivato i loro codici specifici. Le modifiche includono:
-  - Correzione dei componenti `AccessCodeManager`, `StudentManagement`, `QuizManager` e `QuizCreator` per utilizzare l'ID utente (UUID) invece dell'email nel campo `created_by`.
-  - Implementazione di una query che recupera l'ID utente dalla tabella `auth_users` basandosi sull'email memorizzata nel localStorage.
-  - Aggiornamento dei filtri nelle query per utilizzare l'ID utente invece dell'email quando si filtra per `created_by`.
-  - Correzione delle query di eliminazione per garantire che gli istruttori possano eliminare solo i propri quiz.
-  - Miglioramento della sicurezza dei dati rispettando correttamente il modello relazionale dove il campo `created_by` è un UUID che fa riferimento a `auth.users(id)`.
-- **Problemi di attivazione per l'utente "istruttore1@io.it"**: ✅ RISOLTO! Sono state implementate correzioni per garantire che l'utente "istruttore1@io.it" venga riconosciuto correttamente come professore con accesso attivo. Le modifiche includono:
-  - Miglioramento della funzione `checkActiveCode` per registrare correttamente l'utilizzo del codice.
-  - Aggiunta di eventi storage per notificare i cambiamenti senza necessità di ricaricare la pagina.
-  - Risoluzione del problema di visualizzazione nella sezione "Cronologia Codici Utilizzati".
-  - Implementazione di un controllo automatico all'avvio che verifica e corregge i flag se necessario.
-  - Miglioramento del meccanismo di persistenza dei dati nel localStorage per evitare la perdita dei flag di accesso.
-  - Registrazione automatica dell'utilizzo del codice "392673" per garantire che appaia nella cronologia.
-- **Problema con i pulsanti CTA nella landing page**: ✅ RISOLTO! I pulsanti CTA (call-to-action) nella landing page reindirizzavano erroneamente al profilo studente invece delle rispettive pagine di login o registrazione. Le modifiche includono:
-  - Modifica della funzione `handleNavigation` in `LandingPage.tsx` per rimuovere esplicitamente tutti i dati di autenticazione (`isAuthenticated`, `userEmail`, `isProfessor`, ecc.) prima di navigare alle pagine di login/registrazione.
-  - Miglioramento della funzione `handleLogout` in `App.tsx` per garantire una pulizia completa dei dati utente e un hard refresh della pagina.
-  - Aggiunta di un controllo di autenticazione all'avvio dell'app che verifica e pulisce i dati utente se l'utente non è autenticato.
-  - Miglioramento della funzione `handleSubmit` in `AuthScreen.tsx` per rimuovere tutti i dati di autenticazione prima di tentare un nuovo login.
-  - Aggiunta di un controllo più rigoroso per le route protette, verificando esplicitamente il flag `isAuthenticated` prima di renderizzare la dashboard.
-- **Confusione tra "Tutti i Quiz" e "Gestione Quiz"**: ✅ RISOLTO! Gli istruttori avevano difficoltà a distinguere tra le due sezioni poiché entrambe utilizzavano lo stesso componente e mostravano le stesse funzionalità. Le modifiche includono:
-  - Differenziazione del componente `QuizManager` tramite una prop `mode` che può essere 'all' o 'manage'
-  - Aggiunta di un filtro automatico che mostra tutti i quiz nel modo 'all' e solo i quiz personali nel modo 'manage'
-  - Implementazione del pulsante di creazione quiz solo nella sezione "Gestione Quiz"
-  - Aggiunta della funzionalità "Test Quiz" che permette di testare qualsiasi quiz senza influenzare le statistiche
-  - Creazione di una pagina dedicata `TestQuizPage` che mostra il quiz in modalità test
-  - Modifiche al componente `Quiz` per supportare una modalità di test che non salva i risultati
-  - Aggiornamento del componente `QuizList` per mostrare pulsanti diversi in base alla modalità di visualizzazione
-  - Configurazione del routing in `App.tsx` per supportare la nuova pagina di test
-  - Aggiornamento della dashboard dell'istruttore per passare la modalità corretta a `QuizManager` in base alla tab selezionata
-- **Errore "Failed to save quiz result"**: ⚠️ IN ANALISI! Potrebbe essere causato da un problema di tipo dati nella colonna `quiz_id` della tabella `results`. È stato migliorato il logging degli errori per facilitare il debug. Possibili soluzioni:
-  - Verificare che il tipo della colonna `quiz_id` in `results` sia compatibile con il tipo della colonna `id` in `quizzes`
-  - Controllare che non ci siano vincoli di foreign key che impediscono l'inserimento
-  - Assicurarsi che le politiche RLS permettano l'inserimento dei dati
-  - Verificare che i dati passati siano validi e del tipo corretto
-- **Problemi con i quiz interattivi**: Verificare che tutte le tabelle relative ai quiz interattivi (`interactive_quiz_templates`, `interactive_quiz_questions`, `live_quiz_sessions`, `live_quiz_participants`) abbiano politiche RLS appropriate.
-- **Utenti non autorizzati**: Assicurarsi che le informazioni dell'utente (email, ruolo) siano correttamente salvate nel localStorage dopo il login.
-- **Visualizzazione limitata della Cronologia Codici nel Profilo Istruttore**: ✅ RISOLTO! La sezione "Cronologia Codici Utilizzati" nel profilo istruttore mostrava informazioni limitate rispetto alla versione disponibile per gli amministratori. Le modifiche includono:
-  - Estensione della query per recuperare informazioni più dettagliate sui codici utilizzati (ID, data di creazione, data di scadenza, stato di attività, numero massimo di utilizzi, descrizione)
-  - Ridisegno dell'interfaccia utente per mostrare tutte le informazioni in modo chiaro e organizzato
-  - Aggiunta del supporto per visualizzare il tipo di codice "instructor" oltre ai tipi "master" e "one_time"
-  - Implementazione di un layout responsive che si adatta alle dimensioni dello schermo
-  - Visualizzazione di informazioni aggiuntive come la data di creazione e il numero massimo di utilizzi
-  - Miglioramento della coerenza visiva con l'interfaccia dell'amministratore
+### Struttura della Tabella `quiz_types`
+La tabella contiene tre tipi di quiz:
+1. **Esame Standardizzato** (ID: f7d87e26-0163-46ae-b235-5f635f4c1a8d)
+   - Descrizione: Quiz di simulazione esame patente nautica con 20 domande e tempo limite di 30 minuti
+2. **Modulo di Apprendimento** (ID: ec6aff76-cdc9-4ae5-abdc-110cb3c59bb7)
+   - Descrizione: Quiz formativi su argomenti specifici con durata flessibile
+3. **Quiz Interattivo** (ID: d39237a7-7fda-435f-8b57-26cfbae805f5)
+   - Descrizione: Quiz interattivi creati dagli insegnanti per gli studenti
 
 ---
 
@@ -735,4 +476,229 @@ Questo garantisce che, quando un istruttore attiva il proprio accesso, lo stato 
 
 ---
 
-// ... resto del documento ... 
+## Risoluzione Problemi di Salvataggio Quiz
+
+### Problemi Risolti
+
+#### 1. Errore 404 per RPC `get_quiz_questions`
+- **Problema**: L'applicazione generava un errore 404 quando tentava di chiamare una funzione RPC inesistente.
+- **Soluzione**: Ristrutturazione della funzione `loadQuizData` per rimuovere la chiamata RPC problematica e implementare query dirette alle tabelle `quiz_templates` e `quiz_questions`.
+- **Miglioramenti**: Implementazione di tentativi di caricamento multipli e isolati con gestione degli errori migliorata.
+
+#### 2. Errore di rendering in `QuizDetailReport`
+- **Problema**: Errore "Objects are not valid as a React child" quando si tentava di renderizzare direttamente un oggetto.
+- **Soluzione**: Modifica del componente per formattare correttamente l'oggetto `debugInfo` prima del rendering.
+
+#### 3. Errore "Could not find the 'category' column of 'quizzes'"
+- **Problema**: La colonna 'category' non esisteva nella tabella 'quizzes'.
+- **Soluzione**: Modifica del codice in `Quiz.tsx` per rimuovere il campo 'category' non esistente o aggiunta della colonna al database.
+
+#### 4. Errore "Could not find the 'questions' column of 'quizzes'"
+- **Problema**: La colonna 'questions' non esisteva nella tabella 'quizzes'.
+- **Soluzione**: Modifica del codice in `Quiz.tsx` per rimuovere il campo 'questions' non esistente o aggiunta della colonna al database.
+
+#### 5. Errore "invalid input syntax for type uuid: 'exam'"
+- **Problema**: Il campo 'type_id' nella tabella 'quizzes' è di tipo UUID, ma veniva inserita la stringa 'exam'.
+- **Soluzione**: 
+  - Implementazione di una ricerca di un type_id valido dalla tabella `quiz_types` invece di usare una stringa fissa.
+  - Mappatura corretta dei tipi di quiz interni ('exam', 'learning', 'interactive') ai nomi dei tipi nel database ('Esame Standardizzato', 'Modulo di Apprendimento', 'Quiz Interattivo').
+  - Aggiunta della proprietà `quiz_type` all'interfaccia `QuizResult` in `types.ts`.
+
+### Implementazione della Soluzione
+
+#### In `Quiz.tsx`:
+```typescript
+// Mappiamo il tipo di quiz interno ai nomi dei tipi nel database
+let quizTypeName = 'Esame Standardizzato'; // Default per 'exam'
+if (quiz.quiz_type === 'learning') {
+  quizTypeName = 'Modulo di Apprendimento';
+} else if (quiz.quiz_type === 'interactive') {
+  quizTypeName = 'Quiz Interattivo';
+}
+
+// Cerchiamo un type_id che corrisponda al tipo del quiz corrente
+const { data: quizTypes, error: typesError } = await supabase
+  .from('quiz_types')
+  .select('id, name')
+  .eq('name', quizTypeName);
+  
+let validTypeId;
+
+if (typesError || !quizTypes || quizTypes.length === 0) {
+  // Fallback: prendiamo il primo tipo disponibile
+  const { data: anyTypes } = await supabase
+    .from('quiz_types')
+    .select('id')
+    .limit(1);
+    
+  validTypeId = anyTypes[0].id;
+} else {
+  validTypeId = quizTypes[0].id;
+}
+
+// Usiamo il type_id valido nel quiz
+const { data: newQuiz, error: quizError } = await supabase
+  .from('quizzes')
+  .insert([{
+    // ...altri campi
+    type_id: validTypeId,
+    // ...altri campi
+  }])
+```
+
+#### In `api.ts`:
+Implementazione simile per la funzione `saveQuizResult` che ora cerca un type_id valido dalla tabella `quiz_types` invece di usare la stringa 'exam'.
+
+#### In `types.ts`:
+```typescript
+export interface QuizResult {
+  // ...altri campi
+  quiz_type?: QuizType;
+}
+
+export type QuizType = 'exam' | 'learning' | 'interactive';
+```
+
+### Vantaggi della Soluzione
+1. **Robustezza**: L'applicazione ora gestisce correttamente i tipi di quiz e i vincoli di chiave esterna.
+2. **Coerenza dei dati**: I risultati dei quiz sono associati al tipo di quiz corretto.
+3. **Flessibilità**: Supporta diversi tipi di quiz (exam, learning, interactive).
+4. **Diagnostica migliorata**: Logging dettagliato per facilitare il debug.
+
+### Struttura della Tabella `quiz_types`
+La tabella contiene tre tipi di quiz:
+1. **Esame Standardizzato** (ID: f7d87e26-0163-46ae-b235-5f635f4c1a8d)
+   - Descrizione: Quiz di simulazione esame patente nautica con 20 domande e tempo limite di 30 minuti
+2. **Modulo di Apprendimento** (ID: ec6aff76-cdc9-4ae5-abdc-110cb3c59bb7)
+   - Descrizione: Quiz formativi su argomenti specifici con durata flessibile
+3. **Quiz Interattivo** (ID: d39237a7-7fda-435f-8b57-26cfbae805f5)
+   - Descrizione: Quiz interattivi creati dagli insegnanti per gli studenti
+
+---
+
+Questo documento verrà aggiornato regolarmente per riflettere le modifiche e le nuove funzionalità dell'applicazione.
+
+Ultimo aggiornamento: 31 maggio 2024 
+
+## Gestione dello Stato con Redux
+
+### Panoramica dell'Implementazione Redux
+
+L'applicazione utilizza Redux come soluzione centralizzata per la gestione dello stato, in particolare per i dati di autenticazione e autorizzazione. Questo approccio risolve diversi problemi critici, tra cui la sincronizzazione del flag `hasInstructorAccess` in tutta l'applicazione.
+
+### Struttura Redux
+
+La configurazione Redux include:
+
+- **Store**: Il punto centrale che contiene tutto lo stato dell'applicazione
+- **Slices**: Porzioni specializzate dello stato globale (es. authSlice per l'autenticazione)
+- **Reducers**: Funzioni che definiscono come lo stato cambia in risposta alle azioni
+- **Actions**: Eventi che innescano le modifiche allo stato
+- **Selectors**: Funzioni per estrarre dati specifici dallo stato
+
+### Directory e File Principali
+
+```
+src/
+└── redux/
+    ├── store.ts             # Configurazione dello store Redux
+    ├── hooks.ts             # Custom hooks tipizzati (useAppDispatch, useAppSelector)
+    └── slices/
+        └── authSlice.ts     # Gestione dello stato di autenticazione
+```
+
+### Lo Slice di Autenticazione
+
+Il `authSlice.ts` implementa uno "slice" specifico per la gestione dell'autenticazione con le seguenti funzionalità:
+
+- **Stato**: Informazioni sull'utente autenticato, inclusi:
+  - `isAuthenticated`: Flag principale di autenticazione
+  - `isStudent` / `isProfessor`: Tipo di utente
+  - `hasInstructorAccess`: Permesso di accesso come istruttore
+  - `isMasterAdmin`: Permessi amministrativi
+  - `hasActiveAccess`: Accesso attivo alla piattaforma
+  - `needsSubscription`: Necessità di sottoscrizione
+
+- **Azioni**:
+  - `login`: Autentica l'utente e imposta tutti i flag relativi
+  - `logout`: Rimuove tutti i dati di autenticazione
+  - `updateInstructorAccess`: Aggiorna specificamente i permessi dell'istruttore
+  - `syncFromStorage`: Sincronizza lo stato Redux con localStorage
+
+- **Selettori**:
+  - Funzioni per accedere facilmente a porzioni specifiche dello stato di autenticazione
+
+### Integrazione con l'Applicazione Esistente
+
+Redux è integrato nell'applicazione mantenendo la compatibilità con il localStorage per garantire una transizione senza interruzioni:
+
+1. **Inizializzazione dello Stato**: Lo stato iniziale viene caricato dal localStorage per mantenere la persistenza
+2. **Sincronizzazione Bidirezionale**: Gli aggiornamenti a Redux vengono propagati al localStorage e viceversa
+3. **Eventi di Storage**: Gli eventi nativi `storage` e personalizzati `localStorageUpdated` vengono intercettati per mantenere sincronizzato lo stato
+
+### Componenti Aggiornati
+
+I seguenti componenti sono stati aggiornati per utilizzare Redux:
+
+- **UnifiedLoginCard**: Ora utilizza il dispatch di Redux per gestire l'autenticazione
+- **LandingPage**: Implementa il logout centralizzato tramite Redux
+- **App**: Aggiornato per utilizzare lo stato Redux invece del localStorage diretto
+
+### Vantaggi dell'Implementazione Redux
+
+1. **Stato Centralizzato**: Risolve il problema di coerenza dello stato tra componenti
+2. **Flusso Dati Prevedibile**: Rende le modifiche allo stato tracciabili e prevedibili
+3. **Debugging Migliorato**: Facilita l'identificazione e la risoluzione dei problemi
+4. **Tipizzazione Completa**: Integrazione con TypeScript per una migliore sicurezza del tipo
+5. **Gestione degli Eventi Migliorata**: Centralizza la risposta agli eventi di storage
+6. **Scalabilità**: Fornisce una base robusta per future estensioni dell'applicazione
+
+### Utilizzo nei Componenti
+
+Per utilizzare Redux nei componenti:
+
+```typescript
+import { useAppSelector, useAppDispatch } from '../redux/hooks';
+import { selectIsAuthenticated, login, logout } from '../redux/slices/authSlice';
+
+function MyComponent() {
+  // Accedi ai dati dello stato
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  
+  // Ottieni il dispatcher per inviare azioni
+  const dispatch = useAppDispatch();
+  
+  // Esempio di login
+  const handleLogin = (userData) => {
+    dispatch(login(userData));
+  };
+  
+  // Esempio di logout
+  const handleLogout = () => {
+    dispatch(logout());
+  };
+  
+  // Resto del componente...
+}
+```
+
+### Risoluzione del Problema di Sincronizzazione dell'Accesso Istruttore
+
+L'implementazione di Redux risolve specificamente il problema con il flag `hasInstructorAccess`:
+
+1. Lo stato di accesso è ora gestito centralmente in un unico punto
+2. Le modifiche all'accesso vengono propagate immediatamente a tutti i componenti
+3. Il sincronismo con localStorage è gestito in modo coerente
+4. Gli eventi di aggiornamento sono centralizzati
+
+Questo garantisce che, quando un istruttore attiva il proprio accesso, lo stato venga aggiornato correttamente in tutta l'applicazione senza necessità di ricaricare la pagina.
+
+### Manutenzione e Best Practices
+
+1. **Preferire i Selettori**: Utilizza i selettori esportati invece di accedere direttamente allo stato
+2. **Azioni Specifiche**: Crea azioni specifiche per modifiche semantiche dello stato
+3. **Evitare Mutazioni**: Non modificare direttamente lo stato Redux (usare dispatch)
+4. **Separazione delle Responsabilità**: Mantieni la logica di state management nei reducer, non nei componenti
+5. **Utilizzare i Custom Hooks**: Usa `useAppDispatch` e `useAppSelector` per mantenere la tipizzazione
+
+--- 
