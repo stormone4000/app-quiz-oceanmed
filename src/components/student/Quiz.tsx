@@ -265,6 +265,10 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
             
             // Creiamo direttamente un quiz nel database
             const finalQuizId = uuidv4();
+            
+            // Generiamo un UUID anche per type_id invece di usare una stringa
+            const typeId = uuidv4();
+            
             const { data: newQuiz, error: quizError } = await supabase
               .from('quizzes')
               .insert([{
@@ -272,7 +276,7 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
                 title: `Quiz ${quiz.category || 'completato'}`,
                 description: `Quiz completato il ${new Date().toLocaleString()}`,
                 category: quiz.category || 'uncategorized',
-                type_id: 'exam',
+                type_id: typeId, // Usiamo un UUID invece di 'exam'
                 created_by: null,
                 is_active: true,
                 created_at: new Date().toISOString(),
