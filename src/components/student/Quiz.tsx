@@ -266,8 +266,20 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
             // Creiamo direttamente un quiz nel database
             const finalQuizId = uuidv4();
             
-            // Generiamo un UUID anche per type_id invece di usare una stringa
-            const typeId = uuidv4();
+            // Prima cerchiamo un type_id valido dalla tabella quiz_types
+            console.log("Cerco un type_id valido dalla tabella quiz_types...");
+            const { data: quizTypes, error: typesError } = await supabase
+              .from('quiz_types')
+              .select('id')
+              .limit(1);
+              
+            if (typesError || !quizTypes || quizTypes.length === 0) {
+              console.error("Errore nel recupero di un type_id valido:", typesError);
+              throw new Error('Impossibile recuperare un type_id valido');
+            }
+            
+            const validTypeId = quizTypes[0].id;
+            console.log("Type ID valido trovato:", validTypeId);
             
             const { data: newQuiz, error: quizError } = await supabase
               .from('quizzes')
@@ -276,7 +288,7 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
                 title: `Quiz ${quiz.category || 'completato'}`,
                 description: `Quiz completato il ${new Date().toLocaleString()}`,
                 category: quiz.category || 'uncategorized',
-                type_id: typeId, // Usiamo un UUID invece di 'exam'
+                type_id: validTypeId, // Usiamo un type_id valido dalla tabella quiz_types
                 created_by: null,
                 is_active: true,
                 created_at: new Date().toISOString(),
