@@ -103,120 +103,43 @@ export async function saveQuizResult(result: QuizResult): Promise<void> {
       console.warn(`Impossibile trovare l'utente con email ${result.email}: ${userIdError.message}`);
     }
 
-    // Verifichiamo se il quiz esiste nella tabella quizzes
-    console.log("Verifica esistenza quiz con ID:", result.quizId);
-    const { data: quizExists, error: quizError } = await supabase
+    // APPROCCIO DIRETTO: Creiamo sempre un nuovo quiz nella tabella quizzes
+    // Questo evita problemi di foreign key constraint
+    console.log("Creazione diretta di un nuovo quiz nella tabella quizzes...");
+    const newQuizId = uuidv4();
+    
+    const newQuizData = {
+      id: newQuizId,
+      title: result.category ? `Quiz ${result.category}` : 'Quiz completato',
+      description: `Quiz completato il ${new Date().toLocaleString()}`,
+      category: result.category || 'uncategorized',
+      type_id: 'exam',
+      created_by: null,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      questions: result.questions || []
+    };
+    
+    console.log("Dati per il nuovo quiz:", JSON.stringify(newQuizData));
+    
+    const { data: newQuiz, error: quizInsertError } = await supabase
       .from('quizzes')
-      .select('id, questions')
-      .eq('id', result.quizId)
+      .insert([newQuizData])
+      .select('id')
       .single();
-
-    // Se il quiz esiste ma non ha domande, aggiorniamo le domande
-    if (!quizError && quizExists && result.questions && result.questions.length > 0) {
-      if (!quizExists.questions || quizExists.questions.length === 0) {
-        console.log("Il quiz esiste ma non ha domande. Aggiorniamo le domande...");
-        const { error: updateError } = await supabase
-          .from('quizzes')
-          .update({ questions: result.questions })
-          .eq('id', result.quizId);
-          
-        if (updateError) {
-          console.error("Errore nell'aggiornamento delle domande:", updateError);
-        } else {
-          console.log("Domande aggiornate con successo nel quiz esistente");
-        }
-      } else {
-        console.log("Il quiz esiste e ha già domande. Non aggiorniamo.");
-      }
-    } else if (quizError) {
-      console.warn('Quiz non trovato nella tabella quizzes, verifica l\'ID:', result.quizId);
-      console.warn('Errore:', quizError);
       
-      // Proviamo a cercare il quiz in altre tabelle
-      console.log("Tentativo di trovare il quiz in quiz_templates...");
-      const { data: quizTemplate, error: templateError } = await supabase
-        .from('quiz_templates')
-        .select('id, title')
-        .eq('id', result.quizId)
-        .single();
-        
-      if (!templateError && quizTemplate) {
-        console.log("Quiz trovato in quiz_templates, ID:", quizTemplate.id);
-        
-        // Ora che conosciamo la struttura della tabella quizzes, creiamo un record appropriato
-        try {
-          console.log("Creazione di un nuovo record nella tabella quizzes...");
-          const newQuizData = {
-            id: result.quizId, // Usiamo lo stesso ID per mantenere la coerenza
-            title: quizTemplate.title || 'Quiz importato',
-            description: `Quiz importato da template ${result.quizId}`,
-            type_id: null, // Non abbiamo questa informazione
-            created_by: null, // Non abbiamo questa informazione
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            questions: result.questions || [] // Salviamo le domande se disponibili
-          };
-          
-          console.log("Dati per il nuovo quiz:", newQuizData);
-          
-          const { data: newQuiz, error: insertError } = await supabase
-            .from('quizzes')
-            .insert([newQuizData])
-            .select('id')
-            .single();
-            
-          if (insertError) {
-            console.error("Errore nella creazione del quiz:", insertError);
-            console.log("Continuiamo con l'ID originale");
-          } else if (newQuiz) {
-            console.log("Nuovo quiz creato con ID:", newQuiz.id);
-            result.quizId = newQuiz.id; // Usiamo l'ID del nuovo quiz
-          }
-        } catch (insertError) {
-          console.error("Errore durante l'inserimento:", insertError);
-          console.log("Continuiamo con l'ID originale");
-        }
-      } else {
-        console.log("Quiz non trovato in quiz_templates, utilizziamo l'ID originale");
-        
-        // Se non troviamo il quiz in nessuna tabella, creiamo un nuovo record
-        if (result.questions && result.questions.length > 0) {
-          console.log("Creazione di un nuovo quiz con le domande fornite...");
-          try {
-            const newQuizData = {
-              id: result.quizId, // Usiamo lo stesso ID per mantenere la coerenza
-              title: 'Quiz ' + result.category,
-              description: `Quiz generato automaticamente per la categoria ${result.category}`,
-              type_id: null,
-              created_by: null,
-              is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              questions: result.questions
-            };
-            
-            const { data: newQuiz, error: insertError } = await supabase
-              .from('quizzes')
-              .insert([newQuizData])
-              .select('id')
-              .single();
-              
-            if (insertError) {
-              console.error("Errore nella creazione del nuovo quiz:", insertError);
-            } else if (newQuiz) {
-              console.log("Nuovo quiz creato con ID:", newQuiz.id);
-            }
-          } catch (insertError) {
-            console.error("Errore durante l'inserimento del nuovo quiz:", insertError);
-          }
-        }
-      }
+    if (quizInsertError) {
+      console.error("Errore nella creazione del quiz:", quizInsertError);
+      throw new Error(`Failed to create quiz: ${quizInsertError.message}`);
     }
-
+    
+    console.log("Nuovo quiz creato con successo, ID:", newQuiz.id);
+    
+    // Ora salviamo il risultato con il nuovo quiz_id
     const resultData = {
       student_email: result.email,
-      quiz_id: result.quizId,
+      quiz_id: newQuiz.id, // Usiamo l'ID del nuovo quiz appena creato
       user_id: userIdData?.id, // Potrebbe essere undefined per utenti guest
       score: score,
       total_time: result.totalTime || 0,
@@ -242,75 +165,6 @@ export async function saveQuizResult(result: QuizResult): Promise<void> {
       console.error('Messaggio errore:', insertError.message);
       console.error('Dettagli errore:', insertError.details);
       
-      // Se l'errore è dovuto al vincolo user_id, proviamo senza
-      if (insertError.message.includes('results_user_id_fkey') && resultData.user_id) {
-        console.log("Tentativo di inserimento senza user_id...");
-        const resultDataWithoutUserId = { ...resultData };
-        delete resultDataWithoutUserId.user_id;
-        
-        const { error: retryError } = await supabase
-          .from('results')
-          .insert([resultDataWithoutUserId]);
-          
-        if (retryError) {
-          console.error('Errore anche senza user_id:', retryError);
-        } else {
-          console.log("Risultato salvato con successo senza user_id!");
-          return;
-        }
-      }
-      
-      // Se l'errore è dovuto al vincolo quiz_id, proviamo con un approccio diverso
-      if (insertError.message.includes('results_quiz_id_fkey')) {
-        console.log("Errore di foreign key su quiz_id, tentativo alternativo...");
-        
-        // Invece di salvare senza quiz_id, generiamo un nuovo UUID e creiamo un quiz fittizio
-        const newQuizId = uuidv4();
-        console.log("Generato nuovo quiz_id:", newQuizId);
-        
-        // Creiamo un nuovo quiz con questo ID
-        try {
-          const newQuizData = {
-            id: newQuizId,
-            title: 'Quiz ' + result.category,
-            description: `Quiz generato automaticamente per la categoria ${result.category}`,
-            category: result.category || 'uncategorized',
-            type_id: 'exam',
-            created_by: null,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            questions: result.questions || []
-          };
-          
-          const { error: quizInsertError } = await supabase
-            .from('quizzes')
-            .insert([newQuizData]);
-            
-          if (quizInsertError) {
-            console.error("Errore nella creazione del quiz fittizio:", quizInsertError);
-          } else {
-            console.log("Quiz fittizio creato con successo, ID:", newQuizId);
-            
-            // Ora proviamo a salvare il risultato con il nuovo quiz_id
-            const updatedResultData = { ...resultData, quiz_id: newQuizId };
-            
-            const { error: retryError } = await supabase
-              .from('results')
-              .insert([updatedResultData]);
-              
-            if (retryError) {
-              console.error('Errore anche con nuovo quiz_id:', retryError);
-            } else {
-              console.log("Risultato salvato con successo con nuovo quiz_id!");
-              return;
-            }
-          }
-        } catch (error) {
-          console.error("Errore durante la creazione del quiz fittizio:", error);
-        }
-      }
-      
       // Tentativo con client admin se disponibile
       console.log("Tentativo di inserimento con client admin...");
       try {
@@ -330,9 +184,9 @@ export async function saveQuizResult(result: QuizResult): Promise<void> {
         console.error('Errore durante il tentativo con client admin:', adminError);
         throw new Error(`Failed to save quiz result: ${insertError.message}`);
       }
+    } else {
+      console.log("Risultato salvato con successo!");
     }
-
-    console.log("Risultato salvato con successo!");
     console.log("=== FINE SALVATAGGIO RISULTATO QUIZ ===");
   } catch (error) {
     console.error('Errore generale durante il salvataggio del risultato:', error);
