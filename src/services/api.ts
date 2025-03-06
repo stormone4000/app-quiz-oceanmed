@@ -108,12 +108,55 @@ export async function saveQuizResult(result: QuizResult): Promise<void> {
     console.log("Creazione diretta di un nuovo quiz nella tabella quizzes...");
     const newQuizId = uuidv4();
     
+    // Cerchiamo un type_id valido dalla tabella quiz_types
+    console.log("Cerco un type_id valido dalla tabella quiz_types...");
+    
+    // Mappiamo il tipo di quiz interno ai nomi dei tipi nel database
+    let quizTypeName = 'Esame Standardizzato'; // Default per 'exam'
+    if (result.quiz_type === 'learning') {
+      quizTypeName = 'Modulo di Apprendimento';
+    } else if (result.quiz_type === 'interactive') {
+      quizTypeName = 'Quiz Interattivo';
+    }
+    
+    console.log(`Cerco un type_id per il tipo: ${result.quiz_type || 'exam'} (${quizTypeName})`);
+    
+    // Cerchiamo un type_id che corrisponda al tipo del quiz
+    const { data: quizTypes, error: typesError } = await supabase
+      .from('quiz_types')
+      .select('id, name')
+      .eq('name', quizTypeName);
+      
+    let validTypeId;
+    
+    if (typesError || !quizTypes || quizTypes.length === 0) {
+      console.warn(`Nessun tipo di quiz trovato per: ${quizTypeName}`);
+      console.log("Provo a recuperare qualsiasi tipo di quiz disponibile...");
+      
+      // Se non troviamo un tipo corrispondente, prendiamo il primo disponibile
+      const { data: anyTypes, error: anyTypesError } = await supabase
+        .from('quiz_types')
+        .select('id')
+        .limit(1);
+        
+      if (anyTypesError || !anyTypes || anyTypes.length === 0) {
+        console.error("Errore nel recupero di un type_id valido:", anyTypesError);
+        throw new Error('Impossibile recuperare un type_id valido');
+      }
+      
+      validTypeId = anyTypes[0].id;
+      console.log("Type ID generico trovato:", validTypeId);
+    } else {
+      validTypeId = quizTypes[0].id;
+      console.log(`Type ID specifico trovato per '${quizTypeName}':`, validTypeId);
+    }
+    
     const newQuizData = {
       id: newQuizId,
       title: result.category ? `Quiz ${result.category}` : 'Quiz completato',
       description: `Quiz completato il ${new Date().toLocaleString()}`,
       category: result.category || 'uncategorized',
-      type_id: 'exam',
+      type_id: validTypeId, // Usiamo un type_id valido dalla tabella quiz_types
       created_by: null,
       is_active: true,
       created_at: new Date().toISOString(),

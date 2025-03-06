@@ -47,6 +47,7 @@ export interface QuizResult {
   category: string;
   quizId?: string;
   questions?: any[];
+  quiz_type?: QuizType;
 }
 
 export type QuizType = 'exam' | 'learning' | 'interactive';
