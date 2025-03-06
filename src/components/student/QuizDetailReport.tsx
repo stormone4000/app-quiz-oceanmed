@@ -265,12 +265,40 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
       
       // Se arriviamo qui, non abbiamo trovato domande
       console.error("Nessuna domanda trovata dopo tutti i tentativi");
-      setLoadingError("Nessuna domanda disponibile per questo quiz");
-      setDebugInfo({
-        quizId: result.quizId,
-        category: result.category,
-        date: formatDate(result.date)
-      });
+      
+      // Tentativo finale con funzione RPC
+      try {
+        console.log(`Tentativo con funzione RPC get_quiz_with_questions per ID: ${result.quizId}`);
+        const { data: quizData, error: rpcError } = await supabase.rpc(
+          'get_quiz_with_questions',
+          { p_quiz_id: result.quizId }
+        );
+        
+        if (rpcError) {
+          console.error("Errore nella chiamata RPC get_quiz_with_questions:", rpcError);
+        } else if (quizData && quizData.questions && quizData.questions.length > 0) {
+          console.log(`Domande trovate tramite RPC: ${quizData.questions.length}`);
+          setQuestions(quizData.questions);
+          setLoading(false);
+          return;
+        } else {
+          console.log("Nessuna domanda trovata tramite RPC");
+          setLoadingError("Nessuna domanda disponibile per questo quiz");
+          setDebugInfo({
+            quizId: result.quizId,
+            category: result.category,
+            date: formatDate(result.date)
+          });
+        }
+      } catch (err) {
+        console.error("Errore durante la chiamata RPC:", err);
+        setLoadingError("Nessuna domanda disponibile per questo quiz");
+        setDebugInfo({
+          quizId: result.quizId,
+          category: result.category,
+          date: formatDate(result.date)
+        });
+      }
     } catch (error) {
       console.error("Errore imprevisto nel caricamento dei dati:", error);
       setLoadingError(`Errore imprevisto: ${error instanceof Error ? error.message : String(error)}`);
