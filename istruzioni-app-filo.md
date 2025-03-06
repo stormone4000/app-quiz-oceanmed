@@ -289,6 +289,31 @@ L'applicazione utilizza le politiche di sicurezza a livello di riga di Supabase 
 4. Visualizzare statistiche e grafici aggiornati in base ai filtri selezionati
 5. Cliccare su un quiz specifico per visualizzarne i dettagli
 
+### Visualizzazione Studenti Filtrata per Istruttore
+
+#### Descrizione
+È stata implementata una funzionalità che permette agli istruttori di visualizzare solo gli studenti che hanno utilizzato il loro codice di accesso, garantendo che ogni istruttore veda esclusivamente i propri studenti.
+
+#### Implementazione
+1. **Filtro nella Classifica Studenti**: Modifica del componente `StudentLeaderboard` per mostrare solo gli studenti associati all'istruttore corrente
+2. **Utilizzo della Tabella di Relazione**: Query alla tabella `student_instructor` per ottenere gli studenti associati all'istruttore
+3. **Filtro sui Risultati dei Quiz**: Visualizzazione dei risultati dei quiz solo per gli studenti associati all'istruttore
+
+#### Vantaggi
+- **Privacy Migliorata**: Ogni istruttore vede solo i propri studenti
+- **Dati Rilevanti**: Le statistiche mostrate sono specifiche per gli studenti dell'istruttore
+- **Esperienza Personalizzata**: L'istruttore può concentrarsi sui progressi dei propri studenti
+- **Gestione Semplificata**: Riduzione del sovraccarico di informazioni mostrando solo dati pertinenti
+
+#### File Modificati
+- `src/components/instructor/StudentLeaderboard.tsx`: Implementazione del filtro per studenti associati all'istruttore
+
+#### Funzionamento
+1. Quando un istruttore accede alla dashboard, il sistema recupera la sua email
+2. Viene eseguita una query alla tabella `student_instructor` per ottenere tutti gli studenti associati all'istruttore
+3. I risultati dei quiz vengono filtrati per mostrare solo quelli degli studenti associati
+4. La classifica e le statistiche vengono generate utilizzando solo i dati filtrati
+
 ## Risoluzione Problemi di Salvataggio Quiz
 
 ### Problemi Risolti
