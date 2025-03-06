@@ -27,6 +27,7 @@ import {
   selectUserEmail,
   updateInstructorAccess
 } from '../redux/slices/authSlice';
+import { supabase } from '../services/supabase';
 
 ChartJS.register(
   ArcElement,
@@ -61,11 +62,12 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
    * - Per needsSubscription utilizziamo il prop propNeedsSubscription se disponibile
    * - Sincronizziamo hasInstructorAccess con hasActiveAccess tramite Redux quando necessario
    */
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live' | 'gestione-quiz' | 'gestione-alunni'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live' | 'gestione-quiz' | 'gestione-alunni' | 'quiz-history'>('dashboard');
   const [quizType, setQuizType] = useState<QuizType | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isCodeDeactivated, setIsCodeDeactivated] = useState(false);
   const [needsSubscription, setNeedsSubscription] = useState(propNeedsSubscription || false);
+  const [totalInstructors, setTotalInstructors] = useState(0);
   
   // Utilizziamo Redux per ottenere lo stato dell'utente
   const isMaster = useSelector(selectIsMasterAdmin);
@@ -151,6 +153,31 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
       setNeedsSubscription(propNeedsSubscription);
     }
   }, [hostEmail, propNeedsSubscription, userEmailFromRedux]);
+
+  useEffect(() => {
+    if (isMaster && activeTab === 'dashboard') {
+      loadTotalInstructors();
+    }
+  }, [isMaster, activeTab]);
+
+  const loadTotalInstructors = async () => {
+    try {
+      // Utilizziamo una query per contare gli utenti con is_instructor = true
+      const { count, error } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_instructor', true);
+      
+      if (error) {
+        console.error('Errore nel caricamento del numero di istruttori:', error);
+        return;
+      }
+      
+      setTotalInstructors(count || 0);
+    } catch (error) {
+      console.error('Errore nel caricamento del numero di istruttori:', error);
+    }
+  };
   
   const renderContent = () => {
     // Se l'utente non ha accesso, mostriamo solo la tab del profilo
@@ -379,6 +406,18 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
             </div>
             <p className="text-3xl font-bold text-white">{totalStudents}</p>
           </div>
+
+          {isMaster && (
+            <div className="group relative rounded-xl border bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border-white/30 dark:border-slate-700/30 p-6 hover:scale-[1.02] transition-all">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg shadow-inner dark:shadow-none">
+                  <Users className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">Istruttori Totali</h3>
+              </div>
+              <p className="text-3xl font-bold text-white">{totalInstructors}</p>
+            </div>
+          )}
 
           <div className="group relative rounded-xl border bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border-white/30 dark:border-slate-700/30 p-6 hover:scale-[1.02] transition-all">
             <div className="flex items-center gap-3 mb-2">
