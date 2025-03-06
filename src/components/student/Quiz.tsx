@@ -271,11 +271,13 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
                 id: finalQuizId,
                 title: `Quiz ${quiz.category || 'completato'}`,
                 description: `Quiz completato il ${new Date().toLocaleString()}`,
+                category: quiz.category || 'uncategorized',
                 type_id: 'exam',
                 created_by: null,
                 is_active: true,
                 created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
+                questions: quiz.questions || []
               }])
               .select('id')
               .single();
