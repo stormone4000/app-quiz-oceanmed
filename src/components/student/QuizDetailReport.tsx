@@ -374,7 +374,7 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="bg-lime-800/10 dark:bg-lime-800/20 backdrop-blur-lg border border-white/30 dark:border-lime-100/30 rounded-xl shadow-lg p-8">
+      <div className="bg-blue-900 dark:bg-lime-800/20 backdrop-blur-lg border border-white/30 dark:border-lime-100/30 rounded-xl shadow-lg p-8">
         <div className="flex justify-between items-start mb-6">
           <div>
             <h1 className="text-3xl font-light text-white dark:text-slate-100">{quizTitle}</h1>
@@ -472,8 +472,14 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
                 <div key={index} className="p-6">
                   <div className="flex items-start gap-4">
                     <div className="flex-1">
-                      <h3 className="text-lg font-medium text-slate-950 dark:text-slate-100 mb-2"> 
-                        Domanda {index + 1} {hasValidAnswerIndex && !isAnswerCorrect && <span className="text-rose-600 font-semibold">(Risposta Errata)</span>}
+                      <h3 className="text-lg font-medium text-slate-950 dark:text-slate-100 mb-2 flex items-center"> 
+                        {hasValidAnswerIndex && isAnswerCorrect ? (
+                          <CheckCircle2 className="w-5 h-5 text-green-600 mr-2" />
+                        ) : hasValidAnswerIndex && !isAnswerCorrect ? (
+                          <XCircle className="w-5 h-5 text-rose-600 mr-2" />
+                        ) : null}
+                        Domanda {index + 1} {hasValidAnswerIndex && !isAnswerCorrect && <span className="text-rose-600 font-semibold ml-2">(Risposta Errata)</span>}
+                        {hasValidAnswerIndex && isAnswerCorrect && <span className="text-green-600 font-semibold ml-2">(Risposta Corretta)</span>}
                       </h3>
                       <p className="text-slate-950 dark:text-slate-100 mb-4">
                         {question.question_text || question.question || ""}
