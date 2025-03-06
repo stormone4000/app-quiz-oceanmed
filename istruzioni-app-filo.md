@@ -208,6 +208,7 @@ L'applicazione utilizza le politiche di sicurezza a livello di riga di Supabase 
 #### Sidebar Studente
 - Dashboard
 - Quiz Disponibili
+- Cronologia Quiz
 - I Miei Risultati
 - Quiz Interattivi
 - Profilo
@@ -233,6 +234,11 @@ L'applicazione utilizza le politiche di sicurezza a livello di riga di Supabase 
 - Può accedere ai quiz tramite codici forniti dagli istruttori
 - Può visualizzare solo i propri risultati e progressi
 - Può partecipare a sessioni interattive tramite codice PIN
+- Può accedere alla sezione "Cronologia Quiz" per visualizzare e filtrare i risultati dei quiz completati:
+  - Filtro per categoria di quiz
+  - Filtro per tipo di quiz (esame, apprendimento, interattivo)
+  - Filtro per data (mese/anno)
+  - Visualizzazione di statistiche e grafici aggiornati in base ai filtri selezionati
 
 ## Note Tecniche
 - L'applicazione è sviluppata con React e TypeScript
@@ -249,232 +255,39 @@ L'applicazione utilizza le politiche di sicurezza a livello di riga di Supabase 
 - **Deploy Automatico**: Utilizziamo Vercel per il deploy automatico dell'applicazione
   - Ogni push al branch main attiva automaticamente un nuovo deploy
 
-## Risoluzione Problemi di Salvataggio Quiz
+## Nuove Funzionalità
 
-### Problemi Risolti
+### Cronologia Quiz con Filtri Avanzati
 
-#### 1. Errore 404 per RPC `get_quiz_questions`
-- **Problema**: L'applicazione generava un errore 404 quando tentava di chiamare una funzione RPC inesistente.
-- **Soluzione**: Ristrutturazione della funzione `loadQuizData` per rimuovere la chiamata RPC problematica e implementare query dirette alle tabelle `quiz_templates` e `quiz_questions`.
-- **Miglioramenti**: Implementazione di tentativi di caricamento multipli e isolati con gestione degli errori migliorata.
+#### Descrizione
+È stata aggiunta una nuova sezione "Cronologia Quiz" nella sidebar dello studente che permette di visualizzare e filtrare i risultati dei quiz completati.
 
-#### 2. Errore di rendering in `QuizDetailReport`
-- **Problema**: Errore "Objects are not valid as a React child" quando si tentava di renderizzare direttamente un oggetto.
-- **Soluzione**: Modifica del componente per formattare correttamente l'oggetto `debugInfo` prima del rendering.
+#### Implementazione
+1. **Nuova Voce di Menu**: Aggiunta la voce "Cronologia Quiz" nella sidebar, visibile solo per gli studenti
+2. **Componente Dedicato**: Utilizzo del componente `StudentStats` con l'opzione `showFilters` abilitata
+3. **Filtri Implementati**:
+   - **Filtro per Categoria**: Permette di filtrare i quiz per categoria (es. Navigazione, Meteorologia, ecc.)
+   - **Filtro per Tipo di Quiz**: Permette di filtrare per tipo (Esame, Apprendimento, Interattivo)
+   - **Filtro per Data**: Permette di filtrare per mese/anno di completamento
 
-#### 3. Errore "Could not find the 'category' column of 'quizzes'"
-- **Problema**: La colonna 'category' non esisteva nella tabella 'quizzes'.
-- **Soluzione**: Modifica del codice in `Quiz.tsx` per rimuovere il campo 'category' non esistente o aggiunta della colonna al database.
+#### Vantaggi
+- **Migliore Organizzazione**: Accesso diretto alla cronologia dei quiz dalla sidebar
+- **Analisi Dettagliata**: Possibilità di analizzare i risultati per categoria o tipo di quiz
+- **Monitoraggio Temporale**: Visualizzazione dei progressi nel tempo
+- **Statistiche Dinamiche**: Aggiornamento automatico di statistiche e grafici in base ai filtri selezionati
 
-#### 4. Errore "Could not find the 'questions' column of 'quizzes'"
-- **Problema**: La colonna 'questions' non esisteva nella tabella 'quizzes'.
-- **Soluzione**: Modifica del codice in `Quiz.tsx` per rimuovere il campo 'questions' non esistente o aggiunta della colonna al database.
+#### File Modificati
+- `src/components/layout/Sidebar.tsx`: Aggiunta voce di menu
+- `src/components/layout/DashboardLayout.tsx`: Aggiornamento tipi
+- `src/components/StudentDashboard.tsx`: Implementazione della nuova tab
+- `src/components/student/StudentStats.tsx`: Aggiunta funzionalità di filtro
 
-#### 5. Errore "invalid input syntax for type uuid: 'exam'"
-- **Problema**: Il campo 'type_id' nella tabella 'quizzes' è di tipo UUID, ma veniva inserita la stringa 'exam'.
-- **Soluzione**: 
-  - Implementazione di una ricerca di un type_id valido dalla tabella `quiz_types` invece di usare una stringa fissa.
-  - Mappatura corretta dei tipi di quiz interni ('exam', 'learning', 'interactive') ai nomi dei tipi nel database ('Esame Standardizzato', 'Modulo di Apprendimento', 'Quiz Interattivo').
-  - Aggiunta della proprietà `quiz_type` all'interfaccia `QuizResult` in `types.ts`.
-
-### Implementazione della Soluzione
-
-#### In `Quiz.tsx`:
-```typescript
-// Mappiamo il tipo di quiz interno ai nomi dei tipi nel database
-let quizTypeName = 'Esame Standardizzato'; // Default per 'exam'
-if (quiz.quiz_type === 'learning') {
-  quizTypeName = 'Modulo di Apprendimento';
-} else if (quiz.quiz_type === 'interactive') {
-  quizTypeName = 'Quiz Interattivo';
-}
-
-// Cerchiamo un type_id che corrisponda al tipo del quiz corrente
-const { data: quizTypes, error: typesError } = await supabase
-  .from('quiz_types')
-  .select('id, name')
-  .eq('name', quizTypeName);
-  
-let validTypeId;
-
-if (typesError || !quizTypes || quizTypes.length === 0) {
-  // Fallback: prendiamo il primo tipo disponibile
-  const { data: anyTypes } = await supabase
-    .from('quiz_types')
-    .select('id')
-    .limit(1);
-    
-  validTypeId = anyTypes[0].id;
-} else {
-  validTypeId = quizTypes[0].id;
-}
-
-// Usiamo il type_id valido nel quiz
-const { data: newQuiz, error: quizError } = await supabase
-  .from('quizzes')
-  .insert([{
-    // ...altri campi
-    type_id: validTypeId,
-    // ...altri campi
-  }])
-```
-
-#### In `api.ts`:
-Implementazione simile per la funzione `saveQuizResult` che ora cerca un type_id valido dalla tabella `quiz_types` invece di usare la stringa 'exam'.
-
-#### In `types.ts`:
-```typescript
-export interface QuizResult {
-  // ...altri campi
-  quiz_type?: QuizType;
-}
-
-export type QuizType = 'exam' | 'learning' | 'interactive';
-```
-
-### Vantaggi della Soluzione
-1. **Robustezza**: L'applicazione ora gestisce correttamente i tipi di quiz e i vincoli di chiave esterna.
-2. **Coerenza dei dati**: I risultati dei quiz sono associati al tipo di quiz corretto.
-3. **Flessibilità**: Supporta diversi tipi di quiz (exam, learning, interactive).
-4. **Diagnostica migliorata**: Logging dettagliato per facilitare il debug.
-
-### Struttura della Tabella `quiz_types`
-La tabella contiene tre tipi di quiz:
-1. **Esame Standardizzato** (ID: f7d87e26-0163-46ae-b235-5f635f4c1a8d)
-   - Descrizione: Quiz di simulazione esame patente nautica con 20 domande e tempo limite di 30 minuti
-2. **Modulo di Apprendimento** (ID: ec6aff76-cdc9-4ae5-abdc-110cb3c59bb7)
-   - Descrizione: Quiz formativi su argomenti specifici con durata flessibile
-3. **Quiz Interattivo** (ID: d39237a7-7fda-435f-8b57-26cfbae805f5)
-   - Descrizione: Quiz interattivi creati dagli insegnanti per gli studenti
-
----
-
-Questo documento verrà aggiornato regolarmente per riflettere le modifiche e le nuove funzionalità dell'applicazione.
-
-Ultimo aggiornamento: 31 maggio 2024 
-
-## Gestione dello Stato con Redux
-
-### Panoramica dell'Implementazione Redux
-
-L'applicazione utilizza Redux come soluzione centralizzata per la gestione dello stato, in particolare per i dati di autenticazione e autorizzazione. Questo approccio risolve diversi problemi critici, tra cui la sincronizzazione del flag `hasInstructorAccess` in tutta l'applicazione.
-
-### Struttura Redux
-
-La configurazione Redux include:
-
-- **Store**: Il punto centrale che contiene tutto lo stato dell'applicazione
-- **Slices**: Porzioni specializzate dello stato globale (es. authSlice per l'autenticazione)
-- **Reducers**: Funzioni che definiscono come lo stato cambia in risposta alle azioni
-- **Actions**: Eventi che innescano le modifiche allo stato
-- **Selectors**: Funzioni per estrarre dati specifici dallo stato
-
-### Directory e File Principali
-
-```
-src/
-└── redux/
-    ├── store.ts             # Configurazione dello store Redux
-    ├── hooks.ts             # Custom hooks tipizzati (useAppDispatch, useAppSelector)
-    └── slices/
-        └── authSlice.ts     # Gestione dello stato di autenticazione
-```
-
-### Lo Slice di Autenticazione
-
-Il `authSlice.ts` implementa uno "slice" specifico per la gestione dell'autenticazione con le seguenti funzionalità:
-
-- **Stato**: Informazioni sull'utente autenticato, inclusi:
-  - `isAuthenticated`: Flag principale di autenticazione
-  - `isStudent` / `isProfessor`: Tipo di utente
-  - `hasInstructorAccess`: Permesso di accesso come istruttore
-  - `isMasterAdmin`: Permessi amministrativi
-  - `hasActiveAccess`: Accesso attivo alla piattaforma
-  - `needsSubscription`: Necessità di sottoscrizione
-
-- **Azioni**:
-  - `login`: Autentica l'utente e imposta tutti i flag relativi
-  - `logout`: Rimuove tutti i dati di autenticazione
-  - `updateInstructorAccess`: Aggiorna specificamente i permessi dell'istruttore
-  - `syncFromStorage`: Sincronizza lo stato Redux con localStorage
-
-- **Selettori**:
-  - Funzioni per accedere facilmente a porzioni specifiche dello stato di autenticazione
-
-### Integrazione con l'Applicazione Esistente
-
-Redux è integrato nell'applicazione mantenendo la compatibilità con il localStorage per garantire una transizione senza interruzioni:
-
-1. **Inizializzazione dello Stato**: Lo stato iniziale viene caricato dal localStorage per mantenere la persistenza
-2. **Sincronizzazione Bidirezionale**: Gli aggiornamenti a Redux vengono propagati al localStorage e viceversa
-3. **Eventi di Storage**: Gli eventi nativi `storage` e personalizzati `localStorageUpdated` vengono intercettati per mantenere sincronizzato lo stato
-
-### Componenti Aggiornati
-
-I seguenti componenti sono stati aggiornati per utilizzare Redux:
-
-- **UnifiedLoginCard**: Ora utilizza il dispatch di Redux per gestire l'autenticazione
-- **LandingPage**: Implementa il logout centralizzato tramite Redux
-- **App**: Aggiornato per utilizzare lo stato Redux invece del localStorage diretto
-
-### Vantaggi dell'Implementazione Redux
-
-1. **Stato Centralizzato**: Risolve il problema di coerenza dello stato tra componenti
-2. **Flusso Dati Prevedibile**: Rende le modifiche allo stato tracciabili e prevedibili
-3. **Debugging Migliorato**: Facilita l'identificazione e la risoluzione dei problemi
-4. **Tipizzazione Completa**: Integrazione con TypeScript per una migliore sicurezza del tipo
-5. **Gestione degli Eventi Migliorata**: Centralizza la risposta agli eventi di storage
-6. **Scalabilità**: Fornisce una base robusta per future estensioni dell'applicazione
-
-### Utilizzo nei Componenti
-
-Per utilizzare Redux nei componenti:
-
-```typescript
-import { useAppSelector, useAppDispatch } from '../redux/hooks';
-import { selectIsAuthenticated, login, logout } from '../redux/slices/authSlice';
-
-function MyComponent() {
-  // Accedi ai dati dello stato
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  
-  // Ottieni il dispatcher per inviare azioni
-  const dispatch = useAppDispatch();
-  
-  // Esempio di login
-  const handleLogin = (userData) => {
-    dispatch(login(userData));
-  };
-  
-  // Esempio di logout
-  const handleLogout = () => {
-    dispatch(logout());
-  };
-  
-  // Resto del componente...
-}
-```
-
-### Risoluzione del Problema di Sincronizzazione dell'Accesso Istruttore
-
-L'implementazione di Redux risolve specificamente il problema con il flag `hasInstructorAccess`:
-
-1. Lo stato di accesso è ora gestito centralmente in un unico punto
-2. Le modifiche all'accesso vengono propagate immediatamente a tutti i componenti
-3. Il sincronismo con localStorage è gestito in modo coerente
-4. Gli eventi di aggiornamento sono centralizzati
-
-Questo garantisce che, quando un istruttore attiva il proprio accesso, lo stato venga aggiornato correttamente in tutta l'applicazione senza necessità di ricaricare la pagina.
-
-### Manutenzione e Best Practices
-
-1. **Preferire i Selettori**: Utilizza i selettori esportati invece di accedere direttamente allo stato
-2. **Azioni Specifiche**: Crea azioni specifiche per modifiche semantiche dello stato
-3. **Evitare Mutazioni**: Non modificare direttamente lo stato Redux (usare dispatch)
-4. **Separazione delle Responsabilità**: Mantieni la logica di state management nei reducer, non nei componenti
-5. **Utilizzare i Custom Hooks**: Usa `useAppDispatch` e `useAppSelector` per mantenere la tipizzazione
-
----
+#### Utilizzo
+1. Accedere alla dashboard dello studente
+2. Cliccare su "Cronologia Quiz" nella sidebar
+3. Utilizzare i filtri nella parte superiore per raffinare i risultati
+4. Visualizzare statistiche e grafici aggiornati in base ai filtri selezionati
+5. Cliccare su un quiz specifico per visualizzarne i dettagli
 
 ## Risoluzione Problemi di Salvataggio Quiz
 
