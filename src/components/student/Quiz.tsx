@@ -17,7 +17,7 @@ interface QuizData {
   id: string;
   title: string;
   description: string;
-  quiz_type: 'exam' | 'learning';
+  quiz_type: 'exam' | 'learning' | 'interactive';
   category: string;
   question_count: number;
   duration_minutes: number;
@@ -266,17 +266,26 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
             // Creiamo direttamente un quiz nel database
             const finalQuizId = uuidv4();
             
+            // Mappiamo il tipo di quiz interno ai nomi dei tipi nel database
+            let quizTypeName = 'Esame Standardizzato'; // Default
+            if (quiz.quiz_type === 'learning') {
+              quizTypeName = 'Modulo di Apprendimento';
+            } else if (quiz.quiz_type === 'interactive') {
+              quizTypeName = 'Quiz Interattivo';
+            }
+            
+            console.log(`Cerco un type_id per il tipo: ${quiz.quiz_type} (${quizTypeName})`);
+            
             // Cerchiamo un type_id che corrisponda al tipo del quiz corrente
-            console.log("Cerco un type_id che corrisponda al tipo:", quiz.quiz_type || 'exam');
             const { data: quizTypes, error: typesError } = await supabase
               .from('quiz_types')
               .select('id, name')
-              .eq('name', quiz.quiz_type || 'exam');
+              .eq('name', quizTypeName);
               
             let validTypeId;
             
             if (typesError || !quizTypes || quizTypes.length === 0) {
-              console.warn("Nessun tipo di quiz trovato per:", quiz.quiz_type || 'exam');
+              console.warn(`Nessun tipo di quiz trovato per: ${quizTypeName}`);
               console.log("Provo a recuperare qualsiasi tipo di quiz disponibile...");
               
               // Se non troviamo un tipo corrispondente, prendiamo il primo disponibile
@@ -291,9 +300,10 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
               }
               
               validTypeId = anyTypes[0].id;
+              console.log("Type ID generico trovato:", validTypeId);
             } else {
               validTypeId = quizTypes[0].id;
-              console.log(`Type ID valido trovato per '${quiz.quiz_type || 'exam'}':`, validTypeId);
+              console.log(`Type ID specifico trovato per '${quizTypeName}':`, validTypeId);
             }
             
             const { data: newQuiz, error: quizError } = await supabase
