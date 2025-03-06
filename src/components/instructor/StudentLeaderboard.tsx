@@ -36,13 +36,54 @@ export function StudentLeaderboard() {
       setLoading(true);
       setError(null);
 
+      // Ottieni l'email dell'istruttore corrente
+      const instructorEmail = localStorage.getItem('userEmail');
+      if (!instructorEmail) {
+        setError('Email dell\'istruttore non trovata');
+        return;
+      }
+
+      // Ottieni gli studenti associati all'istruttore corrente
+      const { data: studentInstructorData, error: studentInstructorError } = await supabase
+        .from('student_instructor')
+        .select('student_email')
+        .eq('instructor_email', instructorEmail);
+
+      if (studentInstructorError) {
+        console.error('Errore nel caricamento degli studenti associati:', studentInstructorError);
+        throw studentInstructorError;
+      }
+
+      // Se non ci sono studenti associati, mostra un messaggio e termina
+      if (!studentInstructorData || studentInstructorData.length === 0) {
+        console.log('Nessuno studente associato a questo istruttore');
+        setLeaderboard([]);
+        setTotalStudents(0);
+        setLoading(false);
+        return;
+      }
+
+      // Estrai le email degli studenti
+      const studentEmails = studentInstructorData.map(record => record.student_email);
+      console.log(`Trovati ${studentEmails.length} studenti associati all'istruttore ${instructorEmail}`);
+
+      // Ottieni i risultati dei quiz solo per gli studenti associati
       const { data: results, error: resultsError } = await supabase
         .from('results')
         .select('*')
+        .in('student_email', studentEmails)
         .eq('is_instructor_attempt', false)
         .order('date', { ascending: false });
 
       if (resultsError) throw resultsError;
+
+      if (!results || results.length === 0) {
+        console.log('Nessun risultato trovato per gli studenti associati');
+        setLeaderboard([]);
+        setTotalStudents(0);
+        setLoading(false);
+        return;
+      }
 
       const quizIds = [...new Set(results.map(r => r.quizId))].filter(Boolean);
       
@@ -73,6 +114,7 @@ export function StudentLeaderboard() {
       const rankings = Object.values(studentStats)
         .map((student: any) => ({
           id: student.email,
+          email: student.email,
           pseudonym: student.firstName && student.lastName 
             ? `${student.firstName} ${student.lastName}`
             : `Studente${Math.floor(Math.random() * 1000)}`,
