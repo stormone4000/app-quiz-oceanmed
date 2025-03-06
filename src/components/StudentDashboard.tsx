@@ -89,7 +89,7 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
     if (activeTab === 'quiz-history') {
       return (
         <div className="space-y-6">
-          <h2 className="text-3xl font-light text-white mb-6">Cronologia Quiz</h2>
+          <h2 className="text-3xl font-semibold text-white mb-6">Cronologia Quiz</h2>
           <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6">
             <StudentStats 
               results={results} 
