@@ -266,20 +266,35 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
             // Creiamo direttamente un quiz nel database
             const finalQuizId = uuidv4();
             
-            // Prima cerchiamo un type_id valido dalla tabella quiz_types
-            console.log("Cerco un type_id valido dalla tabella quiz_types...");
+            // Cerchiamo un type_id che corrisponda al tipo del quiz corrente
+            console.log("Cerco un type_id che corrisponda al tipo:", quiz.quiz_type || 'exam');
             const { data: quizTypes, error: typesError } = await supabase
               .from('quiz_types')
-              .select('id')
-              .limit(1);
+              .select('id, name')
+              .eq('name', quiz.quiz_type || 'exam');
               
-            if (typesError || !quizTypes || quizTypes.length === 0) {
-              console.error("Errore nel recupero di un type_id valido:", typesError);
-              throw new Error('Impossibile recuperare un type_id valido');
-            }
+            let validTypeId;
             
-            const validTypeId = quizTypes[0].id;
-            console.log("Type ID valido trovato:", validTypeId);
+            if (typesError || !quizTypes || quizTypes.length === 0) {
+              console.warn("Nessun tipo di quiz trovato per:", quiz.quiz_type || 'exam');
+              console.log("Provo a recuperare qualsiasi tipo di quiz disponibile...");
+              
+              // Se non troviamo un tipo corrispondente, prendiamo il primo disponibile
+              const { data: anyTypes, error: anyTypesError } = await supabase
+                .from('quiz_types')
+                .select('id')
+                .limit(1);
+                
+              if (anyTypesError || !anyTypes || anyTypes.length === 0) {
+                console.error("Errore nel recupero di un type_id valido:", anyTypesError);
+                throw new Error('Impossibile recuperare un type_id valido');
+              }
+              
+              validTypeId = anyTypes[0].id;
+            } else {
+              validTypeId = quizTypes[0].id;
+              console.log(`Type ID valido trovato per '${quiz.quiz_type || 'exam'}':`, validTypeId);
+            }
             
             const { data: newQuiz, error: quizError } = await supabase
               .from('quizzes')
@@ -288,7 +303,7 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
                 title: `Quiz ${quiz.category || 'completato'}`,
                 description: `Quiz completato il ${new Date().toLocaleString()}`,
                 category: quiz.category || 'uncategorized',
-                type_id: validTypeId, // Usiamo un type_id valido dalla tabella quiz_types
+                type_id: validTypeId, // Usiamo un type_id valido che corrisponde al tipo del quiz
                 created_by: null,
                 is_active: true,
                 created_at: new Date().toISOString(),
