@@ -23,35 +23,85 @@ export function DashboardStats() {
       setLoading(true);
       setError(null);
 
-      console.log("Tentativo di caricare statistiche dashboard con RPC");
+      console.log("Tentativo di caricare statistiche dashboard con query dirette");
 
-      // Eseguiamo la query direttamente invece di usare una vista
-      const { data, error: queryError } = await supabase.rpc('get_dashboard_stats');
-      console.log("Risultato RPC get_dashboard_stats:", { data, error: queryError });
-
-      if (queryError) throw queryError;
+      // Invece di usare la funzione RPC, eseguiamo direttamente le query
+      // 1. Otteniamo le statistiche degli istruttori
+      const { data: instructorData, error: instructorError } = await supabase
+        .from('auth_users')
+        .select('count')
+        .eq('is_instructor', true);
       
-      if (!data || data.length === 0) {
-        console.log("Nessuna statistica trovata, utilizzo dati mock");
-        // Dati di esempio
-        const mockStats: DashboardStat[] = [
-          {
-            tipo_utente: 'Istruttori Paganti',
-            totale: 3,
-            attivi_ultimi_7_giorni: 2,
-            quiz_completati: 0
-          },
-          {
-            tipo_utente: 'Studenti Iscritti',
-            totale: 1,
-            attivi_ultimi_7_giorni: 1,
-            quiz_completati: 5
-          }
-        ];
-        setStats(mockStats);
-      } else {
-        setStats(data);
+      if (instructorError) {
+        console.error('Errore nel caricamento degli istruttori:', instructorError);
+        throw instructorError;
       }
+
+      // 2. Otteniamo le statistiche degli istruttori attivi negli ultimi 7 giorni
+      const { data: activeInstructorData, error: activeInstructorError } = await supabase
+        .from('auth_users')
+        .select('count')
+        .eq('is_instructor', true)
+        .gte('last_login', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+      
+      if (activeInstructorError) {
+        console.error('Errore nel caricamento degli istruttori attivi:', activeInstructorError);
+        throw activeInstructorError;
+      }
+
+      // 3. Otteniamo le statistiche degli studenti
+      const { data: studentData, error: studentError } = await supabase
+        .from('auth_users')
+        .select('count')
+        .eq('is_instructor', false)
+        .eq('is_master_admin', false);
+      
+      if (studentError) {
+        console.error('Errore nel caricamento degli studenti:', studentError);
+        throw studentError;
+      }
+
+      // 4. Otteniamo le statistiche degli studenti attivi negli ultimi 7 giorni
+      const { data: activeStudentData, error: activeStudentError } = await supabase
+        .from('auth_users')
+        .select('count')
+        .eq('is_instructor', false)
+        .eq('is_master_admin', false)
+        .gte('last_login', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+      
+      if (activeStudentError) {
+        console.error('Errore nel caricamento degli studenti attivi:', activeStudentError);
+        throw activeStudentError;
+      }
+
+      // 5. Otteniamo il numero totale di quiz completati
+      const { data: quizData, error: quizError } = await supabase
+        .from('results')
+        .select('count');
+      
+      if (quizError) {
+        console.error('Errore nel caricamento dei quiz completati:', quizError);
+        throw quizError;
+      }
+
+      // Creiamo le statistiche
+      const newStats: DashboardStat[] = [
+        {
+          tipo_utente: 'Istruttori Paganti',
+          totale: instructorData?.[0]?.count || 0,
+          attivi_ultimi_7_giorni: activeInstructorData?.[0]?.count || 0,
+          quiz_completati: 0
+        },
+        {
+          tipo_utente: 'Studenti Iscritti',
+          totale: studentData?.[0]?.count || 0,
+          attivi_ultimi_7_giorni: activeStudentData?.[0]?.count || 0,
+          quiz_completati: quizData?.[0]?.count || 0
+        }
+      ];
+
+      console.log("Statistiche caricate con successo:", newStats);
+      setStats(newStats);
     } catch (error) {
       console.error('Errore durante il caricamento delle statistiche:', error);
       setError('Errore durante il caricamento delle statistiche');
