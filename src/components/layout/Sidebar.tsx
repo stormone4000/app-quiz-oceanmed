@@ -106,6 +106,12 @@ export function Sidebar({
       showFor: 'all',
     },
     {
+      id: 'quiz-history',
+      icon: BarChart,
+      label: 'Cronologia Quiz',
+      showFor: 'student',
+    },
+    {
       id: 'gestione-quiz',
       icon: Layers,
       label: 'Gestione Quiz',

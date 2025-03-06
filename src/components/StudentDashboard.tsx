@@ -17,7 +17,7 @@ import { QuizSelector } from './student/QuizSelector';
 import type { QuizType, QuizResult } from '../types';
 
 // Definisco il tipo per i tab
-type DashboardTab = 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live' | 'dashboard' | 'gestione-quiz' | 'gestione-alunni';
+type DashboardTab = 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live' | 'dashboard' | 'gestione-quiz' | 'gestione-alunni' | 'quiz-history';
 
 interface Props {
   results: QuizResult[];
@@ -82,6 +82,21 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
         <div className="space-y-6">
           <h2 className="text-3xl font-light text-white mb-6">Cronologia Codici di Accesso</h2>
           <AccessCodeHistory studentEmail={studentEmail} />
+        </div>
+      );
+    }
+
+    if (activeTab === 'quiz-history') {
+      return (
+        <div className="space-y-6">
+          <h2 className="text-3xl font-light text-white mb-6">Cronologia Quiz</h2>
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6">
+            <StudentStats 
+              results={results} 
+              onBack={() => setActiveTab('dashboard')}
+              showFilters={true}
+            />
+          </div>
         </div>
       );
     }
