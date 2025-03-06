@@ -140,14 +140,14 @@ export function StudentStats({ results, onBack, showFilters = false }: StudentSt
     return (
       <div className="space-y-6">
         {showFilters && (
-          <div className="bg-slate-800/10 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 rounded-xl shadow-lg p-6">
-            <h3 className="text-xl font-semibold text-white dark:text-white mb-4">Filtri</h3>
+          <div className="bg-white dark:bg-slate-800/20 backdrop-blur-lg border border-gray-200 dark:border-violet-100/30 rounded-xl p-6">
+            <h3 className="text-xl font-semibold text-slate-950 dark:text-white mb-4">Filtri</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label htmlFor="category-filter" className="block text-base font-medium text-white dark:text-white mb-2">Categoria</label>
+                <label htmlFor="category-filter" className="block text-base font-medium text-slate-950 dark:text-white mb-2">Categoria</label>
                 <select
                   id="category-filter"
-                  className="w-full rounded-md border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="w-full rounded-md border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-950 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   value={categoryFilter || ''}
                   onChange={(e) => setCategoryFilter(e.target.value || null)}
                   aria-label="Filtra per categoria"
@@ -162,10 +162,10 @@ export function StudentStats({ results, onBack, showFilters = false }: StudentSt
               </div>
               
               <div>
-                <label htmlFor="quiz-type-filter" className="block text-base font-medium text-white dark:text-white mb-2">Tipo di Quiz</label>
+                <label htmlFor="quiz-type-filter" className="block text-base font-medium text-slate-950 dark:text-white mb-2">Tipo di Quiz</label>
                 <select
                   id="quiz-type-filter"
-                  className="w-full rounded-md border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="w-full rounded-md border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-950 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   value={quizTypeFilter || ''}
                   onChange={(e) => setQuizTypeFilter(e.target.value || null)}
                   aria-label="Filtra per tipo di quiz"
@@ -180,10 +180,10 @@ export function StudentStats({ results, onBack, showFilters = false }: StudentSt
               </div>
               
               <div>
-                <label htmlFor="date-filter" className="block text-base font-medium text-white dark:text-white mb-2">Data (Mese/Anno)</label>
+                <label htmlFor="date-filter" className="block text-base font-medium text-slate-950 dark:text-white mb-2">Data (Mese/Anno)</label>
                 <select
                   id="date-filter"
-                  className="w-full rounded-md border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="w-full rounded-md border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-950 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   value={dateFilter || ''}
                   onChange={(e) => setDateFilter(e.target.value || null)}
                   aria-label="Filtra per data"
@@ -278,14 +278,14 @@ export function StudentStats({ results, onBack, showFilters = false }: StudentSt
   return (
     <div className="space-y-6">
       {showFilters && (
-        <div className="bg-slate-800/10 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 rounded-xl shadow-lg p-6">
-          <h3 className="text-xl font-semibold text-white dark:text-white mb-4">Filtri</h3>
+        <div className="bg-white dark:bg-slate-800/20 backdrop-blur-lg border border-gray-200 dark:border-violet-100/30 rounded-xl p-6">
+          <h3 className="text-xl font-semibold text-slate-950 dark:text-white mb-4">Filtri</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label htmlFor="category-filter" className="block text-base font-medium text-white dark:text-white mb-2">Categoria</label>
+              <label htmlFor="category-filter" className="block text-base font-medium text-slate-950 dark:text-white mb-2">Categoria</label>
               <select
                 id="category-filter"
-                className="w-full rounded-md border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                className="w-full rounded-md border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-950 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 value={categoryFilter || ''}
                 onChange={(e) => setCategoryFilter(e.target.value || null)}
                 aria-label="Filtra per categoria"
@@ -300,10 +300,10 @@ export function StudentStats({ results, onBack, showFilters = false }: StudentSt
             </div>
             
             <div>
-              <label htmlFor="quiz-type-filter" className="block text-base font-medium text-white dark:text-white mb-2">Tipo di Quiz</label>
+              <label htmlFor="quiz-type-filter" className="block text-base font-medium text-slate-950 dark:text-white mb-2">Tipo di Quiz</label>
               <select
                 id="quiz-type-filter"
-                className="w-full rounded-md border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                className="w-full rounded-md border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-950 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 value={quizTypeFilter || ''}
                 onChange={(e) => setQuizTypeFilter(e.target.value || null)}
                 aria-label="Filtra per tipo di quiz"
@@ -318,10 +318,10 @@ export function StudentStats({ results, onBack, showFilters = false }: StudentSt
             </div>
             
             <div>
-              <label htmlFor="date-filter" className="block text-base font-medium text-white dark:text-white mb-2">Data (Mese/Anno)</label>
+              <label htmlFor="date-filter" className="block text-base font-medium text-slate-950 dark:text-white mb-2">Data (Mese/Anno)</label>
               <select
                 id="date-filter"
-                className="w-full rounded-md border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                className="w-full rounded-md border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-950 dark:text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 value={dateFilter || ''}
                 onChange={(e) => setDateFilter(e.target.value || null)}
                 aria-label="Filtra per data"
@@ -343,34 +343,34 @@ export function StudentStats({ results, onBack, showFilters = false }: StudentSt
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-slate-800/10 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 rounded-xl shadow-lg p-6">
+        <div className="bg-white dark:bg-slate-800/20 backdrop-blur-lg border border-gray-200 dark:border-violet-100/30 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-2">
-            <Target className="w-6 h-6 text-blue-500 dark:text-blue-400" aria-hidden="true" />
-            <h3 className="text-xl font-semibold text-white dark:text-white">Quiz Completati</h3>
+            <Target className="w-6 h-6 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+            <h3 className="text-xl font-semibold text-slate-950 dark:text-white">Quiz Completati</h3>
           </div>
-          <p className="text-3xl font-bold text-blue-500 dark:text-blue-400" aria-label={`${filteredResults.length} quiz completati`}>
+          <p className="text-3xl font-bold text-blue-600 dark:text-blue-400" aria-label={`${filteredResults.length} quiz completati`}>
             {filteredResults.length}
           </p>
         </div>
 
-        <div className="bg-slate-800/10 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 rounded-xl shadow-lg p-6">
+        <div className="bg-white dark:bg-slate-800/20 backdrop-blur-lg border border-gray-200 dark:border-violet-100/30 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-2">
-            <CheckCircle2 className="w-6 h-6 text-blue-500 dark:text-blue-400" aria-hidden="true" />
-            <h3 className="text-xl font-semibold text-white dark:text-white">Media Punteggi</h3>
+            <CheckCircle2 className="w-6 h-6 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+            <h3 className="text-xl font-semibold text-slate-950 dark:text-white">Media Punteggi</h3>
           </div>
-          <p className="text-3xl font-bold text-blue-500 dark:text-blue-400" aria-label={`Media punteggi: ${filteredResults.length > 0 ? ((filteredResults.reduce((acc, curr) => acc + curr.score, 0) / filteredResults.length) * 100).toFixed(1) : '0.0'}%`}>
+          <p className="text-3xl font-bold text-blue-600 dark:text-blue-400" aria-label={`Media punteggi: ${filteredResults.length > 0 ? ((filteredResults.reduce((acc, curr) => acc + curr.score, 0) / filteredResults.length) * 100).toFixed(1) : '0.0'}%`}>
             {filteredResults.length > 0 
               ? ((filteredResults.reduce((acc, curr) => acc + curr.score, 0) / filteredResults.length) * 100).toFixed(1)
               : '0.0'}%
           </p>
         </div>
 
-        <div className="bg-slate-800/10 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 rounded-xl shadow-lg p-6">
+        <div className="bg-white dark:bg-slate-800/20 backdrop-blur-lg border border-gray-200 dark:border-violet-100/30 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-2">
-            <Target className="w-6 h-6 text-blue-500 dark:text-blue-400" aria-hidden="true" />
-            <h3 className="text-xl font-semibold text-white dark:text-white">Tasso di Successo</h3>
+            <Target className="w-6 h-6 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+            <h3 className="text-xl font-semibold text-slate-950 dark:text-white">Tasso di Successo</h3>
           </div>
-          <p className="text-3xl font-bold text-blue-500 dark:text-blue-400" aria-label={`Tasso di successo: ${filteredResults.length > 0 ? ((filteredResults.filter(r => r.score >= 0.75).length / filteredResults.length) * 100).toFixed(1) : '0.0'}%`}>
+          <p className="text-3xl font-bold text-blue-600 dark:text-blue-400" aria-label={`Tasso di successo: ${filteredResults.length > 0 ? ((filteredResults.filter(r => r.score >= 0.75).length / filteredResults.length) * 100).toFixed(1) : '0.0'}%`}>
             {filteredResults.length > 0
               ? ((filteredResults.filter(r => r.score >= 0.75).length / filteredResults.length) * 100).toFixed(1)
               : '0.0'}%
@@ -379,8 +379,8 @@ export function StudentStats({ results, onBack, showFilters = false }: StudentSt
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-slate-800/10 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 rounded-xl shadow-lg p-6">
-          <h3 className="text-xl font-semibold text-white dark:text-white mb-4">Distribuzione Risultati</h3>
+        <div className="bg-white dark:bg-slate-800/20 backdrop-blur-lg border border-gray-200 dark:border-violet-100/30 rounded-xl p-6">
+          <h3 className="text-xl font-semibold text-slate-950 dark:text-white mb-4">Distribuzione Risultati</h3>
           <div className="w-full max-w-xs mx-auto">
             <Pie 
               data={pieData} 
@@ -389,7 +389,7 @@ export function StudentStats({ results, onBack, showFilters = false }: StudentSt
                 plugins: {
                   legend: {
                     labels: {
-                      color: 'rgb(255, 255, 255)',
+                      color: 'rgb(15, 23, 42)',
                       font: {
                         size: 14,
                         weight: 'bold'
@@ -414,8 +414,8 @@ export function StudentStats({ results, onBack, showFilters = false }: StudentSt
           </div>
         </div>
 
-        <div className="bg-slate-800/10 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 rounded-xl shadow-lg p-6">
-          <h3 className="text-xl font-semibold text-white dark:text-white mb-4">Performance per Categoria</h3>
+        <div className="bg-white dark:bg-slate-800/20 backdrop-blur-lg border border-gray-200 dark:border-violet-100/30 rounded-xl p-6">
+          <h3 className="text-xl font-semibold text-slate-950 dark:text-white mb-4">Performance per Categoria</h3>
           <Bar
             data={barData}
             options={{
@@ -425,11 +425,11 @@ export function StudentStats({ results, onBack, showFilters = false }: StudentSt
                   beginAtZero: true,
                   max: 100,
                   grid: {
-                    color: 'rgba(255, 255, 255, 0.1)'
+                    color: 'rgba(15, 23, 42, 0.1)'
                   },
                   ticks: {
                     callback: value => `${value}%`,
-                    color: 'rgb(255, 255, 255)',
+                    color: 'rgb(15, 23, 42)',
                     font: {
                       size: 12,
                       weight: 'bold'
@@ -438,10 +438,10 @@ export function StudentStats({ results, onBack, showFilters = false }: StudentSt
                 },
                 x: {
                   grid: {
-                    color: 'rgba(255, 255, 255, 0.1)'
+                    color: 'rgba(15, 23, 42, 0.1)'
                   },
                   ticks: {
-                    color: 'rgb(255, 255, 255)',
+                    color: 'rgb(15, 23, 42)',
                     font: {
                       size: 12,
                       weight: 'bold'
@@ -452,7 +452,7 @@ export function StudentStats({ results, onBack, showFilters = false }: StudentSt
               plugins: {
                 legend: {
                   labels: {
-                    color: 'rgb(255, 255, 255)',
+                    color: 'rgb(15, 23, 42)',
                     font: {
                       size: 14,
                       weight: 'bold'
@@ -477,7 +477,7 @@ export function StudentStats({ results, onBack, showFilters = false }: StudentSt
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-xl overflow-hidden">
         <div className="p-6 border-b border-gray-200 dark:border-slate-700">
           <h3 className="text-xl font-semibold dark:text-white">Cronologia Quiz</h3>
         </div>
