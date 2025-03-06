@@ -555,6 +555,8 @@ export function QuizDetailReport({ result, onBack, quizTitle }: QuizDetailReport
               <p className="text-gray-400">Categoria: {result.category || 'Non disponibile'}</p>
               <p className="text-gray-400 mb-6">Data: {formatDate(result.date)}</p>
               
+              <p className="text-rose-500 mb-4">ID del quiz non disponibile</p>
+              
               {loadingError && (
                 <p className="text-rose-500 mb-4">{loadingError}</p>
               )}
