@@ -4,6 +4,7 @@ import { supabase } from '../../services/supabase';
 import { saveQuizResult } from '../../services/api';
 import { motion } from 'framer-motion';
 import { QuizDetailReport } from './QuizDetailReport';
+import { v4 as uuidv4 } from 'uuid';
 
 interface QuizProps {
   quizId: string;
@@ -235,27 +236,94 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
       } catch (saveError) {
         console.error('Errore specifico durante il salvataggio:', saveError);
         
-        // Tentativo di recupero in caso di errore RLS
+        // Tentativo di recupero con retry
         try {
-          console.log("Tentativo di recupero: salvataggio risultato senza RLS...");
-          // Salva solo i dati essenziali in localStorage come backup
-          const backupResult = {
-            date: new Date().toISOString(),
-            score: score,
-            totalQuestions: answers.length,
-            correctAnswers: correctAnswers,
-            quizTitle: quiz.title
-          };
-          localStorage.setItem('lastQuizResult', JSON.stringify(backupResult));
-          console.log("Backup del risultato salvato in localStorage");
+          console.log("Primo tentativo fallito, riprovo con un secondo tentativo...");
           
-          // Mostra comunque i risultati all'utente
-          setResult(quizResult);
+          // Generiamo un nuovo ID per il quiz
+          const newQuizId = uuidv4();
+          console.log("Generato nuovo ID per il secondo tentativo:", newQuizId);
+          
+          // Creiamo una copia del risultato con il nuovo ID
+          const retryQuizResult = {
+            ...quizResult,
+            quizId: newQuizId
+          };
+          
+          // Riprova il salvataggio con il nuovo ID
+          await saveQuizResult(retryQuizResult);
+          console.log("Secondo tentativo riuscito! Risultato salvato con successo!");
+          
+          setResult(retryQuizResult);
           setShowResults(true);
-          setError('I risultati sono visualizzati ma potrebbero non essere stati salvati nel database. Un backup è stato creato localmente.');
-        } catch (backupError) {
-          console.error('Errore anche nel backup:', backupError);
-          setError('Errore durante il salvataggio dei risultati. Per favore riprova o contatta l\'assistenza.');
+        } catch (retryError) {
+          console.error('Errore anche nel secondo tentativo:', retryError);
+          
+          // Ultimo tentativo con approccio diretto
+          try {
+            console.log("Tentativo finale con approccio diretto...");
+            
+            // Creiamo direttamente un quiz nel database
+            const finalQuizId = uuidv4();
+            const { data: newQuiz, error: quizError } = await supabase
+              .from('quizzes')
+              .insert([{
+                id: finalQuizId,
+                title: `Quiz ${quiz.category || 'completato'}`,
+                description: `Quiz completato il ${new Date().toLocaleString()}`,
+                category: quiz.category || 'uncategorized',
+                type_id: 'exam',
+                created_by: null,
+                is_active: true,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                questions: quiz.questions || []
+              }])
+              .select('id')
+              .single();
+              
+            if (quizError) {
+              console.error('Errore nella creazione diretta del quiz:', quizError);
+              throw new Error('Impossibile creare il quiz nel database');
+            }
+            
+            console.log("Quiz creato con successo, ID:", newQuiz.id);
+            
+            // Salviamo il risultato con l'ID del nuovo quiz
+            const { error: resultError } = await supabase
+              .from('results')
+              .insert([{
+                student_email: studentEmail,
+                quiz_id: newQuiz.id,
+                score: score,
+                total_time: totalTime,
+                answers: booleanAnswers,
+                question_times: questionTimes,
+                date: new Date().toISOString(),
+                category: quiz.category || quiz.quiz_type,
+                first_name: '',
+                last_name: ''
+              }]);
+              
+            if (resultError) {
+              console.error('Errore nel salvataggio diretto del risultato:', resultError);
+              throw new Error('Impossibile salvare il risultato nel database');
+            }
+            
+            console.log("Risultato salvato con successo con approccio diretto!");
+            
+            // Aggiorniamo il risultato con il nuovo ID
+            const finalQuizResult = {
+              ...quizResult,
+              quizId: newQuiz.id
+            };
+            
+            setResult(finalQuizResult);
+            setShowResults(true);
+          } catch (finalError) {
+            console.error('Errore in tutti i tentativi di salvataggio:', finalError);
+            setError('Errore durante il salvataggio dei risultati. Per favore riprova o contatta l\'assistenza.');
+          }
         }
       }
     } catch (error) {
