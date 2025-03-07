@@ -440,7 +440,7 @@ export function VideoManager() {
           Torna all'elenco
         </button>
 
-        <div className="bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-slate-700/30 rounded-xl shadow-md overflow-hidden">
+        <div className="bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-slate-700/30 rounded-xl overflow-hidden">
           <div className="p-6 border-b border-white/20 dark:border-slate-700/30">
             <h3 className="text-xl font-bold mb-2 text-white">{selectedVideo.title}</h3>
             <p className="text-gray-300">
@@ -464,7 +464,7 @@ export function VideoManager() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center gap-4 flex-wrap">
-        <h2 className="text-3xl font-light text-white dark:text-slate-50">Video Lezioni</h2>
+        <h2 className="text-3xl font-light text-slate-900 dark:text-slate-50">Video Lezioni</h2>
         <div className="flex items-center gap-4">
           <div className="relative">
             <input
@@ -480,7 +480,7 @@ export function VideoManager() {
             onClick={() => setShowCategoryModal(true)}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all transform hover:scale-105 flex items-center gap-2"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-6 h-6 bg-white/20 rounded-full p-1" />
             Nuova Categoria
           </button>
         </div>
@@ -499,12 +499,12 @@ export function VideoManager() {
       )}
 
       {loading ? (
-        <div className="bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-slate-700/30 rounded-xl shadow-lg p-8">
-          <p className="text-center text-white dark:text-slate-400">Caricamento video lezioni...</p>
+        <div className="bg-violet-800/10 dark:bg-violet-800/20 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 rounded-xl p-8">
+          <p className="text-center text-slate-900 dark:text-slate-100">Caricamento video lezioni...</p>
         </div>
       ) : filteredCategories.length === 0 ? (
-        <div className="bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-slate-700/30 rounded-xl shadow-lg p-8">
-          <p className="text-center text-white dark:text-slate-400">
+        <div className="bg-violet-800/10 dark:bg-violet-800/20 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 rounded-xl p-8">
+          <p className="text-center text-slate-900 dark:text-slate-100">
             {searchTerm ? 'Nessun risultato trovato' : 'Nessuna video lezione disponibile'}
           </p>
         </div>
@@ -516,7 +516,7 @@ export function VideoManager() {
             return (
               <div
                 key={category.id}
-                className="bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-slate-700/30 rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow"
+                className="bg-violet-800/10 dark:bg-violet-800/20 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 rounded-xl overflow-hidden transition-all"
               >
                 <div className="p-6">
                   <div className="flex justify-between items-start">
@@ -525,8 +525,8 @@ export function VideoManager() {
                         <Video className={`w-6 h-6 ${color.text}`} />
                       </div>
                       <div>
-                        <h3 className="font-bold text-lg text-white dark:text-slate-100">{category.title}</h3>
-                        <p className="text-sm text-gray-300 dark:text-slate-400">
+                        <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">{category.title}</h3>
+                        <p className="text-sm text-slate-700 dark:text-slate-400">
                           {category.videos.length} video • {formatDate(category.publish_date)}
                         </p>
                       </div>
@@ -541,7 +541,7 @@ export function VideoManager() {
                           });
                           setShowVideoModal(true);
                         }}
-                        className="text-white/70 hover:text-white dark:text-slate-400 dark:hover:text-white transition-colors"
+                        className="text-white/70 hover:text-white dark:text-slate-400 dark:hover:text-white transition-colors p-1.5 bg-blue-600/20 dark:bg-blue-600/30 hover:bg-blue-600/40 rounded-full"
                         title="Aggiungi video a questa categoria"
                       >
                         <Plus className="w-5 h-5" />
@@ -557,8 +557,8 @@ export function VideoManager() {
                           className="flex items-center justify-between p-4 rounded-lg hover:bg-white/10 transition-colors"
                         >
                           <div>
-                            <h4 className="font-medium mb-1 text-white">{video.title}</h4>
-                            <div className="flex items-center gap-2 text-sm text-white/70">
+                            <h4 className="font-medium mb-1 text-slate-900 dark:text-white">{video.title}</h4>
+                            <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-white/70">
                               <Calendar className="w-4 h-4" />
                               <span>{formatDate(video.publish_date)}</span>
                             </div>

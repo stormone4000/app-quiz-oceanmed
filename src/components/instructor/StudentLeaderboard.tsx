@@ -211,11 +211,11 @@ export function StudentLeaderboard() {
   }
 
   return (
-    <div className="bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-slate-700/30 rounded-xl shadow-lg p-4 sm:p-6">
+    <div className="bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-slate-700/30 rounded-xl p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h2 className="text-2xl font-bold flex items-center gap-2">
           <Trophy className="w-6 h-6 text-yellow-500" />
-          <span className="text-white dark:text-slate-100">Classifica Studenti</span>
+          <span className="text-slate-900 dark:text-slate-100">Classifica Studenti</span>
         </h2>
         <div className="w-full sm:w-auto">
           <div className="relative">
@@ -234,28 +234,28 @@ export function StudentLeaderboard() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white/10 dark:bg-slate-800/10 border border-white/30 dark:border-slate-700/30 rounded-lg p-4 hover:scale-[1.02] transition-all">
           <div className="flex items-center gap-2 mb-2">
-            <Users className="w-5 h-5 text-white dark:text-slate-100" />
-            <h3 className="font-semibold text-white dark:text-slate-100">Studenti Totali</h3>
+            <Users className="w-5 h-5 text-slate-900 dark:text-slate-100" />
+            <h3 className="font-semibold text-slate-900 dark:text-slate-100">Studenti Totali</h3>
           </div>
-          <p className="text-2xl font-bold text-white dark:text-slate-100">{totalStudents}</p>
+          <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totalStudents}</p>
         </div>
 
         <div className="bg-white/10 dark:bg-slate-800/10 border border-white/30 dark:border-slate-700/30 rounded-lg p-4 hover:scale-[1.02] transition-all">
           <div className="flex items-center gap-2 mb-2">
-            <Star className="w-5 h-5 text-white dark:text-slate-100" />
-            <h3 className="font-semibold text-white dark:text-slate-100">Media XP</h3>
+            <Star className="w-5 h-5 text-slate-900 dark:text-slate-100" />
+            <h3 className="font-semibold text-slate-900 dark:text-slate-100">Media XP</h3>
           </div>
-          <p className="text-2xl font-bold text-white dark:text-slate-100">
+          <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
             {Math.round(leaderboard.reduce((acc, curr) => acc + curr.xp, 0) / leaderboard.length)}
           </p>
         </div>
 
         <div className="bg-white/10 dark:bg-slate-800/10 border border-white/30 dark:border-slate-700/30 rounded-lg p-4 hover:scale-[1.02] transition-all">
           <div className="flex items-center gap-2 mb-2">
-            <Award className="w-5 h-5 text-white dark:text-slate-100" />
-            <h3 className="font-semibold text-white dark:text-slate-100">Livello Medio</h3>
+            <Award className="w-5 h-5 text-slate-900 dark:text-slate-100" />
+            <h3 className="font-semibold text-slate-900 dark:text-slate-100">Livello Medio</h3>
           </div>
-          <p className="text-2xl font-bold text-white dark:text-slate-100">
+          <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
             {Math.round(leaderboard.reduce((acc, curr) => acc + curr.level, 0) / leaderboard.length)}
           </p>
         </div>
@@ -265,43 +265,43 @@ export function StudentLeaderboard() {
         <table className="w-full min-w-[800px] border-separate border-spacing-0">
           <thead>
             <tr>
-              <th className="px-6 py-3 text-left text-sm font-medium text-white dark:text-slate-100">
+              <th className="px-6 py-3 text-left text-sm font-medium text-slate-900 dark:text-slate-100">
                 <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort('rank')}>
                   Posizione
                   <ArrowUpDown className="w-4 h-4" />
                 </div>
               </th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-white dark:text-slate-100">
+              <th className="px-6 py-3 text-left text-sm font-medium text-slate-900 dark:text-slate-100">
                 <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort('firstName')}>
                   Nome
                   <ArrowUpDown className="w-4 h-4" />
                 </div>
               </th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-white dark:text-slate-100 hidden sm:table-cell">
+              <th className="px-6 py-3 text-left text-sm font-medium text-slate-900 dark:text-slate-100 hidden sm:table-cell">
                 <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort('email')}>
                   Email
                   <ArrowUpDown className="w-4 h-4" />
                 </div>
               </th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-white dark:text-slate-100">
+              <th className="px-6 py-3 text-left text-sm font-medium text-slate-900 dark:text-slate-100">
                 <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort('level')}>
                   Livello
                   <ArrowUpDown className="w-4 h-4" />
                 </div>
               </th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-white dark:text-slate-100 hidden md:table-cell">
+              <th className="px-6 py-3 text-left text-sm font-medium text-slate-900 dark:text-slate-100 hidden md:table-cell">
                 <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort('xp')}>
                   XP
                   <ArrowUpDown className="w-4 h-4" />
                 </div>
               </th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-white dark:text-slate-100 hidden lg:table-cell">
+              <th className="px-6 py-3 text-left text-sm font-medium text-slate-900 dark:text-slate-100 hidden lg:table-cell">
                 <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort('averageScore')}>
                   Media
                   <ArrowUpDown className="w-4 h-4" />
                 </div>
               </th>
-              <th className="px-6 py-3 text-left text-sm font-medium text-white dark:text-slate-100">Trend</th>
+              <th className="px-6 py-3 text-left text-sm font-medium text-slate-900 dark:text-slate-100">Trend</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/10 dark:divide-slate-700/30">
@@ -318,23 +318,23 @@ export function StudentLeaderboard() {
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex flex-col">
-                    <span className="font-medium text-white dark:text-slate-100">{student.pseudonym}</span>
+                    <span className="font-medium text-slate-900 dark:text-slate-100">{student.pseudonym}</span>
                     <span className="text-sm text-gray-300 dark:text-slate-400 sm:hidden">{student.email}</span>
                   </div>
                 </td>
-                <td className="px-6 py-4 hidden sm:table-cell text-white dark:text-slate-100">
+                <td className="px-6 py-4 hidden sm:table-cell text-slate-900 dark:text-slate-100">
                   <span className="truncate">{student.email}</span>
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
                     <Star className="w-4 h-4 text-yellow-500" />
-                    <span className="text-white dark:text-slate-100">{student.level}</span>
+                    <span className="text-slate-900 dark:text-slate-100">{student.level}</span>
                   </div>
                 </td>
-                <td className="px-6 py-4 hidden md:table-cell text-white dark:text-slate-100">
+                <td className="px-6 py-4 hidden md:table-cell text-slate-900 dark:text-slate-100">
                   <span>{student.xp.toLocaleString()}</span>
                 </td>
-                <td className="px-6 py-4 hidden lg:table-cell text-white dark:text-slate-100">
+                <td className="px-6 py-4 hidden lg:table-cell text-slate-900 dark:text-slate-100">
                   <span>{(student.averageScore * 100).toFixed(1)}%</span>
                 </td>
                 <td className="px-6 py-4">

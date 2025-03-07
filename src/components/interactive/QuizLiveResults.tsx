@@ -27,11 +27,11 @@ interface QuizResult {
 }
 
 interface QuizLiveResultsProps {
-  onBack: () => void;
-  hostEmail: string;
+  sessionId: string;
+  onBackClick: () => void;
 }
 
-export function QuizLiveResults({ onBack, hostEmail }: QuizLiveResultsProps) {
+export function QuizLiveResults({ sessionId, onBackClick }: QuizLiveResultsProps) {
   const [results, setResults] = useState<QuizResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,14 +46,14 @@ export function QuizLiveResults({ onBack, hostEmail }: QuizLiveResultsProps) {
 
   useEffect(() => {
     loadResults();
-  }, [hostEmail]);
+  }, [sessionId]);
 
   const loadResults = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      console.log('Loading results for host:', hostEmail);
+      console.log('Loading results for session:', sessionId);
 
       const { data, error: resultsError } = await supabase
         .from('live_quiz_results')
@@ -71,7 +71,7 @@ export function QuizLiveResults({ onBack, hostEmail }: QuizLiveResultsProps) {
             )
           )
         `)
-        .eq('host_email', hostEmail)
+        .eq('session_id', sessionId)
         .order('created_at', { ascending: false });
 
       if (resultsError) {
@@ -371,7 +371,7 @@ export function QuizLiveResults({ onBack, hostEmail }: QuizLiveResultsProps) {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <button
-          onClick={onBack}
+          onClick={onBackClick}
           className="text-white hover:text-blue-100 flex items-center gap-2"
         >
           <ArrowLeft className="w-5 h-5" />

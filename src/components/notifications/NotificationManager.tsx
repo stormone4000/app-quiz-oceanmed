@@ -184,22 +184,23 @@ export function NotificationManager() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center gap-4 flex-wrap">
-        <h2 className="text-3xl font-light text-white dark:text-slate-50">Gestione Notifiche</h2>
-        <div className="flex items-center gap-4">
-          <div className="relative">
+      <h2 className="text-3xl font-light text-slate-900 dark:text-slate-50 mb-6">Gestione Notifiche</h2>
+      
+      <div className="mb-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="relative w-full md:w-auto">
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Cerca notifiche..."
-              className="pl-10 pr-4 py-2 rounded-lg border border-white/30 dark:border-slate-700/30 bg-white/10 dark:bg-slate-800/10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white dark:text-slate-100 placeholder-gray-300 dark:placeholder-slate-400"
+              className="pl-10 pr-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700/30 bg-white dark:bg-slate-800/10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-800 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 w-full"
             />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 dark:text-slate-400 w-5 h-5" />
           </div>
           <button
             onClick={() => setShowModal(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all transform hover:scale-105 flex items-center gap-2"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all transform hover:scale-105 flex items-center gap-2 w-full md:w-auto justify-center"
           >
             <Plus className="w-5 h-5" />
             Nuova Notifica
@@ -208,7 +209,7 @@ export function NotificationManager() {
       </div>
 
       {error && (
-        <div className="bg-red-50/20 dark:bg-red-900/20 border-l-4 border-red-400 dark:border-red-700 p-4 rounded-lg">
+        <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 dark:border-red-700 p-4 rounded-lg mb-4">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400" />
             <p className="text-red-700 dark:text-red-400">{error}</p>
@@ -216,79 +217,79 @@ export function NotificationManager() {
         </div>
       )}
 
-      <div className="bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-slate-700/30 rounded-xl shadow-lg overflow-hidden">
+      <div className="bg-white dark:bg-slate-800/20 backdrop-blur-lg border border-slate-200 dark:border-slate-700/30 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr>
-                <th className="px-6 py-3 text-left text-sm font-medium text-white dark:text-slate-100">
+                <th className="px-6 py-3 text-left text-sm font-medium text-slate-800 dark:text-slate-100">
                   <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort('title')}>
                     Titolo
                     <ArrowUpDown className="w-4 h-4" />
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-white dark:text-slate-100">
+                <th className="px-6 py-3 text-left text-sm font-medium text-slate-800 dark:text-slate-100">
                   <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort('category')}>
                     Categoria
                     <ArrowUpDown className="w-4 h-4" />
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-white dark:text-slate-100">
+                <th className="px-6 py-3 text-left text-sm font-medium text-slate-800 dark:text-slate-100">
                   <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort('is_important')}>
                     Importante
                     <ArrowUpDown className="w-4 h-4" />
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-white dark:text-slate-100">
+                <th className="px-6 py-3 text-left text-sm font-medium text-slate-800 dark:text-slate-100">
                   <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort('created_at')}>
                     Data Creazione
                     <ArrowUpDown className="w-4 h-4" />
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-white dark:text-slate-100">
+                <th className="px-6 py-3 text-left text-sm font-medium text-slate-800 dark:text-slate-100">
                   <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort('expires_at')}>
                     Scadenza
                     <ArrowUpDown className="w-4 h-4" />
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-white dark:text-slate-100">
+                <th className="px-6 py-3 text-left text-sm font-medium text-slate-800 dark:text-slate-100">
                   Azioni
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/10 dark:divide-slate-700/30">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-700/30">
               {filteredNotifications.map(notification => (
-                <tr key={notification.id} className="hover:bg-white/5 dark:hover:bg-slate-800/30 transition-colors">
+                <tr key={notification.id} className="hover:bg-slate-100 dark:hover:bg-slate-800/30 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <Bell className={`w-5 h-5 ${
                         notification.is_important ? 'text-red-500' : 'text-blue-500'
                       }`} />
-                      <span className="font-medium text-white dark:text-slate-100">{notification.title}</span>
+                      <span className="font-medium text-slate-800 dark:text-slate-100">{notification.title}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 text-sm rounded-full ${
                       notification.category === 'announcement'
-                        ? 'bg-blue-100/30 text-blue-100'
+                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-100/30 dark:text-blue-100'
                         : notification.category === 'event'
-                        ? 'bg-green-100/30 text-green-100'
-                        : 'bg-red-100/30 text-red-100'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-100/30 dark:text-green-100'
+                        : 'bg-red-100 text-red-800 dark:bg-red-100/30 dark:text-red-100'
                     }`}>
                       {notification.category}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     {notification.is_important ? (
-                      <span className="text-red-400">Sì</span>
+                      <span className="text-red-600 dark:text-red-400">Sì</span>
                     ) : (
-                      <span className="text-gray-300 dark:text-slate-400">No</span>
+                      <span className="text-slate-600 dark:text-slate-400">No</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-gray-300 dark:text-slate-400">
+                  <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
                     {formatDate(notification.created_at)}
                   </td>
-                  <td className="px-6 py-4 text-gray-300 dark:text-slate-400">
+                  <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
                     {notification.expires_at
                       ? formatDate(notification.expires_at)
                       : '-'
@@ -308,7 +309,8 @@ export function NotificationManager() {
                           });
                           setShowModal(true);
                         }}
-                        className="p-2 text-white hover:bg-white/10 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
+                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                        title="Modifica notifica"
                       >
                         <Edit className="w-5 h-5" />
                       </button>
@@ -317,7 +319,8 @@ export function NotificationManager() {
                           id: notification.id,
                           title: notification.title
                         })}
-                        className="p-2 text-red-400 hover:bg-red-500/10 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                        title="Elimina notifica"
                       >
                         <Trash2 className="w-5 h-5" />
                       </button>
@@ -332,12 +335,12 @@ export function NotificationManager() {
 
       {/* Notification Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-lg rounded-xl shadow-xl max-w-2xl w-full border border-white/30 dark:border-slate-700/30">
-            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+              <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">
                 {editingNotification ? 'Modifica Notifica' : 'Nuova Notifica'}
-              </h2>
+              </h3>
               <button
                 onClick={() => {
                   setShowModal(false);
@@ -350,7 +353,7 @@ export function NotificationManager() {
                     expires_at: null
                   });
                 }}
-                className="text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
+                className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -409,13 +412,13 @@ export function NotificationManager() {
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    id="important"
+                    id="is_important"
                     checked={form.is_important}
                     onChange={(e) => setForm({ ...form, is_important: e.target.checked })}
-                    className="w-4 h-4 text-blue-600 border-gray-300 dark:border-slate-700 rounded focus:ring-blue-500"
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <label htmlFor="important" className="text-sm text-gray-700 dark:text-slate-300">
-                    Notifica Importante
+                  <label htmlFor="is_important" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Contrassegna come importante
                   </label>
                 </div>
 
@@ -434,14 +437,34 @@ export function NotificationManager() {
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-end">
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  setEditingNotification(null);
+                  setForm({
+                    title: '',
+                    content: '',
+                    category: 'announcement',
+                    is_important: false,
+                    expires_at: null
+                  });
+                }}
+                className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+              >
+                Annulla
+              </button>
               <button
                 onClick={handleSave}
-                disabled={loading}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-all transform hover:scale-105 flex items-center gap-2 disabled:opacity-50"
+                disabled={!form.title || !form.content}
+                className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+                  !form.title || !form.content
+                    ? 'bg-blue-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                } text-white`}
               >
                 <Save className="w-5 h-5" />
-                {loading ? 'Salvataggio...' : 'Salva Notifica'}
+                Salva
               </button>
             </div>
           </div>
