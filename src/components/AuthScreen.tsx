@@ -264,14 +264,44 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
         if (formData.accessCode === '55555') {
           hasAccess = true;
         } else {
-          // Check instructor profile
-          const { data: profile } = await supabase
-            .from('instructor_profiles')
-            .select('subscription_status')
-            .eq('email', user.email)
-            .single();
+          // NUOVO: Verifica se l'utente ha attivato un codice PRO
+          console.log('Verifico se l\'utente ha attivato un codice PRO...');
+          const { data: proCodeData, error: proCodeError } = await supabase
+            .from('instructor_activation_codes')
+            .select('*')
+            .eq('assigned_to_email', user.email)
+            .eq('is_active', true)
+            .not('used_at', 'is', null)
+            .order('used_at', { ascending: false })
+            .limit(1);
+          
+          if (!proCodeError && proCodeData && proCodeData.length > 0) {
+            console.log('Codice PRO attivato trovato:', proCodeData[0]);
+            hasAccess = true;
+            
+            // Aggiorniamo anche lo stato dell'account se necessario
+            if (user.account_status !== 'active') {
+              try {
+                await supabase
+                  .from('auth_users')
+                  .update({ account_status: 'active' })
+                  .eq('id', user.id);
+                
+                console.log('Stato account aggiornato a "active"');
+              } catch (updateError) {
+                console.error('Errore nell\'aggiornamento dello stato dell\'account:', updateError);
+              }
+            }
+          } else {
+            // Check instructor profile
+            const { data: profile } = await supabase
+              .from('instructor_profiles')
+              .select('subscription_status')
+              .eq('email', user.email)
+              .single();
 
-          hasAccess = profile?.subscription_status === 'active';
+            hasAccess = profile?.subscription_status === 'active';
+          }
         }
 
         // Store instructor data

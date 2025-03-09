@@ -72,6 +72,9 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       // Mostriamo il messaggio di errore
       setError('Il codice è stato disattivato dall\'amministratore');
     }
+    
+    // NUOVO: Verifica automatica dello stato di attivazione
+    checkInstructorActivationStatus();
   }, [userEmail]);
 
   useEffect(() => {
@@ -510,6 +513,40 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
           } else {
             console.log('Aggiornamento del codice PRO riuscito:', updateData);
           }
+          
+          // NUOVO: Aggiorniamo anche lo stato dell'account dell'utente
+          try {
+            // Prima recuperiamo l'ID dell'utente
+            const { data: userData, error: userError } = await supabase
+              .from('auth_users')
+              .select('id, account_status, is_instructor')
+              .eq('email', userEmail)
+              .single();
+              
+            if (userError) {
+              console.error('Errore nel recupero dei dati utente:', userError);
+            } else if (userData) {
+              console.log('Dati utente recuperati:', userData);
+              
+              // Aggiorniamo lo stato dell'account e confermiamo che è un istruttore
+              const { error: updateUserError } = await supabase
+                .from('auth_users')
+                .update({
+                  account_status: 'active',
+                  is_instructor: true,
+                  role: 'instructor'
+                })
+                .eq('id', userData.id);
+                
+              if (updateUserError) {
+                console.error('Errore nell\'aggiornamento dello stato dell\'account:', updateUserError);
+              } else {
+                console.log('Stato account aggiornato con successo a "active"');
+              }
+            }
+          } catch (userUpdateError) {
+            console.error('Eccezione durante l\'aggiornamento dello stato dell\'account:', userUpdateError);
+          }
         } catch (updateCatchError) {
           console.error('Eccezione durante l\'aggiornamento del codice PRO:', updateCatchError);
           // Continuiamo comunque perché l'utente può usare il codice
@@ -529,6 +566,7 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
         
         setError(''); // Reset del messaggio di errore in caso di successo
         setSuccess(`Codice PRO ${code} verificato con successo!`);
+        setVerifying(false);
         return true;
       }
       
@@ -818,6 +856,92 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
     checkInstructorStatusAndRegisterCode();
   }, [codeHistory, userEmail, loadingHistory]);
 
+  // NUOVO: Funzione per verificare lo stato di attivazione dell'istruttore
+  const checkInstructorActivationStatus = async () => {
+    if (!userEmail) return;
+    
+    console.log('Verifico automaticamente lo stato di attivazione per:', userEmail);
+    
+    try {
+      // Verifichiamo se l'utente ha un codice PRO attivato
+      const { data: proCodeData, error: proCodeError } = await supabase
+        .from('instructor_activation_codes')
+        .select('*')
+        .eq('assigned_to_email', userEmail)
+        .eq('is_active', true)
+        .not('used_at', 'is', null)
+        .order('used_at', { ascending: false })
+        .limit(1);
+      
+      if (proCodeError) {
+        console.error('Errore nella verifica del codice PRO:', proCodeError);
+        return;
+      }
+      
+      if (proCodeData && proCodeData.length > 0) {
+        console.log('Codice PRO attivato trovato:', proCodeData[0]);
+        
+        // Impostiamo i flag necessari
+        localStorage.setItem('hasInstructorAccess', 'true');
+        localStorage.setItem('hasActiveAccess', 'true');
+        localStorage.setItem('needsSubscription', 'false');
+        localStorage.removeItem('alertShown');
+        
+        // Aggiorniamo lo stato del componente
+        setHasInstructorAccess(true);
+        
+        // Forziamo un evento per aggiornare localStorage
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new Event('localStorageUpdated'));
+        
+        // Verifichiamo anche lo stato dell'account
+        const { data: userData, error: userError } = await supabase
+          .from('auth_users')
+          .select('id, account_status, is_instructor, role')
+          .eq('email', userEmail)
+          .single();
+        
+        if (userError) {
+          console.error('Errore nel recupero dei dati utente:', userError);
+          return;
+        }
+        
+        if (userData) {
+          console.log('Dati utente recuperati:', userData);
+          
+          // Se lo stato dell'account non è attivo o i flag non sono corretti, aggiorniamo
+          if (userData.account_status !== 'active' || !userData.is_instructor || userData.role !== 'instructor') {
+            const { error: updateError } = await supabase
+              .from('auth_users')
+              .update({
+                account_status: 'active',
+                is_instructor: true,
+                role: 'instructor'
+              })
+              .eq('id', userData.id);
+            
+            if (updateError) {
+              console.error('Errore nell\'aggiornamento dello stato dell\'account:', updateError);
+            } else {
+              console.log('Stato account aggiornato con successo');
+            }
+          }
+        }
+      } else {
+        console.log('Nessun codice PRO attivato trovato per:', userEmail);
+        
+        // Verifichiamo se l'utente ha un codice di accesso tradizionale
+        const hasInstructorAccess = localStorage.getItem('hasInstructorAccess') === 'true';
+        
+        if (!hasInstructorAccess) {
+          console.log('Nessun accesso istruttore trovato in localStorage');
+        }
+      }
+    } catch (error) {
+      console.error('Errore durante la verifica dello stato di attivazione:', error);
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {!userEmail && (
@@ -1036,90 +1160,103 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
                 </div>
               )}
               
-              <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-start gap-2 text-blue-700 dark:text-blue-400">
-                <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-medium">Accesso limitato</p>
-                  <p className="text-sm">Per sbloccare tutte le funzionalità dell'app, inserisci il codice di attivazione che hai ricevuto. Questo codice ti permetterà di accedere a:</p>
-                  <ul className="list-disc list-inside text-sm mt-2 space-y-1">
-                    <li>Gestione completa dei quiz</li>
-                    <li>Video lezioni</li>
-                    <li>Monitoraggio degli studenti</li>
-                    <li>Tutte le altre funzionalità da istruttore</li>
-                  </ul>
+              {/* NUOVO: Mostra lo stato di attivazione */}
+              {hasInstructorAccess ? (
+                <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg flex items-start gap-2 text-green-700 dark:text-green-400">
+                  <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium">Profilo Istruttore Attivo</p>
+                    <p className="text-sm">Il tuo profilo istruttore è attivo e hai accesso a tutte le funzionalità. Non è necessario reinserire il codice di attivazione.</p>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg flex items-start gap-2 text-blue-700 dark:text-blue-400">
+                  <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium">Accesso limitato</p>
+                    <p className="text-sm">Per sbloccare tutte le funzionalità dell'app, inserisci il codice di attivazione che hai ricevuto. Questo codice ti permetterà di accedere a:</p>
+                    <ul className="list-disc list-inside text-sm mt-2 space-y-1">
+                      <li>Gestione completa dei quiz</li>
+                      <li>Video lezioni</li>
+                      <li>Monitoraggio degli studenti</li>
+                      <li>Tutte le altre funzionalità da istruttore</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
               
-              <form onSubmit={handleMasterCodeSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                    Inserisci il codice di attivazione
-                  </label>
-                  <div className="relative">
-                    <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type="text"
-                      value={formData.masterCode}
-                      onChange={(e) => setFormData({ ...formData, masterCode: e.target.value.toUpperCase() })}
-                      className={`w-full pl-12 pr-4 py-3 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 text-lg tracking-wider ${
-                        verificationStep === 'error' 
-                          ? 'border-red-500 dark:border-red-500' 
-                          : verificationStep === 'success'
-                            ? 'border-green-500 dark:border-green-500'
-                            : 'border-gray-300 dark:border-slate-700'
-                      }`}
-                      placeholder="XXXXX-XXXXX-XXXXX"
-                      required
-                    />
-                    {verificationStep === 'checking' && (
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                      </div>
-                    )}
-                    {verificationStep === 'success' && (
-                      <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 w-5 h-5" />
-                    )}
-                    {verificationStep === 'error' && (
-                      <XCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500 w-5 h-5" />
-                    )}
+              {!hasInstructorAccess && (
+                <form onSubmit={handleMasterCodeSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                      Inserisci il codice di attivazione
+                    </label>
+                    <div className="relative">
+                      <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        value={formData.masterCode}
+                        onChange={(e) => setFormData({ ...formData, masterCode: e.target.value.toUpperCase() })}
+                        className={`w-full pl-12 pr-4 py-3 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 text-lg tracking-wider ${
+                          verificationStep === 'error' 
+                            ? 'border-red-500 dark:border-red-500' 
+                            : verificationStep === 'success'
+                              ? 'border-green-500 dark:border-green-500'
+                              : 'border-gray-300 dark:border-slate-700'
+                        }`}
+                        placeholder="XXXXX-XXXXX-XXXXX"
+                        required
+                      />
+                      {verificationStep === 'checking' && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                        </div>
+                      )}
+                      {verificationStep === 'success' && (
+                        <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 w-5 h-5" />
+                      )}
+                      {verificationStep === 'error' && (
+                        <XCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500 w-5 h-5" />
+                      )}
+                    </div>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+                      Se non hai un codice di attivazione, contatta l'amministratore o acquista un abbonamento.
+                    </p>
                   </div>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-                    Se non hai un codice di attivazione, contatta l'amministratore o acquista un abbonamento.
-                  </p>
-                </div>
 
-                {error && (
-                  <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm flex items-start gap-2">
-                    <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                    <span>{error}</span>
-                  </div>
-                )}
-
-                {success && (
-                  <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm flex items-start gap-2">
-                    <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                    <span>{success}</span>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loading || !formData.masterCode}
-                  className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-lg font-medium"
-                >
-                  {verificationStep === 'checking' ? (
-                    <RefreshCw className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Key className="w-5 h-5" />
+                  {error && (
+                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm flex items-start gap-2">
+                      <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                      <span>{error}</span>
+                    </div>
                   )}
-                  {loading 
-                    ? 'Verifica in corso...' 
-                    : verificationStep === 'success'
-                      ? 'Attivazione in corso...'
-                      : 'Attiva Profilo'
-                  }
-                </button>
-              </form>
+
+                  {success && (
+                    <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm flex items-start gap-2">
+                      <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                      <span>{success}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading || !formData.masterCode}
+                    className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-lg font-medium"
+                  >
+                    {verificationStep === 'checking' ? (
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Key className="w-5 h-5" />
+                    )}
+                    {loading 
+                      ? 'Verifica in corso...' 
+                      : verificationStep === 'success'
+                        ? 'Attivazione in corso...'
+                        : 'Attiva Profilo'
+                    }
+                  </button>
+                </form>
+              )}
             </div>
 
             {/* Subscription Section */}
