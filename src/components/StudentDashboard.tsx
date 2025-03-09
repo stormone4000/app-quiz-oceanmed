@@ -12,12 +12,13 @@ import { StudentStats } from './student/StudentStats';
 import { StudentProfile } from './student/StudentProfile';
 import { NotificationList } from './notifications/NotificationList';
 import { StudentSubscription } from './student/StudentSubscription';
-import { QuizLiveDashboard } from './student/QuizLiveDashboard';
+import { QuizLiveMain } from './interactive/QuizLiveMain';
 import { QuizSelector } from './student/QuizSelector';
 import type { QuizType, QuizResult } from '../types';
+import type { DashboardTab } from '../types-dashboard';
 
 // Definisco il tipo per i tab
-type DashboardTab = 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live' | 'dashboard' | 'gestione-quiz' | 'gestione-alunni' | 'quiz-history';
+// type DashboardTab = 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live' | 'dashboard' | 'gestione-quiz' | 'gestione-alunni' | 'quiz-history' | 'student-access-codes' | 'instructor-access-codes';
 
 interface Props {
   results: QuizResult[];
@@ -31,19 +32,29 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
-  
+
   useEffect(() => {
-    // Check for quiz type and ID in location state
-    const state = location.state;
-    if (state?.quizType && state?.quizId) {
-      setQuizType(state.quizType);
-      setSelectedCategory(state.quizId);
+    // Gestione dei parametri URL per la navigazione diretta
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    if (tab) {
+      setActiveTab(tab as DashboardTab);
     }
   }, [location]);
 
+  // Funzione per tornare alla dashboard
+  const handleBackToDashboard = () => {
+    setActiveTab('stats');
+    setQuizType(null);
+    setSelectedCategory(null);
+  };
+
   const renderContent = () => {
     if (activeTab === 'quiz-live') {
-      return <QuizLiveDashboard studentEmail={studentEmail} />;
+      return <QuizLiveMain 
+        userEmail={studentEmail} 
+        userRole="student" 
+      />;
     }
 
     if (activeTab === 'notifications') {
@@ -77,7 +88,7 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
       );
     }
 
-    if (activeTab === 'access-codes') {
+    if (activeTab === 'student-access-codes' || activeTab === 'access-codes') {
       return (
         <div className="space-y-6">
           <h2 className="text-3xl font-light text-white mb-6">Cronologia Codici di Accesso</h2>
@@ -103,8 +114,8 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
 
     if (activeTab === 'student-quiz') {
       return (
-        <div className="space-y-6">
-          <h2 className="text-3xl font-light text-white mb-6">Quiz Assegnati</h2>
+        <div className="space-y-6 px-4 sm:px-6 md:px-8 py-6 max-w-7xl mx-auto">
+          <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-6">Quiz Assegnati</h2>
           <AssignedQuizzes studentEmail={studentEmail} />
         </div>
       );
@@ -114,15 +125,13 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
       if (!quizType) {
         return (
           <div className="space-y-6">
-            <h2 className="text-3xl font-light text-white mb-6">Quiz Studenti</h2>
-            <QuizSelection
-              onSelectQuizType={(type) => setQuizType(type)}
-              onShowDashboard={() => setActiveTab('stats')}
-            />
-            <QuizSelector onQuizSelect={(quizId) => {
-              setSelectedCategory(quizId);
-              setQuizType('learning');
-            }} />
+            <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-6 px-4 sm:px-6 md:px-8">Quiz Interattivi</h2>
+            <div className="px-4 sm:px-6 md:px-8 py-6 max-w-7xl mx-auto">
+              <QuizSelector onQuizSelect={(quizId) => {
+                setSelectedCategory(quizId);
+                setQuizType('interactive');
+              }} />
+            </div>
           </div>
         );
       }
@@ -148,8 +157,8 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
 
     if (activeTab === 'stats' || activeTab === 'dashboard') {
       return (
-        <div className="space-y-6">
-          <h2 className="text-3xl font-light text-white mb-6">Le Tue Statistiche</h2>
+        <div className="space-y-6 px-4 sm:px-6 md:px-8 py-6 max-w-7xl mx-auto">
+          <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-6">Le Tue Statistiche</h2>
           <StudentProfile studentEmail={studentEmail} />
           <StudentStats 
             results={results} 
@@ -160,22 +169,17 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
     }
 
     if (activeTab === 'quizzes') {
-      if (!quizType) {
+      if (selectedCategory) {
         return (
-          <div className="space-y-6">
-            <QuizSelection
-              onSelectQuizType={(type) => setQuizType(type)}
-              onShowDashboard={() => setActiveTab('stats')}
-            />
-            <QuizSelector onQuizSelect={(quizId) => {
-              setSelectedCategory(quizId);
-              setQuizType('learning');
-            }} />
-          </div>
+          <Quiz
+            quizId={selectedCategory}
+            onBack={() => setSelectedCategory(null)}
+            studentEmail={studentEmail || localStorage.getItem('userEmail') || ''}
+          />
         );
       }
-
-      if (!selectedCategory) {
+      
+      if (quizType) {
         return (
           <QuizCategories
             type={quizType}
@@ -184,13 +188,20 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
           />
         );
       }
-
+      
       return (
-        <Quiz
-          quizId={selectedCategory}
-          onBack={() => setSelectedCategory(null)}
-          studentEmail={studentEmail || localStorage.getItem('userEmail') || ''}
-        />
+        <div className="space-y-6">
+          <QuizSelection
+            onSelectQuizType={(type) => setQuizType(type)}
+            onShowDashboard={() => setActiveTab('stats')}
+          />
+          <div className="px-4 sm:px-6 md:px-8 py-6 max-w-7xl mx-auto">
+            <QuizSelector onQuizSelect={(quizId) => {
+              setSelectedCategory(quizId);
+              setQuizType('learning');
+            }} />
+          </div>
+        </div>
       );
     }
 
@@ -200,7 +211,11 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
   return (
     <DashboardLayout
       activeTab={activeTab}
-      onTabChange={(tab: DashboardTab) => setActiveTab(tab)}
+      onTabChange={(tab: DashboardTab) => {
+        setActiveTab(tab);
+        setQuizType(null);
+        setSelectedCategory(null);
+      }}
       onLogout={onLogout}
       studentEmail={studentEmail}
     >

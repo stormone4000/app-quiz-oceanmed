@@ -75,47 +75,71 @@ export function RegistrationPage() {
         throw new Error('Email già registrata');
       }
 
-      // Create user
-      const { error: insertError } = await supabase
+      // Assicurati che isInstructor sia un booleano
+      const isInstructor = form.isInstructor === true;
+      
+      // Imposta il ruolo corretto in base a isInstructor
+      const role = isInstructor ? 'instructor' : 'student';
+
+      // Log per debug
+      console.log('Dati registrazione:', {
+        email: form.email,
+        isInstructor,
+        role
+      });
+
+      // Usa i valori corretti nell'inserimento
+      const userData = {
+        email: form.email.toLowerCase(),
+        password_hash: passwordHash,
+        first_name: form.firstName,
+        last_name: form.lastName,
+        is_instructor: isInstructor,
+        account_status: isInstructor ? 'pending' : 'active',
+        is_master: false,
+        role: role, // Usa la variabile role impostata correttamente
+        is_master_admin: false,
+        created_at: new Date().toISOString()
+      };
+
+      // Inserimento in auth_users
+      const { data: newUser, error: insertError } = await supabase
         .from('auth_users')
-        .insert([{
-          email: form.email.toLowerCase(),
-          password_hash: passwordHash,
-          first_name: form.firstName,
-          last_name: form.lastName,
-          is_instructor: form.isInstructor,
-          account_status: 'active'
-        }]);
+        .insert([userData])
+        .select('id, role')
+        .single();
 
       if (insertError) throw insertError;
 
-      // If registering as instructor, create instructor profile
-      if (form.isInstructor) {
-        const { error: profileError } = await supabase
+      // Verifica che il ruolo sia stato impostato correttamente
+      if (isInstructor && newUser && newUser.role !== 'instructor') {
+        console.warn('Ruolo non impostato correttamente, correzione manuale...');
+        
+        // Correggi il ruolo
+        await supabase
+          .from('auth_users')
+          .update({ role: 'instructor' })
+          .eq('id', newUser.id);
+      }
+
+      // Per istruttori, inserisci in instructor_profiles
+      if (isInstructor && newUser) {
+        // Inserisci in instructor_profiles
+        await supabase
           .from('instructor_profiles')
           .insert([{
+            user_id: newUser.id, // Importante: imposta il collegamento corretto
             email: form.email.toLowerCase(),
             first_name: form.firstName,
             last_name: form.lastName,
-            subscription_status: 'inactive'
+            created_at: new Date().toISOString()
           }]);
-
-        if (profileError) throw profileError;
-
-        // Store instructor data with inactive status
-        localStorage.setItem('userEmail', form.email.toLowerCase());
-        localStorage.setItem('isProfessor', 'true');
-        localStorage.setItem('hasActiveAccess', 'false');
-
-        // Navigate to pricing page
-        navigate('/pricing', { replace: true });
-        return;
       }
 
       // Store user email and access status in localStorage
       const userEmail = form.email.toLowerCase();
       localStorage.setItem('userEmail', userEmail);
-      localStorage.setItem('isProfessor', 'false');
+      localStorage.setItem('isProfessor', isInstructor ? 'true' : 'false');
       localStorage.setItem('firstName', form.firstName);
       localStorage.setItem('lastName', form.lastName);
 

@@ -15,12 +15,14 @@ export function StudentProfile({ userEmail }: StudentProfileProps) {
     lastName: '',
     currentPassword: '',
     newPassword: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    masterCode: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
+  const [verificationStep, setVerificationStep] = useState<'idle' | 'checking' | 'verifying' | 'success' | 'error'>('idle');
 
   // Funzione per caricare i dati del profilo utente
   const loadUserProfile = async () => {
@@ -220,6 +222,156 @@ export function StudentProfile({ userEmail }: StudentProfileProps) {
     }
   };
 
+  // Funzione per verificare se un codice è attivo
+  const checkActiveCode = async (code: string): Promise<boolean> => {
+    try {
+      setError(null);
+      
+      // Verifica che il codice sia stato inserito
+      if (!code || code.trim() === '') {
+        setError('Inserisci un codice valido.');
+        return false;
+      }
+      
+      // Verifica se il codice inizia con "QUIZ-"
+      if (code.startsWith('QUIZ-')) {
+        setError('Questo è un codice per quiz. Per attivare un account istruttore, utilizza un codice istruttore valido.');
+        return false;
+      }
+      
+      // Verifica se il codice esiste e se è attivo
+      const { data, error: codeError } = await supabase
+        .from('access_codes')
+        .select('*')
+        .eq('code', code)
+        .single();
+      
+      if (codeError) {
+        console.error('Errore durante la verifica del codice:', codeError);
+        setError('Codice non valido o scaduto.');
+        return false;
+      }
+      
+      if (!data) {
+        setError('Codice non trovato.');
+        return false;
+      }
+      
+      if (!data.is_active) {
+        setError('Questo codice è stato disattivato.');
+        return false;
+      }
+      
+      // Verifica se il codice è scaduto
+      if (data.expires_at && new Date(data.expires_at) < new Date()) {
+        setError('Questo codice è scaduto.');
+        return false;
+      }
+      
+      // Verifica se il codice è di tipo istruttore
+      if (data.type !== 'instructor' && data.type !== 'master') {
+        setError('Questo codice non è valido per attivare un account istruttore.');
+        return false;
+      }
+      
+      // Imposta i flag di accesso
+      localStorage.setItem('hasActiveAccess', 'true');
+      localStorage.setItem('hasInstructorAccess', 'true');
+      localStorage.setItem('masterCode', code);
+      localStorage.setItem('isProfessor', 'true');
+      localStorage.setItem('isStudent', 'false');
+      localStorage.setItem('needsSubscription', 'false');
+      localStorage.setItem('isCodeDeactivated', 'false');
+      
+      // Trigger per aggiornare altri componenti
+      window.dispatchEvent(new Event('localStorageUpdated'));
+      
+      return true;
+    } catch (error) {
+      console.error('Errore durante la verifica del codice:', error);
+      setError('Errore durante la verifica del codice. Riprova più tardi.');
+      return false;
+    }
+  };
+
+  // Funzione per gestire l'invio del codice istruttore
+  const handleMasterCodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+    setLoading(true);
+    setVerificationStep('checking');
+
+    try {
+      // Verifico che l'email dell'utente sia presente
+      if (!userEmail) {
+        setVerificationStep('error');
+        throw new Error('Email utente non trovata. Effettua nuovamente il login.');
+      }
+
+      // Verifico che il codice master sia stato inserito
+      if (!formData.masterCode || formData.masterCode.trim() === '') {
+        setVerificationStep('error');
+        throw new Error('Inserisci un codice istruttore valido.');
+      }
+
+      // Mostro un messaggio di verifica in corso
+      setSuccess('Verifica del codice in corso...');
+      
+      // Utilizziamo la funzione checkActiveCode per verificare se il codice è valido
+      const isCodeValid = await checkActiveCode(formData.masterCode);
+      
+      if (!isCodeValid) {
+        setVerificationStep('error');
+        // Non serve impostare un messaggio di errore qui perché checkActiveCode già lo imposta
+        throw new Error('Codice non valido');
+      }
+      
+      // Otteniamo i dettagli del codice dal database
+      const { data: accessCode, error: accessCodeError } = await supabase
+        .from('access_codes')
+        .select('*')
+        .eq('code', formData.masterCode)
+        .single();
+        
+      if (accessCodeError) {
+        console.error('Errore durante l\'ottenimento dei dettagli del codice:', accessCodeError);
+        setVerificationStep('error');
+        throw new Error('Errore durante la verifica del codice. Riprova più tardi.');
+      }
+      
+      // Registra l'utilizzo del codice
+      if (accessCode) {
+        const { error: usageInsertError } = await supabase
+          .from('access_code_usage')
+          .insert({
+            code_id: accessCode.id,
+            student_email: userEmail,
+            first_name: formData.firstName,
+            last_name: formData.lastName
+          });
+          
+        if (usageInsertError) {
+          console.error('Errore durante la registrazione dell\'utilizzo del codice:', usageInsertError);
+        }
+      }
+      
+      setVerificationStep('success');
+      setSuccess('Codice istruttore verificato con successo! Profilo istruttore attivato. Ricarica la pagina per accedere alle funzionalità da istruttore.');
+      
+      // Reindirizza alla dashboard dopo 3 secondi
+      setTimeout(() => {
+        window.location.href = '/dashboard';
+      }, 3000);
+    } catch (error) {
+      console.error('Errore durante la verifica del codice:', error);
+      setError(error instanceof Error ? error.message : 'Errore durante la verifica del codice');
+      setVerificationStep('error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {!userEmail && (
@@ -236,7 +388,7 @@ export function StudentProfile({ userEmail }: StudentProfileProps) {
       {userEmail && (
         <>
           {/* Profile Section */}
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6">
+          <div className="bg-white dark:bg-slate-900 rounded-xl p-6">
             <h2 className="text-2xl font-bold mb-6 dark:text-slate-100 flex items-center gap-2">
               <User className="w-6 h-6 text-blue-600" />
               Il Tuo Profilo
@@ -384,6 +536,58 @@ export function StudentProfile({ userEmail }: StudentProfileProps) {
                 >
                   <Save className="w-5 h-5" />
                   {loading ? 'Salvataggio...' : 'Salva Modifiche'}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Instructor Code Section */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl p-6">
+            <h2 className="text-2xl font-bold mb-6 dark:text-slate-100 flex items-center gap-2">
+              <Key className="w-6 h-6 text-blue-600" />
+              Attiva Profilo Istruttore
+            </h2>
+            
+            <p className="text-gray-700 dark:text-slate-300 mb-6">
+              Se hai un codice istruttore, inseriscilo qui per attivare le funzionalità da istruttore.
+            </p>
+            
+            <form onSubmit={handleMasterCodeSubmit} className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                  Codice Istruttore
+                </label>
+                <div className="relative">
+                  <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    value={formData.masterCode}
+                    onChange={(e) => setFormData({ ...formData, masterCode: e.target.value })}
+                    className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                    placeholder="Inserisci il codice istruttore"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={loading || verificationStep === 'success'}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>Verifica in corso...</>
+                  ) : verificationStep === 'success' ? (
+                    <>
+                      <CheckCircle className="w-5 h-5" />
+                      Codice Verificato
+                    </>
+                  ) : (
+                    <>
+                      <Key className="w-5 h-5" />
+                      Verifica Codice
+                    </>
+                  )}
                 </button>
               </div>
             </form>

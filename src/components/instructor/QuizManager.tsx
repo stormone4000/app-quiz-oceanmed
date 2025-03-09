@@ -50,25 +50,13 @@ export function QuizManager({ mode = 'manage' }: QuizManagerProps) {
       setError(null);
       
       const email = localStorage.getItem('userEmail');
+      const userId = localStorage.getItem('userId');
+      
       if (!email) {
         throw new Error('Email utente non trovata nel localStorage');
       }
 
-      // Ottieni l'ID dell'utente basato sull'email
-      const { data: userData, error: userError } = await supabase
-        .from('auth_users')
-        .select('id')
-        .eq('email', email)
-        .single();
-
-      if (userError) {
-        console.error('Errore nel recuperare l\'ID utente:', userError);
-        throw userError;
-      }
-
-      const userId = userData.id;
-      console.log('ID utente recuperato:', userId);
-
+      // Utilizziamo direttamente l'email dell'utente per filtrare i quiz
       let query = supabase
         .from('quiz_templates')
         .select(`
@@ -89,7 +77,10 @@ export function QuizManager({ mode = 'manage' }: QuizManagerProps) {
       if (isMaster) {
         // Admin può filtrare in vari modi
         if (filterMode === 'my') {
-          query = query.eq('created_by', userId);
+          // Cerca i quiz creati dall'utente corrente (sia per email che per UUID)
+          query = userId 
+            ? query.or(`created_by.eq.${email},created_by.eq.${userId}`) 
+            : query.eq('created_by', email);
         } else if (filterMode === 'public') {
           query = query.eq('visibility', 'public');
         } else if (filterMode === 'private') {
@@ -97,15 +88,39 @@ export function QuizManager({ mode = 'manage' }: QuizManagerProps) {
         }
         // Se filterMode === 'all', non applichiamo filtri aggiuntivi
       } else {
-        // Gli istruttori vedono solo i propri quiz
-        query = query.eq('created_by', userId);
+        if (mode === 'manage') {
+          // Gli istruttori vedono solo i propri quiz nella modalità gestione (sia per email che per UUID)
+          query = userId 
+            ? query.or(`created_by.eq.${email},created_by.eq.${userId}`) 
+            : query.eq('created_by', email);
+        } else if (mode === 'all') {
+          // In modalità "all", gli istruttori vedono i quiz pubblici e i propri
+          const creatorFilter = userId 
+            ? `created_by.eq.${email},created_by.eq.${userId}` 
+            : `created_by.eq.${email}`;
+          query = query.or(`visibility.eq.public,${creatorFilter}`);
+        }
       }
 
-      const { data: quizzesData, error: quizzesError } = await query;
+      let quizzesData;
+      let quizzesError;
+      
+      try {
+        const result = await query;
+        quizzesData = result.data;
+        quizzesError = result.error;
+      } catch (fetchError) {
+        console.error('Errore di connessione durante il caricamento dei quiz:', fetchError);
+        setError('Errore di connessione al server. Riprova più tardi.');
+        setLoading(false);
+        return;
+      }
 
       if (quizzesError) {
         console.error('Errore nella query:', quizzesError);
-        throw quizzesError;
+        setError(`Errore nel caricamento dei quiz: ${quizzesError.message}`);
+        setLoading(false);
+        return;
       }
       
       console.log(`Quiz trovati: ${quizzesData?.length || 0}`);
@@ -170,7 +185,7 @@ export function QuizManager({ mode = 'manage' }: QuizManagerProps) {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, isMaster, filterMode]);
+  }, [activeTab, isMaster, filterMode, mode]);
 
   useEffect(() => {
     const checkMasterStatus = async () => {
@@ -274,17 +289,59 @@ export function QuizManager({ mode = 'manage' }: QuizManagerProps) {
     try {
       setError(null);
       
-      const { error: updateError } = await supabase
+      // Verifica che l'utente corrente sia l'admin o il creatore del quiz
+      const { data: quizData, error: quizError } = await supabase
         .from('quiz_templates')
-        .update({ visibility: isPublic ? 'public' : 'private' })
-        .eq('id', quizId);
-        
-      if (updateError) throw updateError;
+        .select('created_by')
+        .eq('id', quizId)
+        .single();
       
+      if (quizError) {
+        console.error('Errore nel recupero delle informazioni sul quiz:', quizError);
+        setError('Errore nel recupero delle informazioni sul quiz');
+        return;
+      }
+      
+      const userEmail = localStorage.getItem('userEmail');
+      const userId = localStorage.getItem('userId');
+      
+      // Verifica se l'utente è autorizzato a modificare il quiz
+      const isAuthorized = 
+        isMaster || 
+        quizData.created_by === userEmail || 
+        (userId && quizData.created_by === userId);
+      
+      if (!isAuthorized) {
+        console.error('Utente non autorizzato a modificare la visibilità del quiz');
+        setError('Non sei autorizzato a modificare la visibilità di questo quiz');
+        return;
+      }
+      
+      // Determina la tabella corretta in base al tipo di quiz
+      const tableName = activeTab === 'interactive' ? 'interactive_quiz_templates' : 'quiz_templates';
+      
+      try {
+        const { error: updateError } = await supabase
+          .from(tableName)
+          .update({ visibility: isPublic ? 'public' : 'private' })
+          .eq('id', quizId);
+          
+        if (updateError) {
+          console.error(`Errore nell'aggiornamento della visibilità del quiz:`, updateError);
+          setError(`Errore nell'aggiornamento della visibilità: ${updateError.message}`);
+          return;
+        }
+      } catch (fetchError) {
+        console.error('Errore di connessione durante l\'aggiornamento della visibilità:', fetchError);
+        setError('Errore di connessione al server. Riprova più tardi.');
+        return;
+      }
+      
+      // Aggiorna la lista dei quiz solo se l'operazione è andata a buon fine
       await loadQuizzes();
     } catch (error) {
-      console.error('Error updating quiz visibility:', error);
-      setError('Errore durante l\'aggiornamento della visibilità');
+      console.error('Errore durante la modifica della visibilità:', error);
+      setError('Si è verificato un errore durante la modifica della visibilità del quiz');
     }
   };
 
@@ -292,10 +349,25 @@ export function QuizManager({ mode = 'manage' }: QuizManagerProps) {
     try {
       setError(null);
 
-      const { error: regenerateError } = await supabase
+      // Prima otteniamo il nuovo codice usando la funzione RPC
+      const { data: newCodeData, error: regenerateError } = await supabase
         .rpc('regenerate_quiz_code', { quiz_id: quizId });
 
       if (regenerateError) throw regenerateError;
+
+      // Se abbiamo ottenuto un nuovo codice, aggiungiamo il prefisso "QUIZ-"
+      if (newCodeData) {
+        // Il nuovo codice è ora disponibile in newCodeData
+        const formattedCode = `QUIZ-${newCodeData}`;
+        
+        // Aggiorniamo il quiz con il nuovo codice formattato
+        const { error: updateError } = await supabase
+          .from('quiz_templates')
+          .update({ quiz_code: formattedCode })
+          .eq('id', quizId);
+          
+        if (updateError) throw updateError;
+      }
 
       await loadQuizzes();
     } catch (error) {
@@ -380,7 +452,7 @@ export function QuizManager({ mode = 'manage' }: QuizManagerProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-2xl font-bold text-white">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
           {mode === 'all' 
             ? 'Tutti i Quiz Disponibili' 
             : (isMaster ? 'Gestione Quiz Globale' : 'Gestione Quiz')}

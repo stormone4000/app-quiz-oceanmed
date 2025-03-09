@@ -238,24 +238,24 @@ export function NotificationList({ studentEmail }: NotificationListProps) {
   const categories = Array.from(new Set(notifications.map(n => n.category)));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-4 sm:px-6 md:px-8 py-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-2xl font-bold text-white">Le tue Notifiche</h2>
+        <h2 className="text-3xl font-bold text-slate-800 dark:text-white">Le tue Notifiche</h2>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
-          <div className="relative flex-1 sm:flex-none dark:text-slate-100">
+          <div className="relative flex-1 sm:flex-none">
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Cerca notifiche..."
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
             />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
           </div>
           <select
             value={selectedCategory || ''}
             onChange={(e) => setSelectedCategory(e.target.value || null)}
-            className="w-full sm:w-auto px-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+            className="w-full sm:w-auto px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
           >
             <option value="">Tutte le categorie</option>
             {categories.map(category => (
@@ -268,14 +268,14 @@ export function NotificationList({ studentEmail }: NotificationListProps) {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 rounded-xl shadow-lg">
-        <div className="p-6 border-b border-gray-200 dark:border-slate-800">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg overflow-hidden">
+        <div className="p-6 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold dark:text-slate-100">Tutte le Notifiche</h3>
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Tutte le Notifiche</h3>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => handleSort('created_at')}
-                className="text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 flex items-center gap-1"
+                className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 flex items-center gap-1"
               >
                 <Calendar className="w-4 h-4" />
                 <ArrowUpDown className="w-4 h-4" />
@@ -284,72 +284,72 @@ export function NotificationList({ studentEmail }: NotificationListProps) {
           </div>
         </div>
 
-        <div className="divide-y divide-gray-200 dark:divide-grey-600">
+        <div className="divide-y divide-slate-200 dark:divide-slate-700">
           {loading ? (
-            <div className="p-8 text-center text-gray-500">
+            <div className="p-8 text-center text-slate-500 dark:text-slate-400">
               Caricamento notifiche...
             </div>
           ) : filteredNotifications.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
+            <div className="p-8 text-center text-slate-500 dark:text-slate-400">
               Nessuna notifica trovata
             </div>
           ) : (
             filteredNotifications.map(notification => (
               <motion.div
                 key={notification.id}
-                initial={!notification.read ? { backgroundColor: '#f0f9ff' } : {}}
-                animate={{ backgroundColor: '#ffffff' }}
+                initial={!notification.read ? { backgroundColor: 'rgba(59, 130, 246, 0.1)' } : {}}
+                animate={{ backgroundColor: notification.read ? 'transparent' : 'rgba(59, 130, 246, 0.1)' }}
                 transition={{ duration: 0.5 }}
-                className={`p-6 hover:bg-gray-50 dark:hover:bg-slate-800 ${
-                  !notification.read ? 'bg-blue-50' : ''
-                }`}
+                className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors`}
                 onClick={() => !notification.read && markAsRead(notification.id)}
               >
-                <div className="flex items-start flex-1 bg-slate-100/10 dark:bg-slate-950 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 rounded-xl shadow-lg p-6 min-w-0 gap-4">
-                  <div className={`p-3 rounded-full ${
-                    notification.is_important ? 'bg-red-100 dark:bg-red-900/30' : 'bg-blue-100 dark:bg-blue-900/30'
-                  }`}>
-                    <Bell className={`w-5 h-5 ${
-                      notification.is_important ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'
-                    }`} />
-                  </div>
-
-                  <div className="flex-1 bg-slate-100/10 dark:bg-slate-950 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 rounded-xl shadow-lg p-6 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-lg font-medium dark:text-slate-100">
-                        {notification.title}
-                        {!notification.read && (
-                          <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full">
-                            Nuovo
-                          </span>
-                        )}
-                      </h4>
-                      <span className="text-sm text-gray-500 dark:text-slate-400">
-                        {formatDate(notification.created_at)}
-                      </span>
+                <div className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-full ${
+                      notification.is_important 
+                        ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' 
+                        : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                    }`}>
+                      <Bell className="w-5 h-5" />
                     </div>
 
-                    <div className="mt-2 space-y-2">
-                      <p className="text-gray-600 dark:text-slate-400">{notification.content}</p>
-                      
-                      <div className="flex items-center gap-4">
-                        <span className={`px-2 py-0.5 text-xs rounded-full ${
-                          notification.category === 'announcement'
-                            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
-                            : notification.category === 'event'
-                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                            : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                        }`}>
-                          {notification.category === 'announcement' ? 'Annuncio' :
-                           notification.category === 'event' ? 'Evento' : 'Avviso'}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-lg font-medium text-slate-800 dark:text-white flex items-center">
+                          {notification.title}
+                          {!notification.read && (
+                            <span className="ml-2 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full">
+                              Nuovo
+                            </span>
+                          )}
+                        </h4>
+                        <span className="text-sm text-slate-500 dark:text-slate-400">
+                          {formatDate(notification.created_at)}
                         </span>
+                      </div>
 
-                        {notification.expires_at && (
-                          <span className="text-sm text-gray-500 dark:text-slate-400 flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
-                            Scade il {formatDate(notification.expires_at)}
+                      <div className="mt-2 space-y-2">
+                        <p className="text-slate-600 dark:text-slate-300">{notification.content}</p>
+                        
+                        <div className="flex items-center gap-4 flex-wrap">
+                          <span className={`px-2 py-0.5 text-xs rounded-full ${
+                            notification.category === 'announcement'
+                              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                              : notification.category === 'event'
+                              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                              : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                          }`}>
+                            {notification.category === 'announcement' ? 'Annuncio' :
+                             notification.category === 'event' ? 'Evento' : 'Avviso'}
                           </span>
-                        )}
+
+                          {notification.expires_at && (
+                            <span className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                              <Calendar className="w-4 h-4" />
+                              Scade il {formatDate(notification.expires_at)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

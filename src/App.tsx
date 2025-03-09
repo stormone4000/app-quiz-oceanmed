@@ -22,6 +22,7 @@ import { getQuizResults } from './services/api';
 import { useAppSelector, useAppDispatch } from './redux/hooks';
 import { selectAuth, logout, syncFromStorage, login } from './redux/slices/authSlice';
 import { purgeStore } from './redux/store';
+import { QuizLiveMain } from './components/interactive/QuizLiveMain';
 
 // Creazione componenti wrapper per InstructorProfile e StudentProfile
 function ProfileWrapper({component}: {component: React.ElementType}) {
@@ -212,10 +213,12 @@ function App() {
     try {
       // Se l'utente è uno studente, passa la sua email per filtrare i risultati
       const email = auth.isStudent ? auth.userEmail : undefined;
+      // @ts-ignore
       const results = await getQuizResults(email);
       setResults(results);
     } catch (error) {
       console.error('Error loading quiz results:', error);
+      setResults([]);
     }
   };
 
@@ -272,7 +275,7 @@ function App() {
               }
             />
             
-            {/* Quiz Live routes */}
+            {/* Quiz Live routes - Sistema esistente */}
             <Route path="/quiz-live" element={<QuizLiveLayout />}>
               <Route index element={
                 auth.isProfessor 
@@ -293,7 +296,7 @@ function App() {
               } />
               <Route path="leaderboard/:id" element={<QuizLeaderboard />} />
             </Route>
-
+            
             {/* Protected dashboard route */}
             <Route 
               path="/dashboard" 

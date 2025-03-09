@@ -260,40 +260,44 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
   return (
     <div className="max-w-4xl mx-auto p-6">
       {/* User Stats Card */}
-      <div className="bg-violet-800/10 dark:bg-violet-800/20 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 rounded-xl shadow-lg p-6 mb-8">
+      <div className="bg-blue-100 dark:bg-violet-800/20 backdrop-blur-lg border border-blue-200 dark:border-violet-100/30 rounded-xl p-6 mb-8 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
-              <Trophy className="w-6 h-6 text-yellow-500" />
-              <h3 className="text-lg font-semibold text-white dark:text-slate-100">Posizione</h3>
+              <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                <Trophy className="w-6 h-6 text-yellow-600 dark:text-yellow-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Posizione</h3>
             </div>
             <p className="text-3xl font-bold text-blue-600">
               {getOrdinalSuffix(userStats.rank)}
             </p>
-            <p className="text-sm text-gray-300 dark:text-slate-400">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
               su {userStats.totalParticipants} partecipanti
             </p>
           </div>
 
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
-              <Star className="w-6 h-6 text-yellow-500" />
-              <h3 className="text-lg font-semibold text-white dark:text-slate-100">Livello {userStats.level}</h3>
+              <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                <Star className="w-6 h-6 text-yellow-600 dark:text-yellow-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Livello {userStats.level}</h3>
             </div>
             <div className="relative pt-1">
               <div className="flex mb-2 items-center justify-between">
                 <div>
-                  <span className="text-xs font-semibold inline-block text-blue-400 dark:text-blue-300">
+                  <span className="text-xs font-semibold inline-block text-blue-600 dark:text-blue-300">
                     {userStats.xp} XP
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs font-semibold inline-block text-blue-400 dark:text-blue-300">
+                  <span className="text-xs font-semibold inline-block text-blue-600 dark:text-blue-300">
                     {userStats.xpToNextLevel} XP al prossimo livello
                   </span>
                 </div>
               </div>
-              <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-100/20 dark:bg-blue-900/20">
+              <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200 dark:bg-blue-900/20">
                 <div
                   style={{ width: `${(userStats.xp % 1000) / 10}%` }}
                   className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500 dark:bg-blue-400 transition-all duration-500"
@@ -304,22 +308,26 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
 
           <div className="text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
-              <Award className="w-6 h-6 text-yellow-500" />
-              <h3 className="text-lg font-semibold text-white dark:text-slate-100">Traguardi</h3>
+              <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                <Award className="w-6 h-6 text-yellow-600 dark:text-yellow-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Traguardi</h3>
             </div>
             <p className="text-3xl font-bold text-blue-600">
               {Math.floor(userStats.xp / 100)}
             </p>
-            <p className="text-sm text-gray-300 dark:text-slate-400">Traguardi sbloccati</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Traguardi sbloccati</p>
           </div>
         </div>
       </div>
 
       {/* Leaderboard */}
-      <div className="bg-violet-800/10 dark:bg-violet-800/20 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 rounded-xl shadow-lg p-6">
+      <div className="bg-blue-100 dark:bg-violet-800/20 backdrop-blur-lg border border-blue-200 dark:border-violet-100/30 rounded-xl p-6 shadow-sm">
         <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-          <Trophy className="w-6 h-6 text-yellow-500" />
-          <span className="text-white dark:text-slate-100">Top 10 Classifica</span>
+          <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+            <Trophy className="w-6 h-6 text-yellow-600 dark:text-yellow-500" />
+          </div>
+          <span className="text-slate-800 dark:text-slate-100">Top 10 Classifica</span>
         </h2>
 
         <div className="space-y-4">
@@ -328,28 +336,28 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
               key={entry.id}
               className={`flex items-center justify-between p-4 rounded-lg transition-colors border ${
                 entry.id === studentEmail
-                  ? 'bg-blue-100/20 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700'
-                  : 'hover:bg-white/5 dark:hover:bg-slate-700/30 border-transparent'
+                  ? 'bg-blue-200/50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700'
+                  : 'hover:bg-blue-50 dark:hover:bg-slate-700/30 border-blue-100 dark:border-transparent'
               }`}
             >
               <div className="flex items-center gap-4">
-                <span className="text-2xl font-bold text-gray-300 dark:text-slate-400 w-8">
+                <span className="text-2xl font-bold text-slate-600 dark:text-slate-400 w-8">
                   {index + 1}
                 </span>
                 <div>
-                  <p className="font-medium text-white dark:text-slate-100">
+                  <p className="font-medium text-slate-800 dark:text-slate-100">
                     {entry.id === studentEmail 
                       ? `${userStats.firstName} ${userStats.lastName}`
                       : entry.pseudonym}
                   </p>
-                  <p className="text-sm text-gray-300 dark:text-slate-400">Livello {entry.level}</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">Livello {entry.level}</p>
                 </div>
               </div>
 
               <div className="flex items-center gap-6">
                 <div className="text-right">
-                  <p className="font-medium text-white dark:text-slate-100">{entry.xp} XP</p>
-                  <div className="flex items-center justify-end gap-1 text-sm text-gray-300 dark:text-slate-400">
+                  <p className="font-medium text-slate-800 dark:text-slate-100">{entry.xp} XP</p>
+                  <div className="flex items-center justify-end gap-1 text-sm text-slate-600 dark:text-slate-400">
                     {getRankChangeIcon(entry.rank, entry.previousRank)}
                     <span>
                       {entry.rank === entry.previousRank
@@ -366,17 +374,17 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
         </div>
 
         {userStats.rank > 10 && (
-          <div className="mt-6 p-4 border-t border-gray-200">
-            <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
+          <div className="mt-6 p-4 border-t border-blue-200 dark:border-slate-700">
+            <div className="flex items-center justify-between bg-blue-50 dark:bg-slate-800/50 p-4 rounded-lg border border-blue-200 dark:border-slate-700">
               <div className="flex items-center gap-4">
-                <span className="text-2xl font-bold text-gray-500 w-8">
+                <span className="text-2xl font-bold text-slate-600 dark:text-slate-400 w-8">
                   {userStats.rank}
                 </span>
                 <div>
-                  <p className="font-medium">
+                  <p className="font-medium text-slate-800 dark:text-slate-100">
                     {userStats.firstName} {userStats.lastName}
                   </p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
                     Livello {userStats.level}
                   </p>
                 </div>
@@ -384,8 +392,8 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
 
               <div className="flex items-center gap-6">
                 <div className="text-right">
-                  <p className="font-medium">{userStats.xp} XP</p>
-                  <div className="flex items-center justify-end gap-1 text-sm text-gray-600">
+                  <p className="font-medium text-slate-800 dark:text-slate-100">{userStats.xp} XP</p>
+                  <div className="flex items-center justify-end gap-1 text-sm text-slate-600 dark:text-slate-400">
                     {getRankChangeIcon(userStats.rank, userStats.previousRank)}
                     <span>
                       {userStats.rank === userStats.previousRank

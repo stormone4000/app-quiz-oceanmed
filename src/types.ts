@@ -9,6 +9,7 @@ export interface UserRole {
   isMasterAdmin?: boolean;
   needsSubscription?: boolean;
   hasInstructorAccess?: boolean;
+  role?: 'student' | 'instructor' | 'admin';
 }
 
 export interface Question {
@@ -48,6 +49,7 @@ export interface QuizResult {
   quizId?: string;
   questions?: any[];
   quiz_type?: QuizType;
+  userAnswers?: (number | string)[];
 }
 
 export type QuizType = 'exam' | 'learning' | 'interactive';

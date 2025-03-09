@@ -43,7 +43,7 @@ export function DashboardStats() {
         .select('count')
         .eq('is_instructor', true)
         .gte('last_login', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
-      
+
       if (activeInstructorError) {
         console.error('Errore nel caricamento degli istruttori attivi:', activeInstructorError);
         throw activeInstructorError;
@@ -86,19 +86,19 @@ export function DashboardStats() {
 
       // Creiamo le statistiche
       const newStats: DashboardStat[] = [
-        {
-          tipo_utente: 'Istruttori Paganti',
+          {
+            tipo_utente: 'Istruttori Paganti',
           totale: instructorData?.[0]?.count || 0,
           attivi_ultimi_7_giorni: activeInstructorData?.[0]?.count || 0,
-          quiz_completati: 0
-        },
-        {
-          tipo_utente: 'Studenti Iscritti',
+            quiz_completati: 0
+          },
+          {
+            tipo_utente: 'Studenti Iscritti',
           totale: studentData?.[0]?.count || 0,
           attivi_ultimi_7_giorni: activeStudentData?.[0]?.count || 0,
           quiz_completati: quizData?.[0]?.count || 0
-        }
-      ];
+          }
+        ];
 
       console.log("Statistiche caricate con successo:", newStats);
       setStats(newStats);

@@ -215,7 +215,9 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
         category: quiz.category || quiz.quiz_type,
         firstName: '',
         lastName: '',
-        questions: quiz.questions
+        questions: quiz.questions,
+        userAnswers: answers,
+        quiz_type: quiz.quiz_type
       };
       console.log("Oggetto quizResult creato:", JSON.stringify(quizResult));
 

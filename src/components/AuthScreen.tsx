@@ -123,42 +123,74 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
         const passwordHash = await hashPassword(formData.password);
 
         // Get user details
-        const { data: users, error: userError } = await supabase
+        const { data: user, error: userError } = await supabase
           .from('auth_users')
           .select('*')
           .eq('email', formData.email.toLowerCase())
-          .eq('password_hash', passwordHash)
           .single();
 
-        if (userError || !users) {
+        if (userError || !user) {
           throw new Error('Email o password non validi');
         }
 
-        if (users.account_status === 'suspended') {
+        // Verifica la password
+        if (user.password_hash !== passwordHash) {
+          throw new Error('Email o password non validi');
+        }
+
+        if (user.account_status === 'suspended') {
           throw new Error('Account sospeso. Contatta il supporto.');
         }
+
+        // Gestisci coerenza ruolo/is_instructor
+        let effectiveRole = user.role;
+
+        // Se è segnato come istruttore ma il ruolo è studente, correggi il ruolo
+        if (user.is_instructor === true && (user.role === 'student' || user.role === null)) {
+          effectiveRole = 'instructor';
+          
+          // Correggi anche nel database
+          try {
+            await supabase
+              .from('auth_users')
+              .update({ role: 'instructor' })
+              .eq('id', user.id);
+            
+            console.log('Ruolo corretto da "student" a "instructor"');
+          } catch (updateError) {
+            console.error('Errore nell\'aggiornamento del ruolo:', updateError);
+          }
+        }
+
+        // Log per debug
+        console.log('Login successful:', {
+          id: user.id,
+          email: user.email,
+          role: effectiveRole,
+          is_instructor: user.is_instructor
+        });
 
         // Imposta flag autenticazione
         localStorage.setItem('isAuthenticated', 'true');
         
         // Caso speciale per marcosrenatobruno@gmail.com (ADMIN)
-        if (users.email === 'marcosrenatobruno@gmail.com') {
+        if (user.email === 'marcosrenatobruno@gmail.com') {
           console.log('Garantiamo accesso admin per marcosrenatobruno@gmail.com');
-          localStorage.setItem('userEmail', users.email);
+          localStorage.setItem('userEmail', user.email);
           localStorage.setItem('isProfessor', 'true');
           localStorage.setItem('hasActiveAccess', 'true');
           localStorage.setItem('hasInstructorAccess', 'true');
           localStorage.setItem('isMasterAdmin', 'true');
-          localStorage.setItem('firstName', users.first_name || '');
-          localStorage.setItem('lastName', users.last_name || '');
+          localStorage.setItem('firstName', user.first_name || '');
+          localStorage.setItem('lastName', user.last_name || '');
           localStorage.setItem('needsSubscription', 'false');
 
           const userRole: UserRole = {
             isStudent: false,
             isProfessor: true,
-            firstName: users.first_name,
-            lastName: users.last_name,
-            email: users.email,
+            firstName: user.first_name,
+            lastName: user.last_name,
+            email: user.email,
             hasActiveAccess: true,
             hasInstructorAccess: true,
             isMasterAdmin: true,
@@ -183,21 +215,21 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
         }
         
         // Check if master admin
-        if (users.is_master) {
-          localStorage.setItem('userEmail', users.email);
+        if (user.is_master) {
+          localStorage.setItem('userEmail', user.email);
           localStorage.setItem('isProfessor', 'true');
           localStorage.setItem('hasActiveAccess', 'true');
           localStorage.setItem('hasInstructorAccess', 'true');
           localStorage.setItem('isMasterAdmin', 'true');
-          localStorage.setItem('firstName', users.first_name || '');
-          localStorage.setItem('lastName', users.last_name || '');
+          localStorage.setItem('firstName', user.first_name || '');
+          localStorage.setItem('lastName', user.last_name || '');
 
           const userRole: UserRole = {
             isStudent: false,
             isProfessor: true,
-            firstName: users.first_name,
-            lastName: users.last_name,
-            email: users.email,
+            firstName: user.first_name,
+            lastName: user.last_name,
+            email: user.email,
             hasActiveAccess: true,
             hasInstructorAccess: true,
             isMasterAdmin: true
@@ -221,7 +253,7 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
         }
 
         // Check instructor status
-        if (!users.is_instructor) {
+        if (!user.is_instructor && effectiveRole !== 'instructor') {
           throw new Error('Account non autorizzato come istruttore');
         }
 
@@ -236,29 +268,30 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
           const { data: profile } = await supabase
             .from('instructor_profiles')
             .select('subscription_status')
-            .eq('email', users.email)
+            .eq('email', user.email)
             .single();
 
           hasAccess = profile?.subscription_status === 'active';
         }
 
         // Store instructor data
-        localStorage.setItem('userEmail', users.email);
+        localStorage.setItem('userEmail', user.email);
         localStorage.setItem('isProfessor', 'true');
         localStorage.setItem('hasActiveAccess', hasAccess ? 'true' : 'false');
         localStorage.setItem('hasInstructorAccess', hasAccess ? 'true' : 'false');
-        localStorage.setItem('firstName', users.first_name || '');
-        localStorage.setItem('lastName', users.last_name || '');
+        localStorage.setItem('firstName', user.first_name || '');
+        localStorage.setItem('lastName', user.last_name || '');
 
         const userRole: UserRole = {
           isStudent: false,
           isProfessor: true,
-          firstName: users.first_name,
-          lastName: users.last_name,
-          email: users.email,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          email: user.email,
           hasActiveAccess: hasAccess,
           hasInstructorAccess: hasAccess,
-          needsSubscription: !hasAccess
+          needsSubscription: !hasAccess,
+          role: effectiveRole // Usa il ruolo effettivo
         };
 
         // Dispatch dell'azione login con Redux
@@ -290,34 +323,65 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
       const passwordHash = await hashPassword(formData.password);
       
       // Get user details and check credentials
-      const { data: users, error: userError } = await supabase
+      const { data: user, error: userError } = await supabase
         .from('auth_users')
         .select('*')
         .eq('email', formData.email.toLowerCase())
-        .eq('password_hash', passwordHash);
+        .single();
 
-      if (userError) throw userError;
-      
-      if (!users || users.length === 0) {
+      if (userError || !user) {
         throw new Error('Email o password non validi');
       }
 
-      const user = users[0];
+      // Verifica la password
+      if (user.password_hash !== passwordHash) {
+        throw new Error('Email o password non validi');
+      }
+
+      // Gestisci coerenza ruolo/is_instructor
+      let effectiveRole = user.role || 'student';
+
+      // Se è segnato come istruttore ma il ruolo è studente, correggi il ruolo
+      if (user.is_instructor === true && effectiveRole === 'student') {
+        effectiveRole = 'instructor';
+        
+        // Correggi anche nel database
+        try {
+          await supabase
+            .from('auth_users')
+            .update({ role: 'instructor' })
+            .eq('id', user.id);
+          
+          console.log('Ruolo corretto da "student" a "instructor"');
+        } catch (updateError) {
+          console.error('Errore nell\'aggiornamento del ruolo:', updateError);
+        }
+      }
+
+      // Log per debug
+      console.log('Login successful:', {
+        id: user.id,
+        email: user.email,
+        role: effectiveRole,
+        is_instructor: user.is_instructor
+      });
 
       // Store user email in localStorage
       localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('userEmail', user.email.toLowerCase());
-      localStorage.removeItem('isProfessor');
+      localStorage.setItem('userId', user.id);
+      localStorage.setItem('isProfessor', user.is_instructor ? 'true' : 'false');
       localStorage.setItem('firstName', user.first_name || '');
       localStorage.setItem('lastName', user.last_name || '');
       localStorage.removeItem('accessCode');
 
       const userRole: UserRole = {
-        isStudent: true,
-        isProfessor: false,
+        isStudent: !user.is_instructor,
+        isProfessor: user.is_instructor,
         firstName: user.first_name || '',
         lastName: user.last_name || '',
-        email: user.email
+        email: user.email,
+        role: effectiveRole // Usa il ruolo effettivo
       };
 
       // Dispatch dell'azione login con Redux
@@ -331,8 +395,12 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
       // Triggera un evento storage per forzare la sincronizzazione dei dati
       window.dispatchEvent(new Event('storage'));
 
-      // Navigate to dashboard
-      navigate('/dashboard');
+      // Reindirizza in base al ruolo effettivo
+      if (effectiveRole === 'instructor' || user.is_instructor) {
+        navigate('/instructor/dashboard');
+      } else {
+        navigate('/student/dashboard');
+      }
 
     } catch (error) {
       console.error('Login error:', error);

@@ -29,6 +29,7 @@ DECLARE
   result text := '';
   i integer := 0;
   code_exists boolean;
+  formatted_code text;
 BEGIN
   LOOP
     result := '';
@@ -38,15 +39,18 @@ BEGIN
       i := i + 1;
     END LOOP;
     
+    -- Add the QUIZ- prefix to the code
+    formatted_code := 'QUIZ-' || result;
+    
     -- Check if code exists
     SELECT EXISTS (
-      SELECT 1 FROM quiz_templates WHERE quiz_code = result
+      SELECT 1 FROM quiz_templates WHERE quiz_code = formatted_code
     ) INTO code_exists;
     
     EXIT WHEN NOT code_exists;
   END LOOP;
   
-  RETURN result;
+  RETURN formatted_code;
 END;
 $$ LANGUAGE plpgsql;
 

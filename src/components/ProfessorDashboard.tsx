@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from './layout/DashboardLayout';
 import { QuizManager } from './instructor/QuizManager';
 import { AccessCodeManager } from './instructor/AccessCodeManager';
+import { AdminInstructorCodesManager } from './admin/AdminInstructorCodesManager';
 import { VideoManager } from './instructor/VideoManager';
 import { UserManagement } from './instructor/UserManagement';
 import { UserProfile } from './profile/UserProfile';
@@ -13,6 +14,7 @@ import { SubscriptionManager } from './instructor/SubscriptionManager';
 import { StudentManagement } from './instructor/StudentManagement';
 import { NotificationManager } from './notifications/NotificationManager';
 import { DashboardStats } from './admin/DashboardStats';
+import { QuizLiveMain } from './interactive/QuizLiveMain';
 import type { QuizResult } from '../types';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
@@ -28,6 +30,9 @@ import {
   updateInstructorAccess
 } from '../redux/slices/authSlice';
 import { supabase } from '../services/supabase';
+import { DashboardTab } from '../types-dashboard';
+
+// Importiamo il tipo DashboardTab dal file DashboardLayout
 
 ChartJS.register(
   ArcElement,
@@ -62,7 +67,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
    * - Per needsSubscription utilizziamo il prop propNeedsSubscription se disponibile
    * - Sincronizziamo hasInstructorAccess con hasActiveAccess tramite Redux quando necessario
    */
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live' | 'gestione-quiz' | 'gestione-alunni' | 'quiz-history'>('dashboard');
+  const [activeTab, setActiveTab] = useState<DashboardTab>('dashboard');
   const [quizType, setQuizType] = useState<QuizType | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isCodeDeactivated, setIsCodeDeactivated] = useState(false);
@@ -231,8 +236,9 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
   };
   
   const renderContent = () => {
-    // Se l'utente non ha accesso, mostriamo solo la tab del profilo
-    if (!hasActiveAccess && activeTab !== 'profile') {
+    // Se l'utente è un istruttore e non ha accesso attivo, mostriamo solo la tab del profilo
+    // Questo controllo è ora allineato con la logica della Sidebar
+    if (isProfessor && !hasActiveAccess && activeTab !== 'profile' && !isMaster) {
       return (
         <div className="flex flex-col items-center justify-center p-8">
           <h2 className="text-2xl font-bold mb-4">Accesso non autorizzato</h2>
@@ -251,35 +257,59 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
 
     switch (activeTab) {
       case 'students':
-        return <StudentLeaderboard />;
+        return <UserManagement />;
       case 'notifications':
         return <NotificationManager />;
+      case 'quiz-live':
+        return <QuizLiveMain 
+          userEmail={userEmail} 
+          userRole={isProfessor ? 'instructor' : 'student'} 
+        />;
+      case 'pro-codes':
+        // Solo gli admin possono accedere a questa tab
+        if (!isMaster) {
+          return (
+            <div className="flex flex-col items-center justify-center p-8">
+              <h2 className="text-2xl font-bold mb-4">Accesso non autorizzato</h2>
+              <p className="text-gray-600 mb-4">
+                Solo gli amministratori possono gestire i codici PRO per gli istruttori.
+              </p>
+            </div>
+          );
+        }
+        return <AdminInstructorCodesManager />;
       case 'quizzes':
         return (
           <div className="p-4">
-            <div className="mb-4">
-              <h3 className="text-xl font-bold mb-2">Seleziona Quiz</h3>
-              <div className="flex space-x-4">
+            <div className="mb-6">
+              <h3 className="text-2xl font-bold mb-4 text-slate-900 dark:text-white">Seleziona Quiz</h3>
+              <div className="flex flex-wrap gap-3">
                 <button
                   onClick={() => setQuizType('exam')}
-                  className={`px-4 py-2 rounded ${
-                    quizType === 'exam' ? 'bg-blue-500 text-white' : 'bg-gray-200'
+                  className={`px-5 py-2.5 rounded-lg font-medium transition-colors ${
+                    quizType === 'exam' 
+                      ? 'bg-indigo-600 text-white shadow-md' 
+                      : 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600'
                   }`}
                 >
                   Quiz Esame
                 </button>
                 <button
                   onClick={() => setQuizType('learning')}
-                  className={`px-4 py-2 rounded ${
-                    quizType === 'learning' ? 'bg-blue-500 text-white' : 'bg-gray-200'
+                  className={`px-5 py-2.5 rounded-lg font-medium transition-colors ${
+                    quizType === 'learning' 
+                      ? 'bg-blue-600 text-white shadow-md' 
+                      : 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600'
                   }`}
                 >
                   Quiz Apprendimento
                 </button>
                 <button
                   onClick={() => setQuizType('interactive')}
-                  className={`px-4 py-2 rounded ${
-                    quizType === 'interactive' ? 'bg-blue-500 text-white' : 'bg-gray-200'
+                  className={`px-5 py-2.5 rounded-lg font-medium transition-colors ${
+                    quizType === 'interactive' 
+                      ? 'bg-purple-600 text-white shadow-md' 
+                      : 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600'
                   }`}
                 >
                   Quiz Interattivo
@@ -288,12 +318,12 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
             </div>
             
             {quizType && (
-              <div className="mb-4">
-                <h3 className="text-xl font-bold mb-2">Seleziona Categoria</h3>
+              <div className="mb-6">
+                <h3 className="text-2xl font-bold mb-4 text-slate-900 dark:text-white">Seleziona Categoria</h3>
                 <select
                   value={selectedCategory || ''}
                   onChange={(e) => setSelectedCategory(e.target.value || null)}
-                  className="w-full p-2 border rounded"
+                  className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-30 outline-none"
                 >
                   <option value="">Tutte le categorie</option>
                   <option value="base">Base</option>
@@ -331,6 +361,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
       case 'gestione-quiz':
         return <QuizManager mode="manage" />;
       case 'access-codes':
+      case 'instructor-access-codes':
         return <AccessCodeManager />;
       case 'quiz-studenti':
         if (quizType) {
@@ -353,8 +384,10 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
         }
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-white mb-6">Quiz Studenti</h2>
-            <StudentLeaderboard />
+            <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-6 px-4 sm:px-6 md:px-8">Quiz Studenti</h2>
+            <div className="px-4 sm:px-6 md:px-8 py-6 max-w-7xl mx-auto">
+              <StudentLeaderboard />
+            </div>
             <div className="mt-8">
               <QuizSelection
                 onSelectQuizType={(type) => setQuizType(type)}
@@ -439,8 +472,8 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
     };
 
     return (
-      <div className="space-y-8">
-        <h2 className="text-2xl font-bold text-white">
+      <div className="space-y-8 px-4 sm:px-6 md:px-8 py-6 max-w-7xl mx-auto">
+        <h2 className="text-3xl font-bold text-slate-800 dark:text-white">
           {isMaster ? 'Dashboard Admin Master' : 'Dashboard Istruttore'}
         </h2>
 
@@ -450,72 +483,72 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="group relative rounded-xl border bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border-white/30 dark:border-slate-700/30 p-6 hover:scale-[1.02] transition-all">
+          <div className="group relative rounded-xl bg-gradient-to-br from-white to-slate-100 dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700 p-6 hover:scale-[1.02] transition-all">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg shadow-inner dark:shadow-none">
+              <div className="p-3 bg-blue-100 dark:bg-blue-900/40 rounded-xl">
                 <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
-              <h3 className="text-lg font-semibold text-white">Studenti Totali</h3>
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Studenti Totali</h3>
             </div>
-            <p className="text-3xl font-bold text-white">{totalStudents}</p>
+            <p className="text-3xl font-bold text-slate-800 dark:text-white">{totalStudents}</p>
           </div>
 
           {isMaster && (
-            <div className="group relative rounded-xl border bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border-white/30 dark:border-slate-700/30 p-6 hover:scale-[1.02] transition-all">
+            <div className="group relative rounded-xl bg-gradient-to-br from-white to-slate-100 dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700 p-6 hover:scale-[1.02] transition-all">
               <div className="flex items-center gap-3 mb-2">
-                <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg shadow-inner dark:shadow-none">
+                <div className="p-3 bg-purple-100 dark:bg-purple-900/40 rounded-xl">
                   <Users className="w-6 h-6 text-purple-600 dark:text-purple-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-white">Istruttori Totali</h3>
+                <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Istruttori Totali</h3>
               </div>
-              <p className="text-3xl font-bold text-white">{totalInstructors}</p>
+              <p className="text-3xl font-bold text-slate-800 dark:text-white">{totalInstructors}</p>
             </div>
           )}
 
-          <div className="group relative rounded-xl border bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border-white/30 dark:border-slate-700/30 p-6 hover:scale-[1.02] transition-all">
+          <div className="group relative rounded-xl bg-gradient-to-br from-white to-slate-100 dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700 p-6 hover:scale-[1.02] transition-all">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg shadow-inner dark:shadow-none">
+              <div className="p-3 bg-green-100 dark:bg-green-900/40 rounded-xl">
                 <Target className="w-6 h-6 text-green-600 dark:text-green-400" />
               </div>
-              <h3 className="text-lg font-semibold text-white">Tentativi Totali</h3>
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Tentativi Totali</h3>
             </div>
-            <p className="text-3xl font-bold text-white">{totalAttempts}</p>
+            <p className="text-3xl font-bold text-slate-800 dark:text-white">{totalAttempts}</p>
           </div>
 
-          <div className="group relative rounded-xl border bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border-white/30 dark:border-slate-700/30 p-6 hover:scale-[1.02] transition-all">
+          <div className="group relative rounded-xl bg-gradient-to-br from-white to-slate-100 dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700 p-6 hover:scale-[1.02] transition-all">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-lg shadow-inner dark:shadow-none">
+              <div className="p-3 bg-purple-100 dark:bg-purple-900/40 rounded-xl">
                 <CheckCircle2 className="w-6 h-6 text-purple-600 dark:text-purple-400" />
               </div>
-              <h3 className="text-lg font-semibold text-white">Media Punteggi</h3>
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Media Punteggi</h3>
             </div>
-            <p className="text-3xl font-bold text-white">
+            <p className="text-3xl font-bold text-slate-800 dark:text-white">
               {(averageScore * 100).toFixed(1)}%
             </p>
           </div>
 
-          <div className="group relative rounded-xl border bg-white/20 dark:bg-slate-800/20 backdrop-blur-lg border-white/30 dark:border-slate-700/30 p-6 hover:scale-[1.02] transition-all">
+          <div className="group relative rounded-xl bg-gradient-to-br from-white to-slate-100 dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700 p-6 hover:scale-[1.02] transition-all">
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg shadow-inner dark:shadow-none">
+              <div className="p-3 bg-yellow-100 dark:bg-yellow-900/40 rounded-xl">
                 <Target className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
               </div>
-              <h3 className="text-lg font-semibold text-white">Tasso di Successo</h3>
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Tasso di Successo</h3>
             </div>
-            <p className="text-3xl font-bold text-white">
+            <p className="text-3xl font-bold text-slate-800 dark:text-white">
               {((passedAttempts / totalAttempts) * 100).toFixed(1)}%
             </p>
           </div>
         </div>
 
         {/* Top 5 Students */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <Trophy className="w-6 h-6 text-yellow-500" />
-              <h3 className="text-lg font-semibold dark:text-slate-100">Top 5 Studenti</h3>
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Top 5 Studenti</h3>
             </div>
             <button
-              onClick={() => setActiveTab('students')}
+              onClick={() => setActiveTab('gestione-alunni')}
               className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-2"
             >
               Vedi Tutti
@@ -538,16 +571,16 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
                     {index + 1}
                   </span>
                   <div>
-                    <p className="font-medium dark:text-slate-100">{student.name}</p>
-                    <p className="text-sm text-gray-600 dark:text-slate-400">{student.email}</p>
+                    <p className="font-medium text-slate-800 dark:text-white">{student.name}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{student.email}</p>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <p className="font-bold text-blue-600">
+                  <p className="font-bold text-blue-600 dark:text-blue-400">
                     {(student.averageScore * 100).toFixed(1)}%
                   </p>
-                  <p className="text-sm text-gray-600 dark:text-slate-400">Media</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Media</p>
                 </div>
               </div>
             ))}
@@ -555,15 +588,15 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6">
-            <h3 className="text-lg font-semibold mb-4 dark:text-slate-100">Distribuzione Risultati</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-xl overflow-hidden p-6">
+            <h3 className="text-lg font-semibold mb-6 text-slate-800 dark:text-white">Distribuzione Risultati</h3>
             <div className="w-full max-w-xs mx-auto">
               <Pie data={pieData} options={{ responsive: true }} />
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6">
-            <h3 className="text-lg font-semibold mb-4 dark:text-slate-100">Performance per Categoria</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-xl overflow-hidden p-6">
+            <h3 className="text-lg font-semibold mb-6 text-slate-800 dark:text-white">Performance per Categoria</h3>
             <Bar
               data={barData}
               options={{
@@ -589,7 +622,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
         </div>
 
         {/* Recent Quiz Results */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-xl overflow-hidden">
           <div className="p-6 border-b border-gray-200 dark:border-slate-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">

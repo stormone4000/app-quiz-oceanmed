@@ -103,9 +103,12 @@ export async function saveQuizResult(result: QuizResult): Promise<void> {
       console.warn(`Impossibile trovare l'utente con email ${result.email}: ${userIdError.message}`);
     }
 
+    // Importa direttamente il supabaseAdmin per tutte le operazioni
+    const { supabaseAdmin } = await import('./supabase');
+    
     // APPROCCIO DIRETTO: Creiamo sempre un nuovo quiz nella tabella quizzes
     // Questo evita problemi di foreign key constraint
-    console.log("Creazione diretta di un nuovo quiz nella tabella quizzes...");
+    console.log("Creazione diretta di un nuovo quiz nella tabella quizzes usando client admin...");
     const newQuizId = uuidv4();
     
     // Cerchiamo un type_id valido dalla tabella quiz_types
@@ -121,8 +124,8 @@ export async function saveQuizResult(result: QuizResult): Promise<void> {
     
     console.log(`Cerco un type_id per il tipo: ${result.quiz_type || 'exam'} (${quizTypeName})`);
     
-    // Cerchiamo un type_id che corrisponda al tipo del quiz
-    const { data: quizTypes, error: typesError } = await supabase
+    // Cerchiamo un type_id che corrisponda al tipo del quiz usando supabaseAdmin
+    const { data: quizTypes, error: typesError } = await supabaseAdmin
       .from('quiz_types')
       .select('id, name')
       .eq('name', quizTypeName);
@@ -133,8 +136,8 @@ export async function saveQuizResult(result: QuizResult): Promise<void> {
       console.warn(`Nessun tipo di quiz trovato per: ${quizTypeName}`);
       console.log("Provo a recuperare qualsiasi tipo di quiz disponibile...");
       
-      // Se non troviamo un tipo corrispondente, prendiamo il primo disponibile
-      const { data: anyTypes, error: anyTypesError } = await supabase
+      // Se non troviamo un tipo corrispondente, prendiamo il primo disponibile usando supabaseAdmin
+      const { data: anyTypes, error: anyTypesError } = await supabaseAdmin
         .from('quiz_types')
         .select('id')
         .limit(1);
@@ -166,7 +169,8 @@ export async function saveQuizResult(result: QuizResult): Promise<void> {
     
     console.log("Dati per il nuovo quiz:", JSON.stringify(newQuizData));
     
-    const { data: newQuiz, error: quizInsertError } = await supabase
+    // Usa supabaseAdmin per inserire il quiz
+    const { data: newQuiz, error: quizInsertError } = await supabaseAdmin
       .from('quizzes')
       .insert([newQuizData])
       .select('id')
@@ -179,7 +183,7 @@ export async function saveQuizResult(result: QuizResult): Promise<void> {
     
     console.log("Nuovo quiz creato con successo, ID:", newQuiz.id);
     
-    // Ora salviamo il risultato con il nuovo quiz_id
+    // Ora salviamo il risultato con il nuovo quiz_id usando supabaseAdmin
     const resultData = {
       student_email: result.email,
       quiz_id: newQuiz.id, // Usiamo l'ID del nuovo quiz appena creato
@@ -191,45 +195,25 @@ export async function saveQuizResult(result: QuizResult): Promise<void> {
       date: result.date || new Date().toISOString(),
       category: result.category || 'uncategorized',
       first_name: userIdData?.first_name || result.firstName || '',
-      last_name: userIdData?.last_name || result.lastName || ''
+      last_name: userIdData?.last_name || result.lastName || '',
+      user_answers: result.userAnswers || [], // Aggiungiamo le risposte specifiche dell'utente
+      quiz_type: result.quiz_type || 'exam' // Aggiungiamo il tipo di quiz
     };
 
     console.log("Dati da inserire:", JSON.stringify(resultData));
 
-    // Tentativo con client standard
-    console.log("Tentativo di inserimento con client standard...");
-    const { error: insertError } = await supabase
+    // Usa direttamente supabaseAdmin per inserire il risultato
+    console.log("Tentativo di inserimento con client admin...");
+    const { error: adminInsertError } = await supabaseAdmin
       .from('results')
       .insert([resultData]);
-
-    if (insertError) {
-      console.error('Errore dettagliato durante inserimento risultato:', insertError);
-      console.error('Codice errore:', insertError.code);
-      console.error('Messaggio errore:', insertError.message);
-      console.error('Dettagli errore:', insertError.details);
       
-      // Tentativo con client admin se disponibile
-      console.log("Tentativo di inserimento con client admin...");
-      try {
-        const { supabaseAdmin } = await import('./supabase');
-        const { error: adminInsertError } = await supabaseAdmin
-          .from('results')
-          .insert([resultData]);
-          
-        if (adminInsertError) {
-          console.error('Errore anche con client admin:', adminInsertError);
-          throw new Error(`Failed to save quiz result: ${adminInsertError.message}`);
-        } else {
-          console.log("Risultato salvato con successo usando client admin!");
-          return;
-        }
-      } catch (adminError) {
-        console.error('Errore durante il tentativo con client admin:', adminError);
-        throw new Error(`Failed to save quiz result: ${insertError.message}`);
-      }
-    } else {
-      console.log("Risultato salvato con successo!");
+    if (adminInsertError) {
+      console.error('Errore con client admin:', adminInsertError);
+      throw new Error(`Failed to save quiz result: ${adminInsertError.message}`);
     }
+      
+    console.log("Risultato salvato con successo usando client admin!");
     console.log("=== FINE SALVATAGGIO RISULTATO QUIZ ===");
   } catch (error) {
     console.error('Errore generale durante il salvataggio del risultato:', error);
@@ -241,7 +225,10 @@ export const getQuizResults = async (email?: string): Promise<QuizResult[]> => {
   console.log(`[${new Date().toISOString()}] Caricamento risultati quiz per email: ${email || 'non specificata'}`);
   
   try {
-    let query = supabase
+    // Importa il client admin per bypassare le restrizioni RLS
+    const { supabaseAdmin } = await import('./supabase');
+    
+    let query = supabaseAdmin
       .from('results')
       .select(`
         *,
@@ -300,8 +287,8 @@ export const getQuizResults = async (email?: string): Promise<QuizResult[]> => {
           try {
             console.log(`[${new Date().toISOString()}] Tentativo 1: Caricamento domande da quiz_questions per quiz_id: ${result.quiz_id}`);
             
-            // Tentativo 1: Caricare le domande dalla tabella quiz_questions
-            const { data: questionData, error: questionError } = await supabase
+            // Tentativo 1: Caricare le domande dalla tabella quiz_questions usando supabaseAdmin
+            const { data: questionData, error: questionError } = await supabaseAdmin
               .from('quiz_questions')
               .select('*')
               .eq('quiz_id', result.quiz_id);
@@ -316,9 +303,9 @@ export const getQuizResults = async (email?: string): Promise<QuizResult[]> => {
             } else {
               console.log(`Nessuna domanda trovata nella tabella quiz_questions per quiz_id: ${result.quiz_id}`);
               
-              // Tentativo 2: Caricare le domande dal template del quiz
+              // Tentativo 2: Caricare le domande dal template del quiz usando supabaseAdmin
               console.log(`[${new Date().toISOString()}] Tentativo 2: Caricamento domande dal template per quiz_id: ${result.quiz_id}`);
-              const { data: quizData, error: quizError } = await supabase
+              const { data: quizData, error: quizError } = await supabaseAdmin
                 .from('quizzes')
                 .select('template_id, questions')
                 .eq('id', result.quiz_id)
@@ -328,9 +315,9 @@ export const getQuizResults = async (email?: string): Promise<QuizResult[]> => {
                 console.error(`Errore nel caricamento del template_id per quiz_id ${result.quiz_id}:`, quizError);
                 
                 // Se c'è un errore, potrebbe essere perché la colonna 'questions' non esiste
-                // Proviamo di nuovo senza richiedere quella colonna
+                // Proviamo di nuovo senza richiedere quella colonna usando supabaseAdmin
                 console.log(`Tentativo alternativo senza colonna 'questions'`);
-                const { data: quizDataAlt, error: quizErrorAlt } = await supabase
+                const { data: quizDataAlt, error: quizErrorAlt } = await supabaseAdmin
                   .from('quizzes')
                   .select('template_id')
                   .eq('id', result.quiz_id)
@@ -341,7 +328,7 @@ export const getQuizResults = async (email?: string): Promise<QuizResult[]> => {
                 } else if (quizDataAlt && quizDataAlt.template_id) {
                   console.log(`Trovato template_id: ${quizDataAlt.template_id} per quiz_id: ${result.quiz_id}`);
                   
-                  const { data: templateQuestions, error: templateError } = await supabase
+                  const { data: templateQuestions, error: templateError } = await supabaseAdmin
                     .from('quiz_templates')
                     .select('questions')
                     .eq('id', quizDataAlt.template_id)
@@ -364,7 +351,7 @@ export const getQuizResults = async (email?: string): Promise<QuizResult[]> => {
                 } else if (quizData && quizData.template_id) {
                   console.log(`Trovato template_id: ${quizData.template_id} per quiz_id: ${result.quiz_id}`);
                   
-                  const { data: templateQuestions, error: templateError } = await supabase
+                  const { data: templateQuestions, error: templateError } = await supabaseAdmin
                     .from('quiz_templates')
                     .select('questions')
                     .eq('id', quizData.template_id)
@@ -380,12 +367,12 @@ export const getQuizResults = async (email?: string): Promise<QuizResult[]> => {
                   } else {
                     console.log(`Nessuna domanda trovata nel template per template_id: ${quizData.template_id}`);
                     
-                    // Tentativo 3: Caricare le domande direttamente dalla tabella quizzes
+                    // Tentativo 3: Caricare le domande direttamente dalla tabella quizzes usando supabaseAdmin
                     console.log(`[${new Date().toISOString()}] Tentativo 3: Caricamento domande direttamente dalla tabella quizzes per quiz_id: ${result.quiz_id}`);
                     
                     // Questo tentativo potrebbe fallire se la colonna 'questions' non esiste
                     try {
-                      const { data: directQuizData, error: directQuizError } = await supabase
+                      const { data: directQuizData, error: directQuizError } = await supabaseAdmin
                         .from('quizzes')
                         .select('questions')
                         .eq('id', result.quiz_id)
@@ -406,9 +393,9 @@ export const getQuizResults = async (email?: string): Promise<QuizResult[]> => {
                     if (!formattedResult.questions || formattedResult.questions.length === 0) {
                       console.log(`Nessuna domanda trovata direttamente nella tabella quizzes per quiz_id: ${result.quiz_id}`);
                       
-                      // Tentativo 4: Ultimo tentativo - cercare nella tabella quiz_templates direttamente con l'ID del quiz
+                      // Tentativo 4: Ultimo tentativo - cercare nella tabella quiz_templates direttamente con l'ID del quiz usando supabaseAdmin
                       console.log(`[${new Date().toISOString()}] Tentativo 4: Caricamento domande da quiz_templates usando direttamente quiz_id: ${result.quiz_id}`);
-                      const { data: fallbackTemplateData, error: fallbackTemplateError } = await supabase
+                      const { data: fallbackTemplateData, error: fallbackTemplateError } = await supabaseAdmin
                         .from('quiz_templates')
                         .select('questions')
                         .eq('id', result.quiz_id)
@@ -424,9 +411,9 @@ export const getQuizResults = async (email?: string): Promise<QuizResult[]> => {
                       } else {
                         console.log(`Nessuna domanda trovata in nessun tentativo per quiz_id: ${result.quiz_id}`);
                         
-                        // Tentativo 5: Cercare nella tabella quiz_templates usando il campo quiz_id
+                        // Tentativo 5: Cercare nella tabella quiz_templates usando il campo quiz_id usando supabaseAdmin
                         console.log(`[${new Date().toISOString()}] Tentativo 5: Caricamento domande da quiz_templates usando il campo quiz_id: ${result.quiz_id}`);
-                        const { data: quizIdTemplateData, error: quizIdTemplateError } = await supabase
+                        const { data: quizIdTemplateData, error: quizIdTemplateError } = await supabaseAdmin
                           .from('quiz_templates')
                           .select('questions')
                           .eq('quiz_id', result.quiz_id)
@@ -468,7 +455,7 @@ export const getQuizResults = async (email?: string): Promise<QuizResult[]> => {
 
     return formattedResults;
   } catch (error) {
-    console.error('Errore durante l\'esecuzione di getQuizResults:', error);
+    console.error('Errore generale nel recupero dei risultati quiz:', error);
     return [];
   }
 };

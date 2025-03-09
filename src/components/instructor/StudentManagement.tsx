@@ -20,7 +20,7 @@ interface Student {
 // Interfaccia per i dati restituiti dalla query student_instructor
 interface StudentInstructorRow {
   student_email: string;
-  student: {
+  auth_users?: {
     id: string;
     email: string;
     first_name: string | null;
@@ -31,7 +31,7 @@ interface StudentInstructorRow {
       status: string;
     }[];
     account_status: string;
-  } | null;
+  };
 }
 
 export function StudentManagement() {
@@ -64,104 +64,327 @@ export function StudentManagement() {
       
       console.log('Caricamento studenti per l\'istruttore:', instructorEmail);
       
-      // Primo metodo: carica gli studenti dalla tabella student_instructor
-      const { data: studentData, error: studentError } = await supabase
+      // APPROCCIO SEMPLIFICATO: Raccogliamo prima tutte le email degli studenti associati all'istruttore
+      let studentEmails: string[] = [];
+      
+      // 1. Recuperiamo le email dalla tabella student_instructor
+      console.log('Recupero email dalla tabella student_instructor...');
+      const { data: relationData, error: relationError } = await supabase
         .from('student_instructor')
-        .select(`
-          student_email,
-          student:student_email (
-            id,
-            email,
-            first_name,
-            last_name,
-            last_login,
-            subscriptions (
-              plan_id,
-              status
-            ),
-            account_status
-          )
-        `)
+        .select('student_email')
         .eq('instructor_email', instructorEmail);
-        
-      if (studentError) {
-        console.error('Errore nel caricamento degli studenti dalla tabella student_instructor:', studentError);
-        throw studentError;
+      
+      if (relationError) {
+        console.error('Errore nel recupero da student_instructor:', relationError);
+      } else if (relationData && relationData.length > 0) {
+        console.log('Email trovate in student_instructor:', relationData.length);
+        studentEmails = [...studentEmails, ...relationData.map(r => r.student_email)];
       }
       
-      if (studentData && studentData.length > 0) {
-        console.log('Studenti trovati nella tabella student_instructor:', studentData.length);
-        
-        const formattedStudents = (studentData as unknown as StudentInstructorRow[]).map(item => ({
-          id: item.student?.id || '',
-          email: item.student_email,
-          first_name: item.student?.first_name || '',
-          last_name: item.student?.last_name || '',
-          last_login: item.student?.last_login || '',
-          subscription: item.student?.subscriptions?.[0],
-          account_status: (item.student?.account_status || 'active') as 'active' | 'suspended'
-        }));
-        
-        setStudents(formattedStudents);
-        setLoading(false);
-        return;
-      }
-      
-      // Metodo di fallback: utilizzare la relazione tramite access_code_usage
-      console.log('Nessuno studente trovato nella tabella student_instructor, tentativo con access_code_usage');
-      
-      // Carica direttamente gli studenti usando la colonna instructor_email nella tabella access_code_usage
+      // 2. Recuperiamo le email dalla tabella access_code_usage
+      console.log('Recupero email dalla tabella access_code_usage...');
       const { data: usageData, error: usageError } = await supabase
         .from('access_code_usage')
-        .select(`
-          student_email,
-          first_name,
-          last_name
-        `)
+        .select('student_email')
         .eq('instructor_email', instructorEmail);
-        
+      
       if (usageError) {
-        console.error('Errore nel caricamento dell\'utilizzo dei codici:', usageError);
-        throw usageError;
+        console.error('Errore nel recupero da access_code_usage:', usageError);
+      } else if (usageData && usageData.length > 0) {
+        console.log('Email trovate in access_code_usage:', usageData.length);
+        studentEmails = [...studentEmails, ...usageData.map(u => u.student_email)];
       }
       
-      if (!usageData || usageData.length === 0) {
-        console.log('Nessuno studente ha utilizzato i codici di questo istruttore');
+      // 3. Recuperiamo le email degli studenti che hanno utilizzato codici creati dall'istruttore
+      console.log('Recupero codici creati dall\'istruttore...');
+      
+      // Prima recuperiamo l'ID dell'utente dalla sua email
+      const { data: userData, error: userError } = await supabase
+        .from('auth_users')
+        .select('id')
+        .eq('email', instructorEmail)
+        .single();
+      
+      if (userError) {
+        console.error('Errore nel recupero dell\'ID dell\'istruttore:', userError);
+      } else if (userData && userData.id) {
+        console.log('ID istruttore trovato:', userData.id);
+        
+        // Ora usiamo l'ID per cercare i codici
+        const { data: codesData, error: codesError } = await supabase
+          .from('access_codes')
+          .select('id')
+          .eq('created_by', userData.id);
+        
+        if (codesError) {
+          console.error('Errore nel recupero dei codici:', codesError);
+        } else if (codesData && codesData.length > 0) {
+          console.log('Codici trovati:', codesData.length);
+          
+          const codeIds = codesData.map(code => code.id);
+          const { data: codeUsageData, error: codeUsageError } = await supabase
+            .from('access_code_usage')
+            .select('student_email')
+            .in('code_id', codeIds);
+          
+          if (codeUsageError) {
+            console.error('Errore nel recupero degli utilizzi dei codici:', codeUsageError);
+          } else if (codeUsageData && codeUsageData.length > 0) {
+            console.log('Email trovate tramite codici:', codeUsageData.length);
+            studentEmails = [...studentEmails, ...codeUsageData.map(u => u.student_email)];
+            
+            // Aggiorniamo i record per includere l'email dell'istruttore
+            for (const usage of codeUsageData) {
+              // Aggiorna access_code_usage
+              const { error: updateError } = await supabase
+                .from('access_code_usage')
+                .update({ instructor_email: instructorEmail })
+                .eq('student_email', usage.student_email)
+                .is('instructor_email', null);
+              
+              if (updateError) {
+                console.warn('Errore nell\'aggiornamento dell\'instructor_email:', updateError);
+              }
+              
+              // Inserisci in student_instructor
+              const { error: insertError } = await supabase
+                .from('student_instructor')
+                .upsert({
+                  student_email: usage.student_email,
+                  instructor_email: instructorEmail
+                });
+              
+              if (insertError) {
+                console.warn('Errore nell\'inserimento in student_instructor:', insertError);
+              }
+            }
+          }
+        }
+      }
+      
+      // 4. Recuperiamo anche gli studenti dai risultati dei quiz creati dall'istruttore
+      if (userData && userData.id) {
+        console.log('Recupero quiz creati dall\'istruttore...');
+        const { data: quizData, error: quizError } = await supabase
+          .from('quiz_templates')
+          .select('id')
+          .eq('created_by', userData.id);
+        
+        if (quizError) {
+          console.error('Errore nel recupero dei quiz:', quizError);
+        } else if (quizData && quizData.length > 0) {
+          console.log('Quiz trovati:', quizData.length);
+          
+          const quizIds = quizData.map(quiz => quiz.id);
+          const { data: resultsData, error: resultsError } = await supabase
+            .from('results')
+            .select('student_email')
+            .in('quiz_id', quizIds);
+          
+          if (resultsError) {
+            console.error('Errore nel recupero dei risultati dei quiz:', resultsError);
+          } else if (resultsData && resultsData.length > 0) {
+            console.log('Email trovate tramite risultati quiz:', resultsData.length);
+            studentEmails = [...studentEmails, ...resultsData.map(r => r.student_email)];
+          }
+        }
+      }
+      
+      // Rimuoviamo i duplicati e l'email dell'istruttore stesso
+      studentEmails = [...new Set(studentEmails)].filter(email => email !== instructorEmail);
+      
+      console.log('Totale email uniche trovate:', studentEmails.length);
+      
+      // APPROCCIO ALTERNATIVO: Se non abbiamo trovato studenti, proviamo con una query JOIN diretta
+      if (studentEmails.length === 0) {
+        console.log('Nessuno studente trovato con metodo standard, provo con approccio alternativo...');
+        
+        // Recuperiamo prima le email degli studenti dalla tabella student_instructor
+        const { data: siData, error: siError } = await supabase
+          .from('student_instructor')
+          .select('student_email')
+          .eq('instructor_email', instructorEmail);
+        
+        if (siError) {
+          console.error('Errore nel recupero da student_instructor:', siError);
+        } else if (siData && siData.length > 0) {
+          console.log('Email trovate in student_instructor:', siData.length);
+          
+          // Recuperiamo i dettagli degli studenti dalla tabella auth_users
+          const studentEmails = siData.map(item => item.student_email);
+          const { data: userData, error: userError } = await supabase
+            .from('auth_users')
+            .select(`
+              id,
+              email,
+              first_name,
+              last_name,
+              last_login,
+              account_status
+            `)
+            .in('email', studentEmails);
+          
+          if (userError) {
+            console.error('Errore nel recupero dei dettagli degli studenti:', userError);
+          } else if (userData && userData.length > 0) {
+            console.log('Dettagli studenti trovati:', userData.length);
+            
+            // Formattazione dei dati degli studenti
+            const formattedStudents = userData.map(user => ({
+              id: user.id,
+              email: user.email,
+              first_name: user.first_name || '',
+              last_name: user.last_name || '',
+              last_login: user.last_login || '',
+              account_status: (user.account_status || 'active') as 'active' | 'suspended'
+            }));
+            
+            setStudents(formattedStudents);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+      
+      if (studentEmails.length === 0) {
+        console.log('Nessuno studente trovato, provo un ultimo approccio con access_codes...');
+        
+        // Recuperiamo prima l'ID dell'istruttore
+        const { data: instructorData, error: instructorError } = await supabase
+          .from('auth_users')
+          .select('id')
+          .eq('email', instructorEmail)
+          .single();
+        
+        if (instructorError) {
+          console.error('Errore nel recupero dell\'ID dell\'istruttore:', instructorError);
+        } else if (instructorData && instructorData.id) {
+          console.log('ID istruttore trovato:', instructorData.id);
+          
+          // Recuperiamo i codici creati dall'istruttore
+          const { data: codesData, error: codesError } = await supabase
+            .from('access_codes')
+            .select('id, code')
+            .eq('created_by', instructorData.id);
+          
+          if (codesError) {
+            console.error('Errore nel recupero dei codici:', codesError);
+          } else if (codesData && codesData.length > 0) {
+            console.log('Codici trovati:', codesData.length, codesData.map(c => c.code).join(', '));
+            
+            // Recuperiamo gli utilizzi di questi codici
+            const codeIds = codesData.map(code => code.id);
+            const { data: usageData, error: usageError } = await supabase
+              .from('access_code_usage')
+              .select('student_email, first_name, last_name, used_at')
+              .in('code_id', codeIds);
+            
+            if (usageError) {
+              console.error('Errore nel recupero degli utilizzi dei codici:', usageError);
+            } else if (usageData && usageData.length > 0) {
+              console.log('Utilizzi trovati:', usageData.length);
+              
+              // Creiamo oggetti Student dai dati di utilizzo
+              const usageStudents = usageData.map(usage => ({
+                id: usage.student_email, // Usiamo l'email come ID temporaneo
+                email: usage.student_email,
+                first_name: usage.first_name || '',
+                last_name: usage.last_name || '',
+                last_login: usage.used_at || '',
+                account_status: 'active' as const
+              }));
+              
+              // Aggiorniamo anche le relazioni
+              for (const usage of usageData) {
+                // Aggiorna access_code_usage
+                const { error: updateError } = await supabase
+                  .from('access_code_usage')
+                  .update({ instructor_email: instructorEmail })
+                  .eq('student_email', usage.student_email)
+                  .is('instructor_email', null);
+                
+                if (updateError) {
+                  console.warn('Errore nell\'aggiornamento dell\'instructor_email:', updateError);
+                }
+                
+                // Inserisci in student_instructor
+                const { error: insertError } = await supabase
+                  .from('student_instructor')
+                  .upsert({
+                    student_email: usage.student_email,
+                    instructor_email: instructorEmail
+                  });
+                
+                if (insertError) {
+                  console.warn('Errore nell\'inserimento in student_instructor:', insertError);
+                }
+              }
+              
+              setStudents(usageStudents);
+              setLoading(false);
+              return;
+            }
+          }
+        }
+        
+        console.log('Nessuno studente trovato con nessun metodo');
         setStudents([]);
         setLoading(false);
         return;
       }
       
-      // Estrai le email degli studenti e rimuovi i duplicati
-      const studentEmails = [...new Set(usageData.map(record => record.student_email))];
-      console.log('Email degli studenti trovate:', studentEmails);
-      
-      // Carica i dati degli studenti
-      const { data: users, error: usersError } = await supabase
+      // Recuperiamo i dettagli completi degli studenti
+      const { data: studentsData, error: studentsError } = await supabase
         .from('auth_users')
         .select(`
-          *,
+          id,
+          email,
+          first_name,
+          last_name,
+          last_login,
           subscriptions (
             plan_id,
             status
-          )
+          ),
+          account_status
         `)
-        .in('email', studentEmails)
-        .order('last_login', { ascending: false });
-
-      if (usersError) throw usersError;
-
-      const formattedStudents = users.map(user => ({
-        id: user.id,
-        email: user.email,
-        first_name: user.first_name || '',
-        last_name: user.last_name || '',
-        last_login: user.last_login || user.created_at,
-        subscription: user.subscriptions?.[0],
-        account_status: (user.account_status || 'active') as 'active' | 'suspended'
-      }));
-
-      setStudents(formattedStudents);
+        .in('email', studentEmails);
+      
+      if (studentsError) {
+        console.error('Errore nel recupero dei dettagli degli studenti:', studentsError);
+        throw studentsError;
+      }
+      
+      if (!studentsData || studentsData.length === 0) {
+        console.log('Nessun dettaglio studente trovato');
+        
+        // Fallback: creiamo oggetti studente dalle email
+        const fallbackStudents = studentEmails.map(email => ({
+          id: email, // Usiamo l'email come ID temporaneo
+          email: email,
+          first_name: '',
+          last_name: '',
+          last_login: '',
+          account_status: 'active' as const
+        }));
+        
+        setStudents(fallbackStudents);
+      } else {
+        console.log('Dettagli studenti trovati:', studentsData.length);
+        
+        // Formattazione dei dati degli studenti
+        const formattedStudents = studentsData.map(user => ({
+          id: user.id,
+          email: user.email,
+          first_name: user.first_name || '',
+          last_name: user.last_name || '',
+          last_login: user.last_login || '',
+          subscription: user.subscriptions?.[0],
+          account_status: (user.account_status || 'active') as 'active' | 'suspended'
+        }));
+        
+        setStudents(formattedStudents);
+      }
     } catch (error) {
       console.error('Error loading students:', error);
       setError('Errore durante il caricamento degli studenti');
@@ -362,8 +585,25 @@ export function StudentManagement() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-white dark:text-slate-100">Gestione Studenti</h2>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Gestione Studenti</h2>
+        <button
+          onClick={loadStudents}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          disabled={loading}
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          Aggiorna
+        </button>
       </div>
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative dark:bg-red-900/30 dark:border-red-800 dark:text-red-400" role="alert">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 mr-2" />
+            <span>{error}</span>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md overflow-hidden">
         <div className="p-6 border-b border-gray-200 dark:border-slate-800">
@@ -393,92 +633,124 @@ export function StudentManagement() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-slate-800">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 dark:text-slate-400">Email</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 dark:text-slate-400">Nome Completo</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 dark:text-slate-400">Stato Account</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 dark:text-slate-400">Ultimo Accesso</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 dark:text-slate-400">Azioni</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
-              {filteredStudents.map((student) => (
-                <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-slate-800">
-                  <td className="px-6 py-4 dark:text-slate-300">{student.email}</td>
-                  <td className="px-6 py-4 dark:text-slate-300">
-                    {student.first_name} {student.last_name}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      student.account_status === 'active'
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                        : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                    }`}>
-                      {student.account_status === 'active' ? 'Attivo' : 'Sospeso'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-gray-500 dark:text-slate-400">
-                    {formatDate(student.last_login)}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setSelectedStudent(student)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                        title="Visualizza Dettagli"
-                      >
-                        <Eye className="w-5 h-5" />
-                      </button>
-
-                      <button
-                        onClick={() => handleSuspendStudent(student.id, student.account_status === 'active')}
-                        className={`p-2 ${
-                          student.account_status === 'active'
-                            ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
-                            : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
-                        } rounded-lg transition-colors`}
-                        title={student.account_status === 'active' ? 'Sospendi Account' : 'Riattiva Account'}
-                      >
-                        {student.account_status === 'active' ? (
-                          <XCircle className="w-5 h-5" />
-                        ) : (
-                          <CheckCircle2 className="w-5 h-5" />
-                        )}
-                      </button>
-
-                      <button
-                        onClick={() => handleResetProgress(student.id)}
-                        className="p-2 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
-                        title="Reset Progressi"
-                      >
-                        <RefreshCw className="w-5 h-5" />
-                      </button>
-
-                      <button
-                        onClick={() => setShowDeleteModal({ id: student.id, name: `${student.first_name} ${student.last_name}` })}
-                        className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                        title="Elimina Account"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </td>
+        {loading ? (
+          <div className="flex justify-center items-center p-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          </div>
+        ) : filteredStudents.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-slate-800">
+                <tr>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 dark:text-slate-400">Email</th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 dark:text-slate-400">Nome Completo</th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 dark:text-slate-400">Stato Account</th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 dark:text-slate-400">Ultimo Accesso</th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 dark:text-slate-400">Azioni</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+                {filteredStudents.map((student) => (
+                  <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-slate-800">
+                    <td className="px-6 py-4 dark:text-slate-300">{student.email}</td>
+                    <td className="px-6 py-4 dark:text-slate-300">
+                      {student.first_name || student.last_name ? 
+                        `${student.first_name} ${student.last_name}` : 
+                        <span className="text-gray-400 dark:text-gray-500 italic">Nome non disponibile</span>
+                      }
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        student.account_status === 'active'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                      }`}>
+                        {student.account_status === 'active' ? 'Attivo' : 'Sospeso'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-gray-500 dark:text-slate-400">
+                      {formatDate(student.last_login)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center space-x-3">
+                        <button
+                          onClick={() => setSelectedStudent(student)}
+                          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                          title="Visualizza dettagli"
+                        >
+                          <Eye className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleSuspendStudent(student.id, student.account_status === 'active')}
+                          className={`${
+                            student.account_status === 'active'
+                              ? 'text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300'
+                              : 'text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300'
+                          }`}
+                          title={student.account_status === 'active' ? 'Sospendi account' : 'Riattiva account'}
+                        >
+                          {student.account_status === 'active' ? (
+                            <XCircle className="w-5 h-5" />
+                          ) : (
+                            <CheckCircle2 className="w-5 h-5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleResetProgress(student.id)}
+                          className="text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-300"
+                          title="Reimposta progressi"
+                        >
+                          <Clock className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => setShowDeleteModal({ id: student.id, name: `${student.first_name} ${student.last_name}` })}
+                          className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                          title="Elimina studente"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center p-12 text-center">
+            <User className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Nessuno studente trovato</h3>
+            <p className="text-gray-500 dark:text-gray-400 max-w-md mb-6">
+              Non sono stati trovati studenti associati al tuo account. Gli studenti appariranno qui quando utilizzeranno i tuoi codici quiz o di accesso.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button
+                onClick={loadStudents}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Riprova
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {selectedStudent && (
+        <StudentDetails
+          student={selectedStudent}
+          onBack={() => setSelectedStudent(null)}
+        />
+      )}
+
       {showDeleteModal && (
         <DeleteModal
-          title="Elimina Account Studente"
-          message={`Sei sicuro di voler eliminare l'account di ${showDeleteModal.name}? Questa azione non può essere annullata.`}
-          onConfirm={() => handleDeleteStudent(showDeleteModal.id)}
+          title="Elimina studente"
+          message={`Sei sicuro di voler eliminare lo studente ${showDeleteModal.name}? Questa azione non può essere annullata e rimuoverà tutti i dati associati a questo studente.`}
+          onConfirm={() => {
+            handleDeleteStudent(showDeleteModal.id);
+            setShowDeleteModal(null);
+          }}
           onCancel={() => setShowDeleteModal(null)}
           isLoading={loading}
         />

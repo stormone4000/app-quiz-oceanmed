@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Key, Calendar, Trash2, AlertCircle, CheckCircle, XCircle, RefreshCw, X, Save } from 'lucide-react';
+import { Plus, Key, Calendar, Trash2, AlertCircle, CheckCircle, XCircle, RefreshCw, X, Save, User, Search, RotateCw, Copy } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 
 interface AccessCode {
@@ -32,7 +32,9 @@ export function AccessCodeManager() {
   const [codes, setCodes] = useState<AccessCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [expandedCode, setExpandedCode] = useState<string | null>(null);
   const [form, setForm] = useState<CodeForm>({
     code: '',
     type: 'one_time',
@@ -46,16 +48,61 @@ export function AccessCodeManager() {
     // Carica l'ID dell'utente corrente
     const fetchCurrentUserId = async () => {
       const instructorEmail = localStorage.getItem('userEmail');
-      if (!instructorEmail) return;
+      if (!instructorEmail) {
+        console.error('Email utente non trovata nel localStorage');
+        setError('Sessione utente non valida. Effettua nuovamente il login.');
+        return;
+      }
       
-      const { data, error } = await supabase
-        .from('auth_users')
-        .select('id')
-        .eq('email', instructorEmail)
-        .single();
+      try {
+        // Prima verifichiamo se l'utente esiste nella tabella users
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', instructorEmail)
+          .single();
+          
+        if (userData && !userError) {
+          console.log('ID utente recuperato dalla tabella users:', userData.id);
+          setCurrentUserId(userData.id);
+          localStorage.setItem('userId', userData.id);
+          return;
+        }
         
-      if (data && !error) {
-        setCurrentUserId(data.id);
+        // Se non esiste nella tabella users, proviamo con auth_users
+        const { data: authData, error: authError } = await supabase
+          .from('auth_users')
+          .select('id')
+          .eq('email', instructorEmail)
+          .single();
+          
+        if (authData && !authError) {
+          console.log('ID utente recuperato dalla tabella auth_users:', authData.id);
+          
+          // Verifichiamo se questo ID esiste anche nella tabella users
+          const { data: userCheck, error: userCheckError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('id', authData.id)
+            .single();
+            
+          if (userCheck && !userCheckError) {
+            console.log('ID utente verificato nella tabella users');
+            setCurrentUserId(authData.id);
+            localStorage.setItem('userId', authData.id);
+          } else {
+            console.warn('ID utente non trovato nella tabella users, utilizzo email come fallback');
+            setCurrentUserId(instructorEmail);
+          }
+        } else {
+          console.warn('Impossibile recuperare l\'ID utente dal database:', authError);
+          console.warn('Utilizzo dell\'email come ID utente:', instructorEmail);
+          setCurrentUserId(instructorEmail);
+        }
+      } catch (err) {
+        console.error('Errore durante il recupero dell\'ID utente:', err);
+        console.warn('Utilizzo dell\'email come ID utente:', instructorEmail);
+        setCurrentUserId(instructorEmail);
       }
     };
     
@@ -72,37 +119,159 @@ export function AccessCodeManager() {
     try {
       setLoading(true);
       setError(null);
-
-      if (!currentUserId) {
-        setError('Utente non identificato. Effettua nuovamente il login.');
-        return;
+      
+      const instructorEmail = localStorage.getItem('userEmail');
+      const isMaster = localStorage.getItem('isMaster') === 'true';
+      
+      if (!currentUserId && !instructorEmail) {
+        throw new Error('Sessione utente non valida. Effettua nuovamente il login.');
       }
 
-      // Prima query: carica solo i codici di accesso creati dall'istruttore corrente
-      const { data: accessCodes, error: codesError } = await supabase
+      // Verifichiamo se l'ID utente è un UUID
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(currentUserId || '');
+      
+      let query = supabase
         .from('access_codes')
         .select('*')
-        .eq('created_by', currentUserId)
         .order('created_at', { ascending: false });
-
-      if (codesError) throw codesError;
+      
+      if (isUUID) {
+        // Se è un UUID valido, verifichiamo che esista nella tabella users
+        const { data: userExists, error: userCheckError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', currentUserId)
+          .single();
+          
+        if (userExists && !userCheckError) {
+          console.log('Caricamento codici di accesso per UUID:', currentUserId);
+          query = query.eq('created_by', currentUserId);
+        } else {
+          // Se l'UUID non esiste nella tabella users, cerchiamo per email
+          console.warn('ID utente non trovato nella tabella users, cerco per email');
+          // Cerchiamo i codici creati dall'utente con questa email o senza created_by
+          // Nota: questo potrebbe non funzionare se la colonna created_by accetta solo UUID
+          // In questo caso, potremmo dover cercare tutti i codici e filtrarli lato client
+          query = query.or('created_by.is.null');
+        }
+      } else if (currentUserId) {
+        // Se non è un UUID ma abbiamo un valore (probabilmente un'email), cerchiamo solo i codici senza created_by
+        console.log('Caricamento codici senza created_by (currentUserId non è UUID)');
+        query = query.is('created_by', null);
+      } else {
+        // Fallback: cerchiamo solo i codici senza created_by
+        console.log('Caricamento codici senza created_by (fallback)');
+        query = query.is('created_by', null);
+      }
+      
+      const { data: accessCodes, error: codesError } = await query;
+        
+      if (codesError) {
+        console.error('Errore nel recupero dei codici di accesso:', codesError);
+        throw new Error(`Errore nel recupero dei codici di accesso: ${codesError.message}`);
+      }
+      
+      // Carica tutti i codici se la query precedente fallisce
+      if (!accessCodes || accessCodes.length === 0) {
+        console.log('Nessun codice trovato con la query specifica, carico tutti i codici');
+        const { data: allCodes, error: allCodesError } = await supabase
+          .from('access_codes')
+          .select('*')
+          .order('created_at', { ascending: false });
+          
+        if (allCodesError) {
+          console.error('Errore nel recupero di tutti i codici di accesso:', allCodesError);
+          throw new Error(`Errore nel recupero di tutti i codici di accesso: ${allCodesError.message}`);
+        }
+        
+        // Filtriamo i codici lato client
+        let filteredCodes = allCodes ? allCodes.filter(code => 
+          !code.created_by || // Codici senza created_by
+          code.created_by === instructorEmail || // Codici creati con l'email
+          code.created_by === currentUserId // Codici creati con l'ID corrente
+        ) : [];
+        
+        // Nascondi il codice master 55555 se l'utente non è un amministratore
+        if (!isMaster) {
+          filteredCodes = filteredCodes.filter(code => code.code !== '55555');
+        }
+        
+        if (filteredCodes.length > 0) {
+          console.log(`Trovati ${filteredCodes.length} codici dopo il filtraggio lato client`);
+          
+          // Recupera gli utilizzi dei codici
+          if (filteredCodes.length > 0) {
+            const { data: usageData, error: usageError } = await supabase
+              .from('access_code_usage')
+              .select(`
+                id,
+                code_id,
+                student_email,
+                used_at,
+                students:student_email (
+                  first_name,
+                  last_name
+                )
+              `)
+              .in('code_id', filteredCodes.map(code => code.id));
+              
+            if (usageError) {
+              console.warn('Errore nel recupero degli utilizzi dei codici:', usageError);
+              // Continuiamo comunque, mostrando i codici senza informazioni di utilizzo
+            }
+            
+            // Associa gli utilizzi ai rispettivi codici
+            const codesWithUsage = filteredCodes.map(code => ({
+              ...code,
+              usage: usageData ? usageData.filter(usage => usage.code_id === code.id) : []
+            }));
+            
+            setCodes(codesWithUsage);
+          } else {
+            setCodes([]);
+          }
+          
+          setLoading(false);
+          return;
+        }
+      }
       
       if (accessCodes && accessCodes.length > 0) {
-        // Seconda query: carica gli utilizzi dei codici
+        console.log(`Trovati ${accessCodes.length} codici di accesso`);
+        
+        // Nascondi il codice master 55555 se l'utente non è un amministratore
+        let filteredAccessCodes = accessCodes;
+        if (!isMaster) {
+          filteredAccessCodes = accessCodes.filter(code => code.code !== '55555');
+        }
+        
+        // Recupera gli utilizzi dei codici
         const { data: usageData, error: usageError } = await supabase
           .from('access_code_usage')
-          .select('*')
-          .in('code_id', accessCodes.map(code => code.id));
+          .select(`
+            id,
+            code_id,
+            student_email,
+            first_name,
+            last_name,
+            used_at
+          `)
+          .in('code_id', filteredAccessCodes.map(code => code.id));
           
         if (usageError) {
-          console.warn('Errore nel caricamento degli utilizzi dei codici:', usageError);
-          // Continuiamo comunque con i codici senza utilizzi
+          console.warn('Errore nel recupero degli utilizzi dei codici:', usageError);
+          // Continuiamo comunque, mostrando i codici senza informazioni di utilizzo
         }
         
         // Associa gli utilizzi ai rispettivi codici
-        const codesWithUsage = accessCodes.map(code => ({
+        const codesWithUsage = filteredAccessCodes.map(code => ({
           ...code,
-          usage: usageData ? usageData.filter(usage => usage.code_id === code.id) : []
+          usage: usageData ? usageData.filter(usage => usage.code_id === code.id).map(usage => ({
+            student_email: usage.student_email,
+            first_name: usage.first_name,
+            last_name: usage.last_name,
+            used_at: usage.used_at
+          })) : []
         }));
         
         setCodes(codesWithUsage);
@@ -121,12 +290,19 @@ export function AccessCodeManager() {
     try {
       setError(null);
       
-      if (!currentUserId) {
+      const instructorEmail = localStorage.getItem('userEmail');
+      if (!currentUserId && !instructorEmail) {
         throw new Error('Sessione utente non valida. Effettua nuovamente il login.');
       }
       
       // Generate a random 6-digit code if not provided
-      const code = form.code || Math.floor(100000 + Math.random() * 900000).toString();
+      let code = form.code;
+      if (!code) {
+        // Genera un codice casuale a 6 cifre
+        const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+        // Aggiungi il prefisso "QUIZ-" per differenziare i codici per gli studenti
+        code = `QUIZ-${randomCode}`;
+      }
       
       // Calculate expiration date based on duration
       let expirationDate = null;
@@ -136,19 +312,53 @@ export function AccessCodeManager() {
         expirationDate = expiration.toISOString();
       }
 
-      const { error: insertError } = await supabase
-        .from('access_codes')
-        .insert([{
-          code,
-          type: form.type,
-          expiration_date: form.expiration_date || expirationDate,
-          is_active: true,
-          duration_months: form.duration_months,
-          duration_type: form.duration_type,
-          created_by: currentUserId
-        }]);
+      // Verifichiamo se l'ID utente è un UUID
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(currentUserId || '');
+      
+      // Prepariamo i dati per l'inserimento
+      const codeData = {
+        code,
+        type: form.type,
+        expiration_date: form.expiration_date || expirationDate,
+        is_active: true,
+        duration_months: form.duration_months,
+        duration_type: form.duration_type
+      };
+      
+      // Se è un UUID valido, verifichiamo che esista nella tabella users
+      if (isUUID) {
+        const { data: userExists, error: userCheckError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', currentUserId)
+          .single();
+          
+        if (userExists && !userCheckError) {
+          console.log('Creazione codice di accesso con UUID:', currentUserId);
+          // Aggiungiamo il created_by solo se è un UUID valido e esiste nella tabella users
+          Object.assign(codeData, { created_by: currentUserId });
+        } else {
+          console.warn('ID utente non trovato nella tabella users, non imposto created_by');
+          // Non impostiamo created_by, lasciandolo NULL
+        }
+      } else {
+        console.warn('ID utente non è un UUID valido, non imposto created_by');
+        // Non impostiamo created_by, lasciandolo NULL
+      }
 
-      if (insertError) throw insertError;
+      console.log('Creazione codice di accesso con i seguenti dati:', codeData);
+
+      const { data, error: insertError } = await supabase
+        .from('access_codes')
+        .insert([codeData])
+        .select();
+
+      if (insertError) {
+        console.error('Errore durante la creazione del codice di accesso:', insertError);
+        throw new Error(`Errore durante la creazione del codice: ${insertError.message}`);
+      }
+
+      console.log('Codice di accesso creato con successo:', data);
 
       setShowGenerateModal(false);
       setForm({
@@ -165,21 +375,139 @@ export function AccessCodeManager() {
     }
   };
 
+  const reactivateCode = async (codeId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      setSuccess(null);
+      
+      // Aggiorna lo stato del codice
+      const { error } = await supabase
+        .from('access_codes')
+        .update({ is_active: true })
+        .eq('id', codeId);
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Aggiorna la lista dei codici
+      loadAccessCodes();
+      
+      setSuccess('Codice riattivato con successo');
+    } catch (error) {
+      console.error('Error reactivating code:', error);
+      setError('Errore durante la riattivazione del codice');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const deactivateCode = async (codeId: string) => {
     try {
+      setLoading(true);
       setError(null);
-
-      const { error: updateError } = await supabase
+      setSuccess(null);
+      
+      // Aggiorna lo stato del codice
+      const { error } = await supabase
         .from('access_codes')
         .update({ is_active: false })
         .eq('id', codeId);
-
-      if (updateError) throw updateError;
-
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Aggiorna la lista dei codici
       loadAccessCodes();
+      
+      setSuccess('Codice disattivato con successo');
     } catch (error) {
       console.error('Error deactivating code:', error);
       setError('Errore durante la disattivazione del codice');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteCode = async (codeId: string) => {
+    try {
+      if (!confirm('Sei sicuro di voler eliminare definitivamente questo codice? Questa azione non può essere annullata.')) {
+        return;
+      }
+      
+      setLoading(true);
+      setError(null);
+      setSuccess(null);
+      
+      // Elimina il codice
+      const { error } = await supabase
+        .from('access_codes')
+        .delete()
+        .eq('id', codeId);
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Aggiorna la lista dei codici
+      loadAccessCodes();
+      
+      setSuccess('Codice eliminato con successo');
+    } catch (error) {
+      console.error('Error deleting code:', error);
+      setError('Errore durante l\'eliminazione del codice');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const syncActivationData = async (codeId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      setSuccess(null);
+      
+      // Recupera i dati del codice
+      const { data: codeData, error: codeError } = await supabase
+        .from('access_codes')
+        .select('*')
+        .eq('id', codeId)
+        .single();
+        
+      if (codeError) {
+        throw codeError;
+      }
+      
+      if (!codeData) {
+        throw new Error('Codice non trovato');
+      }
+      
+      // Recupera i dati di utilizzo
+      const { data: usageData, error: usageError } = await supabase
+        .from('access_code_usage')
+        .select('*')
+        .eq('code_id', codeId);
+        
+      if (usageError) {
+        throw usageError;
+      }
+      
+      if (!usageData || usageData.length === 0) {
+        setSuccess('Nessun dato di utilizzo trovato per questo codice');
+        return;
+      }
+      
+      // Aggiorna la lista dei codici
+      loadAccessCodes();
+      
+      setSuccess(`Dati di attivazione sincronizzati con successo per il codice ${codeData.code}`);
+    } catch (error) {
+      console.error('Error syncing activation data:', error);
+      setError('Errore durante la sincronizzazione dei dati di attivazione');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -201,13 +529,20 @@ export function AccessCodeManager() {
     return `${months} mesi`;
   };
 
+  // Aggiungo la funzione per copiare il codice negli appunti
+  const copyCodeToClipboard = (code: string) => {
+    navigator.clipboard.writeText(code);
+    setSuccess(`Codice ${code} copiato negli appunti!`);
+    setTimeout(() => setSuccess(null), 3000);
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-white dark:text-slate-100">Gestione Codici di Accesso</h2>
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Gestione Codici di Accesso</h1>
         <button
           onClick={() => setShowGenerateModal(true)}
-          className="bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-lg hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2"
+          className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg flex items-center gap-2"
         >
           <Plus className="w-5 h-5" />
           Genera Nuovo Codice
@@ -215,112 +550,216 @@ export function AccessCodeManager() {
       </div>
 
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 dark:border-red-700 p-4 rounded-lg">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400" />
-            <p className="text-red-700 dark:text-red-400">{error}</p>
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-md flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-medium">Errore</p>
+            <p>{error}</p>
           </div>
         </div>
       )}
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md overflow-hidden">
-        <div className="p-6 border-b border-gray-200 dark:border-slate-800">
-          <div className="flex items-center gap-3">
-            <Key className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-            <h3 className="text-lg font-semibold dark:text-slate-100">Lista Codici di Accesso</h3>
+      {success && (
+        <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6 rounded-md flex items-start gap-3">
+          <CheckCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-medium">Operazione completata</p>
+            <p>{success}</p>
           </div>
         </div>
+      )}
 
-        {loading ? (
-          <div className="p-6 text-center">
-            <RefreshCw className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin mx-auto mb-2" />
-            <p className="text-gray-500 dark:text-slate-400">Caricamento codici...</p>
-          </div>
-        ) : codes.length === 0 ? (
-          <div className="p-6 text-center">
-            <p className="text-gray-500 dark:text-slate-400">Nessun codice di accesso trovato.</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-200 dark:divide-slate-800">
-            {codes.map(code => (
-              <div key={code.id} className="p-6 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className={`p-2 rounded-lg ${
-                        code.type === 'master' 
-                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400'
-                          : code.is_active
-                            ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                            : 'bg-gray-100 dark:bg-gray-900/30 text-gray-600 dark:text-gray-400'
-                      }`}>
-                        <Key className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-lg dark:text-slate-100">{code.code}</p>
-                        <p className="text-sm text-gray-500 dark:text-slate-400">
-                          {code.type === 'master' ? 'Codice Master' : 'Codice Monouso'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1 text-sm text-gray-600 dark:text-slate-400">
-                      <p>Creato il: {formatDate(code.created_at)}</p>
-                      <p>Durata: {getDurationText(code.duration_months, code.duration_type)}</p>
-                      {code.expiration_date && (
-                        <p>Scade il: {formatDate(code.expiration_date)}</p>
-                      )}
-                      <p className="flex items-center gap-2">
-                        Stato: 
-                        {code.is_active ? (
-                          <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
-                            <CheckCircle className="w-4 h-4" />
-                            Attivo
-                          </span>
-                        ) : (
-                          <span className="text-red-600 dark:text-red-400">Disattivato</span>
-                        )}
-                      </p>
-                    </div>
-
-                    {code.usage && code.usage.length > 0 && (
-                      <div className="mt-4">
-                        <p className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                          Utilizzi:
-                        </p>
-                        <div className="space-y-2">
-                          {code.usage.map((use, index) => (
-                            <div key={index} className="text-sm text-gray-600 dark:text-slate-400">
-                              <p>
-                                {[use.first_name, use.last_name].filter(Boolean).join(' ') || 'Utente'}
-                                {' - '}
-                                {use.student_email}
-                              </p>
-                              <p className="text-xs text-gray-500 dark:text-slate-500">
-                                Utilizzato il: {formatDate(use.used_at)}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {code.type !== 'master' && code.is_active && (
+      {loading ? (
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600 mb-2"></div>
+          <p className="text-slate-600 dark:text-slate-400">Caricamento codici in corso...</p>
+        </div>
+      ) : codes.length === 0 ? (
+        <div className="text-center py-12 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+          <Key className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">Nessun codice trovato</h2>
+          <p className="text-slate-600 dark:text-slate-400 mb-6">Non hai ancora generato codici di accesso.</p>
+          <button
+            onClick={() => setShowGenerateModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg flex items-center gap-2 mx-auto"
+          >
+            <Plus className="w-5 h-5" />
+            Genera il tuo primo codice
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4">
+          {codes.map((code) => (
+            <div 
+              key={code.id} 
+              className={`bg-white dark:bg-slate-800 rounded-lg shadow-md p-4 mb-4 transition-all duration-300 ${
+                expandedCode === code.id ? 'border-l-4 border-blue-500' : ''
+              }`}
+            >
+              <div 
+                className="flex justify-between items-start cursor-pointer"
+                onClick={() => setExpandedCode(expandedCode === code.id ? null : code.id)}
+              >
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Key className={`w-5 h-5 ${code.is_active ? 'text-green-500' : 'text-red-500'}`} />
+                    <h3 className="text-lg font-semibold">{code.code}</h3>
                     <button
-                      onClick={() => deactivateCode(code.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                      title="Disattiva codice"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyCodeToClipboard(code.code);
+                      }}
+                      className="p-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                      title="Copia negli appunti"
                     >
-                      <Trash2 className="w-5 h-5" />
+                      <Copy className="w-4 h-4" />
                     </button>
+                    <span className={`px-2 py-0.5 text-xs rounded-full ${
+                      code.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 
+                                      'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                    }`}>
+                      {code.is_active ? 'Attivo' : 'Disattivato'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Tipo: <span className="font-medium">{code.type === 'master' ? 'Master' : 'Monouso'}</span>
+                  </p>
+                  {code.expiration_date && (
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      Scadenza: <span className="font-medium">{formatDate(code.expiration_date)}</span>
+                    </p>
+                  )}
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    Creato il: <span className="font-medium">{formatDate(code.created_at)}</span>
+                  </p>
+                  
+                  {/* Mostra un'anteprima degli studenti che hanno utilizzato il codice */}
+                  {code.usage && code.usage.length > 0 && (
+                    <div className="mt-2 flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400">
+                      <User className="w-4 h-4" />
+                      <span>Utilizzato da {code.usage.length} {code.usage.length === 1 ? 'studente' : 'studenti'}</span>
+                    </div>
                   )}
                 </div>
+                
+                <div className="flex gap-2">
+                  {!code.is_active && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        reactivateCode(code.id);
+                      }}
+                      className="p-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                      title="Riattiva codice"
+                    >
+                      <RefreshCw className="w-5 h-5" />
+                    </button>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deactivateCode(code.id);
+                    }}
+                    className={`p-2 ${code.is_active 
+                      ? 'text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300' 
+                      : 'text-slate-400 cursor-not-allowed'}`}
+                    disabled={!code.is_active}
+                    title={code.is_active ? "Disattiva codice" : "Codice già disattivato"}
+                  >
+                    <XCircle className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              
+              {/* Contenuto espandibile */}
+              {expandedCode === code.id && (
+                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <h4 className="text-sm font-semibold mb-2">Dettagli codice:</h4>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    ID: <span className="font-mono text-xs">{code.id}</span>
+                  </p>
+                  
+                  {/* Mostra gli studenti che hanno utilizzato il codice */}
+                  <div className="mt-3">
+                    <h4 className="text-sm font-semibold mb-2">Utilizzato da:</h4>
+                    {code.usage && code.usage.length > 0 ? (
+                      <ul className="space-y-1 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-md">
+                        {code.usage.map((usage, index) => (
+                          <li key={index} className="text-sm flex items-center gap-2">
+                            <User className="w-4 h-4 text-blue-500" />
+                            <span className="font-medium">
+                              {usage.first_name && usage.last_name 
+                                ? `${usage.first_name} ${usage.last_name}` 
+                                : usage.student_email}
+                            </span>
+                            <span className="text-xs text-slate-500 flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {formatDate(usage.used_at)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-slate-500 italic bg-slate-50 dark:bg-slate-900/50 p-3 rounded-md">
+                        Nessuno studente ha ancora utilizzato questo codice
+                      </p>
+                    )}
+                  </div>
+                  
+                  {/* Pulsanti di azione */}
+                  <div className="mt-4 flex justify-end gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        syncActivationData(code.id);
+                      }}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium flex items-center gap-1"
+                    >
+                      <RotateCw className="w-4 h-4" />
+                      Sincronizza
+                    </button>
+                    
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteCode(code.id);
+                      }}
+                      className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium flex items-center gap-1"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Elimina
+                    </button>
+                    
+                    {!code.is_active ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          reactivateCode(code.id);
+                        }}
+                        className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium flex items-center gap-1"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        Riattiva
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deactivateCode(code.id);
+                        }}
+                        className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm font-medium flex items-center gap-1"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Disattiva
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {showGenerateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">

@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Home, BookOpen, Users, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, Layers, Award, User, Bell, BarChart, Key, Briefcase, BookCheck, UserCheck, Target } from 'lucide-react';
 import { NotificationBell } from '../notifications/NotificationBell';
 import { useTheme } from '../theme-provider';
-
-type DashboardTab = 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live' | 'dashboard' | 'gestione-quiz' | 'gestione-alunni' | 'quiz-history';
+import { DashboardTab, MenuItem } from '../../types-dashboard';
 
 interface SidebarProps {
   activeTab: DashboardTab;
@@ -14,16 +13,6 @@ interface SidebarProps {
   onLogout: () => void;
   studentEmail?: string;
   isMaster?: boolean;
-}
-
-interface MenuItem {
-  id: DashboardTab;
-  icon: React.ElementType;
-  label: string;
-  showFor: 'admin' | 'instructor' | 'student' | 'all';
-  path?: string;
-  requiresAccess?: boolean;
-  lockedMessage?: string;
 }
 
 export function Sidebar({ 
@@ -104,15 +93,34 @@ export function Sidebar({
       showFor: 'all',
     },
     {
+      id: 'pro-codes',
+      icon: Key,
+      label: 'Codici PRO',
+      showFor: 'admin',
+      requiresAccess: true,
+    },
+    {
       id: 'quizzes',
       icon: BookOpen,
       label: 'Quiz Disponibili',
       showFor: 'all',
     },
     {
+      id: 'student-quiz',
+      icon: BookCheck,
+      label: 'Quiz Assegnati',
+      showFor: 'student',
+    },
+    {
       id: 'quiz-history',
       icon: BarChart,
       label: 'Cronologia Quiz',
+      showFor: 'student',
+    },
+    {
+      id: 'student-access-codes',
+      icon: Key,
+      label: 'Cronologia Codici',
       showFor: 'student',
     },
     {
@@ -130,7 +138,7 @@ export function Sidebar({
       requiresAccess: true,
     },
     {
-      id: 'access-codes',
+      id: 'instructor-access-codes',
       icon: Key,
       label: 'Codici di Accesso',
       showFor: 'instructor',
@@ -209,12 +217,10 @@ export function Sidebar({
       
       // Verifichiamo l'accesso usando sia le props che gli stati locali
       const hasAccess = adminHasAccess || // Gli admin hanno sempre accesso
+                        (!isProfessor || // Studenti hanno sempre accesso
                         (!requiresAccess || // Elementi che non richiedono accesso
-                        hasInstructorAccess || // Istruttori con codice attivo
-                        !isProfessor) && // Studenti
-                        !shouldDisableForIstruttore1 && // Caso speciale istruttore1
-                        !(isInstructorWithoutAccess && requiresAccess); // Istruttori senza codice attivo
-      
+                        (isProfessor && hasInstructorAccess))); // Verifica più rigorosa per istruttori
+                        
       console.log(`Menu item ${id}:`, { 
         hasAccess, 
         adminHasAccess, 

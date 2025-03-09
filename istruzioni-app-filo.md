@@ -33,7 +33,7 @@ L'applicazione utilizza i seguenti strumenti per lo sviluppo e il deployment:
 - Accesso a "Gestione Alunni" nella sidebar per monitorare chi ha attivato i codici
 - Visualizzazione dei risultati e delle statistiche dei propri quiz
 - Modifica e eliminazione solo dei propri quiz
-- Non può rendere pubblici o privati i quiz (a differenza dell'admin)
+- Possibilità di rendere pubblici o privati i propri quiz
 
 ### Studente
 - Partecipazione ai quiz assegnati
@@ -60,6 +60,8 @@ L'applicazione utilizza i seguenti strumenti per lo sviluppo e il deployment:
 - Gli studenti partecipano in tempo reale usando un codice PIN
 - Leaderboard in tempo reale per incentivare la competizione
 - Ideali per sessioni di gruppo e verifiche rapide delle conoscenze
+- Generazione automatica di codici PIN per ogni sessione
+- Possibilità di copiare facilmente il PIN per condividerlo con gli studenti
 
 ## Funzionalità Principali
 
@@ -68,12 +70,15 @@ L'applicazione utilizza i seguenti strumenti per lo sviluppo e il deployment:
 - Aggiunta di domande a scelta multipla con possibilità di caricare immagini
 - Personalizzazione di icone, colori e categorie
 - Impostazione di tempi e modalità di completamento
+- Impostazione della visibilità (pubblica o privata) per tutti i tipi di quiz
 
 ### Quiz Live
 - Creazione di sessioni interattive
 - Generazione automatica di codici PIN per l'accesso
 - Monitoraggio in tempo reale della partecipazione
 - Visualizzazione dei risultati immediati
+- Notifica automatica del PIN all'avvio della sessione
+- Interfaccia intuitiva per la gestione delle sessioni attive
 
 ### Assegnazione Quiz
 - Selezione di studenti specifici per l'assegnazione
@@ -87,6 +92,91 @@ L'applicazione utilizza i seguenti strumenti per lo sviluppo e il deployment:
 - Verifica automatica della validità e scadenza dei codici
 - Interfaccia intuitiva con feedback visivo durante la verifica
 - Cronologia dei codici utilizzati per ogni utente
+- **Differenziazione dei codici**: I codici per gli studenti hanno il prefisso "QUIZ-" per distinguerli dai codici per gli istruttori
+- **Codice master riservato**: Il codice master "55555" è riservato agli amministratori e non è visibile agli istruttori
+
+### Tipi di Codici di Accesso
+- **Codici Istruttore**: Utilizzati per attivare gli account istruttore
+  - Non hanno prefissi specifici
+  - Il codice master "55555" è riservato agli amministratori
+  - Visibili solo a chi li ha creati e agli amministratori
+  
+- **Codici Quiz (QUIZ-xxxx)**: Utilizzati dagli studenti per accedere ai quiz
+  - Hanno sempre il prefisso "QUIZ-" seguito da un codice numerico
+  - Generati automaticamente dal sistema
+  - Possono essere creati da istruttori e amministratori
+  - Utilizzati esclusivamente per l'accesso ai quiz, non per l'attivazione di account
+
+### Distinzione tra Codici di Accesso e Codici Quiz
+
+#### Problema risolto
+È stata implementata una soluzione per gestire la distinzione tra due sistemi di codici completamente diversi nell'applicazione:
+
+1. **Codici Quiz**: codici collegati direttamente ai quiz nella tabella `quiz_templates`
+   - Danno accesso a un quiz specifico identificato dal codice
+   - Sono memorizzati nel campo `quiz_code` della tabella `quiz_templates`
+   - Utilizzati principalmente per condividere quiz specifici
+
+2. **Codici di Accesso**: codici generali nella tabella `access_codes`
+   - Danno accesso generale alla piattaforma
+   - Sono memorizzati nella tabella `access_codes` 
+   - Utilizzati per attivare abbonamenti o concedere accesso alla piattaforma
+
+#### Soluzione implementata
+Per risolvere i problemi di ambiguità e garantire la compatibilità durante la fase di transizione:
+
+1. **Riconoscimento di entrambi i tipi di codici**:
+   - L'interfaccia utente cerca il codice inserito in entrambe le tabelle (`quiz_templates` e `access_codes`)
+   - Se trova un codice in `quiz_templates`, lo memorizza come `quizCode` e dà accesso al quiz specifico
+   - Se trova un codice in `access_codes`, lo memorizza come `accessCode` e dà accesso a tutti i quiz pubblici
+
+2. **Supporto per codici con e senza prefisso**:
+   - L'applicazione gestisce sia i codici nel formato "QUIZ-XXXXXX" che "XXXXXX"
+   - Questa compatibilità è mantenuta durante la fase di transizione al nuovo formato
+
+3. **Query SQL per aggiornare il sistema**:
+   - Sono state implementate funzioni sul database per generare automaticamente codici con il prefisso "QUIZ-"
+   - Le funzioni di rigenerazione dei codici sono state aggiornate per mantenere la coerenza
+
+#### Verifica della validità dei codici
+Per verificare lo stato dei codici nel database, è possibile eseguire:
+```sql
+-- Verifica codice quiz
+SELECT * FROM quiz_templates WHERE quiz_code = 'CODICE';
+
+-- Verifica codice di accesso
+SELECT * FROM access_codes WHERE code = 'CODICE';
+```
+
+### Utilizzo dei Codici di Accesso
+1. **Per Attivare un Account Istruttore**:
+   - L'utente accede alla pagina del profilo istruttore
+   - Inserisce un codice istruttore valido (senza prefisso "QUIZ-")
+   - Il sistema verifica la validità del codice
+   - Se valido, l'account viene attivato come istruttore
+
+2. **Per Accedere ai Quiz (Studenti)**:
+   - Lo studente accede alla pagina dei quiz
+   - Inserisce un codice quiz valido (con prefisso "QUIZ-")
+   - Il sistema verifica la validità del codice in entrambe le tabelle:
+     a. Cerca prima nella tabella `quiz_templates` per codici quiz specifici
+     b. Se non trova corrispondenze, cerca nella tabella `access_codes` per codici di accesso generali
+   - Se trova un codice quiz, lo studente ottiene accesso al quiz specifico
+   - Se trova un codice di accesso:
+     a. Lo studente ottiene accesso a tutti i quiz pubblici
+     b. Il sistema registra l'utilizzo del codice nella tabella `access_code_usage`
+     c. Viene creata un'associazione studente-istruttore nella tabella `student_instructor`
+     d. Lo studente appare nella sezione "Gestione Studenti" dell'istruttore che ha creato il codice
+   - Il sistema gestisce automaticamente entrambi i formati (con e senza prefisso "QUIZ-")
+
+3. **Flusso di Verifica dei Codici**:
+   - Quando uno studente inserisce un codice, il sistema esegue i seguenti controlli:
+     1. Verifica che il codice inizi con "QUIZ-" (formato richiesto)
+     2. Cerca il codice esatto nella tabella `quiz_templates`
+     3. Se non lo trova, cerca il codice senza prefisso nella tabella `quiz_templates`
+     4. Se ancora non lo trova, cerca il codice nella tabella `access_codes`
+     5. Se lo trova in qualsiasi passaggio, concede l'accesso appropriato
+     6. Se non lo trova in nessuna tabella, mostra un messaggio di errore
 
 ### Analisi e Statistiche
 - Dashboard con panoramica dei risultati
@@ -145,18 +235,19 @@ L'applicazione utilizza le politiche di sicurezza a livello di riga di Supabase 
 2. Compila le informazioni di base (titolo, descrizione, categoria)
 3. Aggiunge domande, opzioni e risposte corrette
 4. Può caricare immagini per illustrare le domande
-5. Salva il quiz
-6. Se è un admin, può scegliere se rendere il quiz pubblico o privato
-7. Se è un istruttore, ottiene un codice quiz da distribuire agli studenti
+5. Imposta la visibilità del quiz (pubblica o privata)
+6. Salva il quiz
 
 ### Sessione Quiz Interattivo
-1. L'istruttore crea una sessione da un quiz interattivo
-2. Il sistema genera un codice PIN univoco
-3. Gli studenti accedono utilizzando il codice PIN
-4. L'istruttore avvia il quiz quando tutti sono pronti
-5. Gli studenti rispondono alle domande in tempo reale
-6. La leaderboard mostra i risultati in diretta
-7. L'istruttore può terminare la sessione in qualsiasi momento
+1. L'istruttore crea un quiz interattivo
+2. Clicca sul pulsante "Avvia" per creare una sessione
+3. Il sistema genera automaticamente un codice PIN univoco e lo mostra all'istruttore
+4. L'istruttore condivide il codice PIN con gli studenti (può copiarlo facilmente con un clic)
+5. Gli studenti accedono utilizzando il codice PIN
+6. L'istruttore monitora la partecipazione in tempo reale
+7. Gli studenti rispondono alle domande in tempo reale
+8. La leaderboard mostra i risultati in diretta
+9. L'istruttore può terminare la sessione in qualsiasi momento
 
 ### Assegnazione e Completamento Quiz Standard
 1. L'istruttore seleziona un quiz da assegnare
@@ -225,8 +316,8 @@ L'applicazione utilizza le politiche di sicurezza a livello di riga di Supabase 
   - **Tutti i Quiz**: Permette di visualizzare e testare tutti i quiz disponibili nel sistema senza influire sulle statistiche
   - **Gestione Quiz**: Permette di creare, modificare ed eliminare solo i propri quiz personali
 - Può testare qualsiasi quiz tramite la modalità di test, che apre il quiz in una nuova scheda senza registrare risultati nelle statistiche
-- Ottiene codici quiz da distribuire agli studenti
-- Non può rendere pubblici o privati i quiz (a differenza dell'admin)
+- Può creare e gestire sessioni di quiz interattivi con codici PIN
+- Può rendere pubblici o privati i propri quiz
 - Può monitorare gli studenti che hanno attivato i codici attraverso la sezione "Gestione Alunni"
 - Può visualizzare statistiche relative solo ai propri quiz
 
@@ -257,286 +348,350 @@ L'applicazione utilizza le politiche di sicurezza a livello di riga di Supabase 
 
 ## Nuove Funzionalità
 
-### Cronologia Quiz con Filtri Avanzati
+### Gestione Migliorata dei Quiz Interattivi
 
 #### Descrizione
-È stata aggiunta una nuova sezione "Cronologia Quiz" nella sidebar dello studente che permette di visualizzare e filtrare i risultati dei quiz completati.
+È stata migliorata la gestione dei quiz interattivi con un sistema di codici PIN più robusto e un'interfaccia utente più intuitiva.
 
 #### Implementazione
-1. **Nuova Voce di Menu**: Aggiunta la voce "Cronologia Quiz" nella sidebar, visibile solo per gli studenti
-2. **Componente Dedicato**: Utilizzo del componente `StudentStats` con l'opzione `showFilters` abilitata
-3. **Filtri Implementati**:
-   - **Filtro per Categoria**: Permette di filtrare i quiz per categoria (es. Navigazione, Meteorologia, ecc.)
-   - **Filtro per Tipo di Quiz**: Permette di filtrare per tipo (Esame, Apprendimento, Interattivo)
-   - **Filtro per Data**: Permette di filtrare per mese/anno di completamento
+1. **Generazione Automatica di PIN**: Ogni sessione di quiz interattivo riceve automaticamente un codice PIN a 6 cifre
+2. **Visualizzazione Chiara del PIN**: Il PIN viene mostrato in modo evidente nell'interfaccia con possibilità di copia rapida
+3. **Notifica all'Avvio**: Quando un quiz viene avviato, viene mostrato un messaggio con il PIN da condividere con gli studenti
+4. **Gestione Robusta delle Sessioni**: Migliorata la gestione delle sessioni attive e in attesa
 
 #### Vantaggi
-- **Migliore Organizzazione**: Accesso diretto alla cronologia dei quiz dalla sidebar
-- **Analisi Dettagliata**: Possibilità di analizzare i risultati per categoria o tipo di quiz
-- **Monitoraggio Temporale**: Visualizzazione dei progressi nel tempo
-- **Statistiche Dinamiche**: Aggiornamento automatico di statistiche e grafici in base ai filtri selezionati
+- **Esperienza Utente Migliorata**: Processo più fluido per istruttori e studenti
+- **Condivisione Facilitata**: Copia rapida del PIN per condividerlo con gli studenti
+- **Feedback Immediato**: Notifiche chiare durante l'avvio e la gestione delle sessioni
+- **Robustezza**: Gestione migliorata degli errori e delle eccezioni
 
 #### File Modificati
-- `src/components/layout/Sidebar.tsx`: Aggiunta voce di menu
-- `src/components/layout/DashboardLayout.tsx`: Aggiornamento tipi
-- `src/components/StudentDashboard.tsx`: Implementazione della nuova tab
-- `src/components/student/StudentStats.tsx`: Aggiunta funzionalità di filtro
+- `src/components/interactive/QuizLiveManager.tsx`: Migliorata la gestione delle sessioni e dei PIN
+- `src/components/instructor/QuizCreator.tsx`: Aggiunta la generazione di PIN per i quiz interattivi
 
 #### Utilizzo
-1. Accedere alla dashboard dello studente
-2. Cliccare su "Cronologia Quiz" nella sidebar
-3. Utilizzare i filtri nella parte superiore per raffinare i risultati
-4. Visualizzare statistiche e grafici aggiornati in base ai filtri selezionati
-5. Cliccare su un quiz specifico per visualizzarne i dettagli
+1. Creare un nuovo quiz interattivo o selezionarne uno esistente
+2. Cliccare sul pulsante "Avvia" per creare una sessione
+3. Il sistema genera automaticamente un codice PIN e lo mostra all'istruttore
+4. Condividere il PIN con gli studenti (copiandolo con un clic)
+5. Monitorare la partecipazione degli studenti in tempo reale
+6. Avviare il quiz quando tutti gli studenti sono pronti
 
-### Visualizzazione Studenti Filtrata per Istruttore
+### Visibilità dei Quiz per Istruttori
 
 #### Descrizione
-È stata implementata una funzionalità che permette agli istruttori di visualizzare solo gli studenti che hanno utilizzato il loro codice di accesso, garantendo che ogni istruttore veda esclusivamente i propri studenti.
+È stata implementata la possibilità per gli istruttori di impostare la visibilità (pubblica o privata) dei propri quiz, funzionalità precedentemente riservata agli amministratori.
 
 #### Implementazione
-1. **Filtro nella Classifica Studenti**: Modifica del componente `StudentLeaderboard` per mostrare solo gli studenti associati all'istruttore corrente
-2. **Utilizzo della Tabella di Relazione**: Query alla tabella `student_instructor` per ottenere gli studenti associati all'istruttore
-3. **Filtro sui Risultati dei Quiz**: Visualizzazione dei risultati dei quiz solo per gli studenti associati all'istruttore
+1. **Selettore di Visibilità**: Aggiunto un selettore di visibilità nel form di creazione/modifica quiz
+2. **Gestione Permessi**: Modificate le politiche di sicurezza per consentire agli istruttori di modificare la visibilità
+3. **Interfaccia Unificata**: La stessa interfaccia è utilizzata per tutti i tipi di quiz (esame, apprendimento, interattivo)
 
 #### Vantaggi
-- **Privacy Migliorata**: Ogni istruttore vede solo i propri studenti
-- **Dati Rilevanti**: Le statistiche mostrate sono specifiche per gli studenti dell'istruttore
-- **Esperienza Personalizzata**: L'istruttore può concentrarsi sui progressi dei propri studenti
-- **Gestione Semplificata**: Riduzione del sovraccarico di informazioni mostrando solo dati pertinenti
+- **Maggiore Autonomia**: Gli istruttori possono gestire autonomamente la visibilità dei propri quiz
+- **Flessibilità**: Possibilità di creare quiz privati per specifici gruppi di studenti
+- **Esperienza Coerente**: Interfaccia unificata per tutti i tipi di quiz
 
 #### File Modificati
-- `src/components/instructor/StudentLeaderboard.tsx`: Implementazione del filtro per studenti associati all'istruttore
+- `src/components/instructor/QuizCreator.tsx`: Aggiunto selettore di visibilità per tutti i tipi di quiz
+- `src/components/instructor/QuizManager.tsx`: Modificata la funzione di gestione della visibilità
+- `src/components/instructor/QuizList.tsx`: Aggiornata l'interfaccia per mostrare e modificare la visibilità
 
-#### Funzionamento
-1. Quando un istruttore accede alla dashboard, il sistema recupera la sua email
-2. Viene eseguita una query alla tabella `student_instructor` per ottenere tutti gli studenti associati all'istruttore
-3. I risultati dei quiz vengono filtrati per mostrare solo quelli degli studenti associati
-4. La classifica e le statistiche vengono generate utilizzando solo i dati filtrati
+#### Utilizzo
+1. Durante la creazione di un nuovo quiz, selezionare la visibilità desiderata (pubblica o privata)
+2. Per i quiz esistenti, utilizzare il toggle di visibilità nella lista dei quiz
+3. I quiz pubblici saranno visibili a tutti gli studenti
+4. I quiz privati saranno visibili solo agli studenti con un codice di accesso specifico
 
-## Risoluzione Problemi di Salvataggio Quiz
+### Miglioramento della gestione dei codici (Giugno 2024)
 
-### Problemi Risolti
+#### Descrizione
+È stato implementato un sistema migliorato per la gestione dei codici quiz e dei codici di accesso, eliminando la confusione tra i due sistemi e garantendo una corretta verifica di entrambi i tipi di codici.
 
-#### 1. Errore 404 per RPC `get_quiz_questions`
-- **Problema**: L'applicazione generava un errore 404 quando tentava di chiamare una funzione RPC inesistente.
-- **Soluzione**: Ristrutturazione della funzione `loadQuizData` per rimuovere la chiamata RPC problematica e implementare query dirette alle tabelle `quiz_templates` e `quiz_questions`.
-- **Miglioramenti**: Implementazione di tentativi di caricamento multipli e isolati con gestione degli errori migliorata.
+#### Problema risolto
+- Gli studenti incontravano errori quando inserivano codici di accesso con il prefisso "QUIZ-"
+- Il sistema cercava questi codici solo nella tabella `quiz_templates` e non nella tabella `access_codes`
+- I codici di accesso validi non venivano riconosciuti correttamente
+- Gli studenti non venivano associati all'istruttore nella sezione "Gestione Studenti"
 
-#### 2. Errore di rendering in `QuizDetailReport`
-- **Problema**: Errore "Objects are not valid as a React child" quando si tentava di renderizzare direttamente un oggetto.
-- **Soluzione**: Modifica del componente per formattare correttamente l'oggetto `debugInfo` prima del rendering.
+#### Modifiche implementate
+1. **Ricerca in entrambe le tabelle**:
+   - `QuizSelector.tsx`: Modificato per cercare sequenzialmente in `quiz_templates` e `access_codes`
+   - `QuizCategories.tsx`: Aggiornato per gestire sia `quizCode` che `accessCode` nel localStorage
 
-#### 3. Errore "Could not find the 'category' column of 'quizzes'"
-- **Problema**: La colonna 'category' non esisteva nella tabella 'quizzes'.
-- **Soluzione**: Modifica del codice in `Quiz.tsx` per rimuovere il campo 'category' non esistente o aggiunta della colonna al database.
+2. **Gestione migliorata dei prefissi**:
+   - Supporto completo per codici con e senza prefisso "QUIZ-"
+   - Compatibilità con i codici esistenti durante la fase di transizione
 
-#### 4. Errore "Could not find the 'questions' column of 'quizzes'"
-- **Problema**: La colonna 'questions' non esisteva nella tabella 'quizzes'.
-- **Soluzione**: Modifica del codice in `Quiz.tsx` per rimuovere il campo 'questions' non esistente o aggiunta della colonna al database.
+3. **Differenziazione chiara**:
+   - Distinzione netta tra codici quiz (per quiz specifici) e codici di accesso (per accesso generale)
+   - Documentazione aggiornata per chiarire le differenze tra i due tipi di codici
 
-#### 5. Errore "invalid input syntax for type uuid: 'exam'"
-- **Problema**: Il campo 'type_id' nella tabella 'quizzes' è di tipo UUID, ma veniva inserita la stringa 'exam'.
-- **Soluzione**: 
-  - Implementazione di una ricerca di un type_id valido dalla tabella `quiz_types` invece di usare una stringa fissa.
-  - Mappatura corretta dei tipi di quiz interni ('exam', 'learning', 'interactive') ai nomi dei tipi nel database ('Esame Standardizzato', 'Modulo di Apprendimento', 'Quiz Interattivo').
-  - Aggiunta della proprietà `quiz_type` all'interfaccia `QuizResult` in `types.ts`.
+4. **Registrazione dell'utilizzo dei codici**:
+   - Quando uno studente usa un codice di accesso, l'utilizzo viene registrato in `access_code_usage`
+   - Viene creata un'associazione studente-istruttore in `student_instructor`
+   - Lo studente appare nella sezione "Gestione Studenti" dell'istruttore che ha creato il codice
 
-### Implementazione della Soluzione
+#### Vantaggi
+- **Esperienza utente migliorata**: Gli studenti possono utilizzare entrambi i tipi di codici senza errori
+- **Compatibilità garantita**: Supporto per i formati vecchi e nuovi dei codici
+- **Flessibilità**: Gli amministratori possono utilizzare entrambi i sistemi di codici in base alle esigenze
+- **Tracciamento completo**: Gli istruttori possono vedere tutti gli studenti che hanno utilizzato i loro codici
 
-#### In `Quiz.tsx`:
-```typescript
-// Mappiamo il tipo di quiz interno ai nomi dei tipi nel database
-let quizTypeName = 'Esame Standardizzato'; // Default per 'exam'
-if (quiz.quiz_type === 'learning') {
-  quizTypeName = 'Modulo di Apprendimento';
-} else if (quiz.quiz_type === 'interactive') {
-  quizTypeName = 'Quiz Interattivo';
-}
+#### Verifica delle modifiche
+Per verificare il corretto funzionamento del sistema, è possibile:
+- Inserire un codice quiz (formato: "QUIZ-XXXXXX" o "XXXXXX") per accedere a un quiz specifico
+- Inserire un codice di accesso (formato: "QUIZ-XXXXXX") per ottenere accesso a tutti i quiz pubblici
+- Verificare che lo studente appaia nella sezione "Gestione Studenti" dell'istruttore
+- Controllare nei log di console il percorso di verifica seguito dal sistema
 
-// Cerchiamo un type_id che corrisponda al tipo del quiz corrente
-const { data: quizTypes, error: typesError } = await supabase
-  .from('quiz_types')
-  .select('id, name')
-  .eq('name', quizTypeName);
-  
-let validTypeId;
+### Miglioramento della visualizzazione della Cronologia Codici di Accesso (Giugno 2024)
 
-if (typesError || !quizTypes || quizTypes.length === 0) {
-  // Fallback: prendiamo il primo tipo disponibile
-  const { data: anyTypes } = await supabase
-    .from('quiz_types')
-    .select('id')
-    .limit(1);
-    
-  validTypeId = anyTypes[0].id;
-} else {
-  validTypeId = quizTypes[0].id;
-}
+#### Descrizione
+È stata migliorata la visualizzazione della cronologia dei codici di accesso per gli studenti, assicurando che il nome dell'istruttore che ha fornito il codice sia chiaramente visibile.
 
-// Usiamo il type_id valido nel quiz
-const { data: newQuiz, error: quizError } = await supabase
-  .from('quizzes')
-  .insert([{
-    // ...altri campi
-    type_id: validTypeId,
-    // ...altri campi
-  }])
+#### Problema risolto
+- Gli studenti non potevano vedere chi aveva fornito loro i codici di accesso
+- Il componente tentava di accedere a tabelle con problemi di autorizzazione
+- La visualizzazione dell'interfaccia utente non era sufficientemente chiara
+
+#### Modifiche implementate
+1. **Miglioramento dell'accesso ai dati**:
+   - Implementato un sistema robusto per recuperare i nomi degli istruttori
+   - Aggiunto un meccanismo di fallback che genera nomi dagli indirizzi email quando i dati completi non sono disponibili
+   - Migliorati i log di debug per facilitare la risoluzione dei problemi
+
+2. **Ottimizzazione della visualizzazione**:
+   - Aggiunta un'icona utente accanto al nome dell'istruttore
+   - Implementato uno stile distintivo per rendere l'informazione più evidente
+   - Aggiunta l'etichetta "Fornito da:" prima del nome dell'istruttore
+   - Migliorato il layout generale delle card della cronologia per una migliore leggibilità
+
+3. **Gestione degli errori**:
+   - Implementato un sistema di gestione degli errori più robusto
+   - Aggiunta la visualizzazione di messaggi di errore più chiari
+   - Fornito un fallback visivo appropriato quando i dati non sono disponibili
+
+#### Vantaggi
+- **Maggiore trasparenza**: Gli studenti possono ora vedere chiaramente chi ha fornito loro i codici di accesso
+- **Migliore esperienza utente**: L'interfaccia è più intuitiva e fornisce informazioni più complete
+- **Robustezza**: Il sistema gestisce correttamente anche quando l'accesso a determinate tabelle del database è limitato
+
+#### File modificati
+- `src/components/student/AccessCodeHistory.tsx`: Aggiornata la logica di recupero dei dati e la visualizzazione
+  - Migliorata la funzione `getInstructorNames` per gestire diverse fonti di dati
+  - Aggiunta la funzione `generateNamesFromEmails` per creare nomi leggibili dalle email
+  - Aggiornato il layout delle card per mostrare più chiaramente l'istruttore
+
+#### Utilizzo
+Gli studenti possono accedere alla "Cronologia Codici di Accesso" dalla sidebar e vedere:
+1. I codici che hanno utilizzato
+2. Lo stato attuale di ciascun codice (attivo o scaduto)
+3. La data di utilizzo e di scadenza
+4. Il nome dell'istruttore che ha fornito ciascun codice
+
+### Sistema di Codici PRO per Attivazione Istruttori (Luglio 2024)
+
+#### Descrizione
+È stato implementato un sistema avanzato di gestione dei codici PRO per l'attivazione degli account istruttore. Questo sistema è separato dal sistema di codici QUIZ e fornisce un metodo sicuro e tracciabile per attivare gli account degli istruttori.
+
+#### Problema risolto
+- Eliminata la confusione tra codici per studenti (QUIZ-) e codici per istruttori (PRO-)
+- Migliorata la sicurezza dell'attivazione degli account istruttore
+- Aggiunta la possibilità di assegnare specifici codici a specifici indirizzi email
+- Implementato un sistema di tracciamento completo dell'attivazione dei codici
+
+#### Architettura del sistema
+1. **Struttura del database**:
+   - **Tabella `instructor_activation_codes`**: Memorizza i codici PRO per l'attivazione degli istruttori
+     - `id`: UUID univoco per ogni codice
+     - `code`: Stringa nel formato "PRO-XXXXXX" (es. "PRO-123456")
+     - `created_by`: UUID dell'amministratore che ha creato il codice (può essere NULL)
+     - `assigned_to_email`: Email dell'istruttore a cui è assegnato il codice
+     - `is_active`: Booleano che indica se il codice è attivo
+     - `created_at`: Timestamp di creazione del codice
+     - `expiration_date`: Timestamp di scadenza del codice
+     - `used_at`: Timestamp che indica quando il codice è stato utilizzato (NULL se non utilizzato)
+     - `used_by`: ID o email dell'utente che ha utilizzato il codice
+
+   - **Tabella `auth_users`**: Contiene gli utenti del sistema
+     - Relazione con `instructor_activation_codes` tramite l'email
+
+2. **Differenziazione dei codici**:
+   - **Codici PRO (PRO-XXXXXX)**: Utilizzati esclusivamente per l'attivazione degli account istruttore
+   - **Codici QUIZ (QUIZ-XXXXXX)**: Utilizzati esclusivamente dagli studenti per accedere ai quiz
+
+#### Flusso completo di creazione e utilizzo dei codici PRO
+
+##### 1. Creazione dei codici PRO (Amministratore)
+1. L'amministratore accede alla sezione "Codici PRO" nella dashboard
+2. Inserisce l'email dell'istruttore a cui assegnare il codice
+3. Imposta la validità del codice in giorni (default: 30 giorni)
+4. Clicca su "Genera Codice PRO"
+5. Il sistema genera automaticamente un codice nel formato "PRO-XXXXXX"
+6. Il codice viene salvato nel database con:
+   - `assigned_to_email`: Email dell'istruttore specificata
+   - `is_active`: true
+   - `created_at`: Data e ora correnti
+   - `expiration_date`: Data corrente + giorni di validità specificati
+   - `used_at` e `used_by`: NULL (non ancora utilizzato)
+7. Il codice generato viene mostrato all'amministratore, che può copiarlo negli appunti
+
+##### 2. Amministrazione dei codici PRO (Amministratore)
+1. L'amministratore può visualizzare tutti i codici PRO generati
+2. Per ogni codice, può vedere:
+   - Il codice completo (es. "PRO-123456")
+   - L'email dell'istruttore a cui è assegnato
+   - Lo stato del codice (Attivo, Attivato, Disattivato)
+   - La data di creazione
+   - La data di scadenza
+   - Se è stato utilizzato, la data di attivazione e l'ID utente
+3. Può disattivare un codice in qualsiasi momento
+4. Può verificare lo stato di attivazione di un codice tramite il pulsante di verifica
+5. Può sincronizzare manualmente i dati di attivazione per un codice che mostra "In attesa di attivazione" ma che è stato effettivamente utilizzato
+
+##### 3. Attivazione del codice PRO (Istruttore)
+1. L'istruttore accede alla pagina del profilo
+2. Visualizza la sezione "Attivazione Profilo Istruttore"
+3. Inserisce il codice PRO ricevuto dall'amministratore
+4. Il sistema verifica che:
+   - Il codice esista nella tabella `instructor_activation_codes`
+   - Il codice sia attivo (`is_active = true`)
+   - Il codice non sia scaduto (`expiration_date > NOW()`)
+   - Il codice sia assegnato all'email dell'istruttore corrente
+5. Se tutte le verifiche hanno successo:
+   - Il campo `used_at` viene aggiornato con la data e ora correnti
+   - Il campo `used_by` viene aggiornato con l'ID utente o l'email dell'istruttore
+   - Lo stato dell'account dell'istruttore viene aggiornato a `active`
+   - I flag `hasInstructorAccess` e `hasActiveAccess` vengono impostati a `true` nel localStorage
+   - L'istruttore riceve accesso completo alle funzionalità di istruttore
+6. Se la verifica fallisce:
+   - Viene mostrato un messaggio di errore specifico (es. "Codice non valido", "Codice assegnato a un'altra email")
+   - L'accesso alle funzionalità di istruttore rimane bloccato
+
+##### 4. Visualizzazione dei codici utilizzati (Istruttore)
+1. L'istruttore può visualizzare la cronologia dei codici utilizzati nella sezione "Profilo"
+2. Per ogni codice, può vedere:
+   - Il codice completo (es. "PRO-123456")
+   - Il tipo di codice (Master, Istruttore)
+   - La data di utilizzo
+   - La data di creazione
+   - La data di scadenza
+   - Lo stato del codice (Attivo, Disattivato)
+
+#### Sincronizzazione e risoluzione dei problemi
+
+##### 1. Sincronizzazione automatica
+- All'accesso, il sistema verifica automaticamente lo stato di attivazione dell'istruttore
+- Se l'istruttore ha un codice attivato, i flag `hasInstructorAccess` e `hasActiveAccess` vengono sincronizzati
+- Il sistema verifica che il codice non sia stato disattivato o non sia scaduto
+
+##### 2. Sincronizzazione manuale (Amministratore)
+1. Se un codice PRO è stato utilizzato ma nel pannello amministrativo appare ancora come "In attesa di attivazione":
+   - L'amministratore può cliccare sul pulsante "Sincronizza" accanto al codice
+   - Il sistema cercherà prima l'ID utente nel database tramite l'email associata
+   - Se trova l'ID, aggiorna il record con l'ID utente e la data corrente
+   - Se non trova l'ID, utilizza l'email come fallback
+   - Aggiorna anche lo stato dell'account utente a `active`
+   - Il codice apparirà ora come "Attivato" con la data di attivazione
+
+##### 3. Verifica dello stato (Amministratore)
+1. L'amministratore può verificare lo stato di un codice specifico tramite il pulsante di verifica (icona refresh) 
+2. Il sistema esegue una query diretta per verificare se il codice è stato attivato
+3. Mostra un messaggio dettagliato con lo stato corrente del codice:
+   - Se attivato: "Il codice PRO-XXXXXX è stato attivato il [data] da [email]"
+   - Se non attivato: "Il codice PRO-XXXXXX non è ancora stato attivato"
+
+#### Query SQL di supporto per la gestione dei codici PRO
+
+1. **Aggiornamento manuale di un codice PRO**:
+```sql
+-- Aggiorna il codice PRO con l'ID utente corretto
+UPDATE instructor_activation_codes
+SET 
+  used_at = CURRENT_TIMESTAMP,
+  used_by = '[ID_UTENTE]'
+WHERE 
+  code = 'PRO-XXXXXX' 
+  AND assigned_to_email = '[EMAIL]';
+
+-- Aggiorna anche lo stato dell'account dell'utente
+UPDATE auth_users
+SET 
+  account_status = 'active'
+WHERE 
+  id = '[ID_UTENTE]';
 ```
 
-#### In `api.ts`:
-Implementazione simile per la funzione `saveQuizResult` che ora cerca un type_id valido dalla tabella `quiz_types` invece di usare la stringa 'exam'.
-
-#### In `types.ts`:
-```typescript
-export interface QuizResult {
-  // ...altri campi
-  quiz_type?: QuizType;
-}
-
-export type QuizType = 'exam' | 'learning' | 'interactive';
+2. **Verifica dello stato di un codice PRO**:
+```sql
+-- Verifica lo stato di attivazione di un codice PRO
+SELECT 
+  code,
+  assigned_to_email,
+  is_active,
+  created_at,
+  expiration_date,
+  used_at,
+  used_by
+FROM instructor_activation_codes
+WHERE code = 'PRO-XXXXXX';
 ```
 
-### Vantaggi della Soluzione
-1. **Robustezza**: L'applicazione ora gestisce correttamente i tipi di quiz e i vincoli di chiave esterna.
-2. **Coerenza dei dati**: I risultati dei quiz sono associati al tipo di quiz corretto.
-3. **Flessibilità**: Supporta diversi tipi di quiz (exam, learning, interactive).
-4. **Diagnostica migliorata**: Logging dettagliato per facilitare il debug.
+3. **Ricerca dei codici PRO assegnati a un'email specifica**:
+```sql
+-- Cerca tutti i codici assegnati a un'email specifica
+SELECT * FROM instructor_activation_codes
+WHERE assigned_to_email = '[EMAIL]'
+ORDER BY created_at DESC;
+```
 
-### Struttura della Tabella `quiz_types`
-La tabella contiene tre tipi di quiz:
-1. **Esame Standardizzato** (ID: f7d87e26-0163-46ae-b235-5f635f4c1a8d)
-   - Descrizione: Quiz di simulazione esame patente nautica con 20 domande e tempo limite di 30 minuti
-2. **Modulo di Apprendimento** (ID: ec6aff76-cdc9-4ae5-abdc-110cb3c59bb7)
-   - Descrizione: Quiz formativi su argomenti specifici con durata flessibile
-3. **Quiz Interattivo** (ID: d39237a7-7fda-435f-8b57-26cfbae805f5)
-   - Descrizione: Quiz interattivi creati dagli insegnanti per gli studenti
+#### File modificati e implementazioni principali
+
+1. **Componente AdminInstructorCodesManager**:
+   - Aggiunta funzione `handleGenerateProCode` per generare nuovi codici PRO
+   - Aggiunta funzione `fetchActivationCodes` per recuperare l'elenco dei codici
+   - Aggiunta funzione `handleDeactivateCode` per disattivare i codici
+   - Aggiunta funzione `handleCheckActivationStatus` per verificare lo stato dei codici
+   - Aggiunta funzione `handleSyncActivationData` per sincronizzare manualmente i dati di attivazione
+
+2. **Componente InstructorProfile**:
+   - Modificata funzione `checkActiveCode` per verificare i codici PRO
+   - Aggiunta gestione specifica per i codici che iniziano con "PRO-"
+   - Implementata logica per verificare che il codice sia assegnato all'email corretta
+   - Aggiunta logica per aggiornare i campi `used_at` e `used_by` nel database
+
+3. **Struttura del database**:
+   - Aggiunta tabella `instructor_activation_codes` per memorizzare i codici PRO
+   - Implementate politiche di sicurezza RLS appropriate per proteggere i dati
+
+#### Vantaggi del nuovo sistema
+
+1. **Sicurezza migliorata**:
+   - I codici PRO sono assegnati a email specifiche
+   - Solo l'utente con l'email corretta può attivare un codice
+   - Gli amministratori possono disattivare codici in qualsiasi momento
+
+2. **Tracciabilità completa**:
+   - Ogni codice PRO è tracciabile dall'inizio alla fine
+   - Timestamp precisi di creazione, attivazione e scadenza
+   - Gli amministratori possono vedere chi ha attivato ogni codice
+
+3. **User experience migliorata**:
+   - Messaggi di errore specifici per guidare l'utente
+   - Interfaccia intuitiva per amministratori e istruttori
+   - Visualizzazione chiara dello stato dei codici
+
+4. **Gestione semplificata**:
+   - Generazione automatica di codici nel formato corretto
+   - Interfaccia user-friendly per gli amministratori
+   - Funzioni di sincronizzazione e verifica per risolvere problemi
+
+5. **Separazione chiara dai codici QUIZ**:
+   - I codici PRO (PRO-XXXXXX) sono esclusivamente per l'attivazione degli istruttori
+   - I codici QUIZ (QUIZ-XXXXXX) sono esclusivamente per l'accesso ai quiz da parte degli studenti
+   - Nessuna confusione possibile tra i due sistemi
 
 ---
 
-Questo documento verrà aggiornato regolarmente per riflettere le modifiche e le nuove funzionalità dell'applicazione.
-
-Ultimo aggiornamento: 31 maggio 2024 
-
-## Gestione dello Stato con Redux
-
-### Panoramica dell'Implementazione Redux
-
-L'applicazione utilizza Redux come soluzione centralizzata per la gestione dello stato, in particolare per i dati di autenticazione e autorizzazione. Questo approccio risolve diversi problemi critici, tra cui la sincronizzazione del flag `hasInstructorAccess` in tutta l'applicazione.
-
-### Struttura Redux
-
-La configurazione Redux include:
-
-- **Store**: Il punto centrale che contiene tutto lo stato dell'applicazione
-- **Slices**: Porzioni specializzate dello stato globale (es. authSlice per l'autenticazione)
-- **Reducers**: Funzioni che definiscono come lo stato cambia in risposta alle azioni
-- **Actions**: Eventi che innescano le modifiche allo stato
-- **Selectors**: Funzioni per estrarre dati specifici dallo stato
-
-### Directory e File Principali
-
-```
-src/
-└── redux/
-    ├── store.ts             # Configurazione dello store Redux
-    ├── hooks.ts             # Custom hooks tipizzati (useAppDispatch, useAppSelector)
-    └── slices/
-        └── authSlice.ts     # Gestione dello stato di autenticazione
-```
-
-### Lo Slice di Autenticazione
-
-Il `authSlice.ts` implementa uno "slice" specifico per la gestione dell'autenticazione con le seguenti funzionalità:
-
-- **Stato**: Informazioni sull'utente autenticato, inclusi:
-  - `isAuthenticated`: Flag principale di autenticazione
-  - `isStudent` / `isProfessor`: Tipo di utente
-  - `hasInstructorAccess`: Permesso di accesso come istruttore
-  - `isMasterAdmin`: Permessi amministrativi
-  - `hasActiveAccess`: Accesso attivo alla piattaforma
-  - `needsSubscription`: Necessità di sottoscrizione
-
-- **Azioni**:
-  - `login`: Autentica l'utente e imposta tutti i flag relativi
-  - `logout`: Rimuove tutti i dati di autenticazione
-  - `updateInstructorAccess`: Aggiorna specificamente i permessi dell'istruttore
-  - `syncFromStorage`: Sincronizza lo stato Redux con localStorage
-
-- **Selettori**:
-  - Funzioni per accedere facilmente a porzioni specifiche dello stato di autenticazione
-
-### Integrazione con l'Applicazione Esistente
-
-Redux è integrato nell'applicazione mantenendo la compatibilità con il localStorage per garantire una transizione senza interruzioni:
-
-1. **Inizializzazione dello Stato**: Lo stato iniziale viene caricato dal localStorage per mantenere la persistenza
-2. **Sincronizzazione Bidirezionale**: Gli aggiornamenti a Redux vengono propagati al localStorage e viceversa
-3. **Eventi di Storage**: Gli eventi nativi `storage` e personalizzati `localStorageUpdated` vengono intercettati per mantenere sincronizzato lo stato
-
-### Componenti Aggiornati
-
-I seguenti componenti sono stati aggiornati per utilizzare Redux:
-
-- **UnifiedLoginCard**: Ora utilizza il dispatch di Redux per gestire l'autenticazione
-- **LandingPage**: Implementa il logout centralizzato tramite Redux
-- **App**: Aggiornato per utilizzare lo stato Redux invece del localStorage diretto
-
-### Vantaggi dell'Implementazione Redux
-
-1. **Stato Centralizzato**: Risolve il problema di coerenza dello stato tra componenti
-2. **Flusso Dati Prevedibile**: Rende le modifiche allo stato tracciabili e prevedibili
-3. **Debugging Migliorato**: Facilita l'identificazione e la risoluzione dei problemi
-4. **Tipizzazione Completa**: Integrazione con TypeScript per una migliore sicurezza del tipo
-5. **Gestione degli Eventi Migliorata**: Centralizza la risposta agli eventi di storage
-6. **Scalabilità**: Fornisce una base robusta per future estensioni dell'applicazione
-
-### Utilizzo nei Componenti
-
-Per utilizzare Redux nei componenti:
-
-```typescript
-import { useAppSelector, useAppDispatch } from '../redux/hooks';
-import { selectIsAuthenticated, login, logout } from '../redux/slices/authSlice';
-
-function MyComponent() {
-  // Accedi ai dati dello stato
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  
-  // Ottieni il dispatcher per inviare azioni
-  const dispatch = useAppDispatch();
-  
-  // Esempio di login
-  const handleLogin = (userData) => {
-    dispatch(login(userData));
-  };
-  
-  // Esempio di logout
-  const handleLogout = () => {
-    dispatch(logout());
-  };
-  
-  // Resto del componente...
-}
-```
-
-### Risoluzione del Problema di Sincronizzazione dell'Accesso Istruttore
-
-L'implementazione di Redux risolve specificamente il problema con il flag `hasInstructorAccess`:
-
-1. Lo stato di accesso è ora gestito centralmente in un unico punto
-2. Le modifiche all'accesso vengono propagate immediatamente a tutti i componenti
-3. Il sincronismo con localStorage è gestito in modo coerente
-4. Gli eventi di aggiornamento sono centralizzati
-
-Questo garantisce che, quando un istruttore attiva il proprio accesso, lo stato venga aggiornato correttamente in tutta l'applicazione senza necessità di ricaricare la pagina.
-
-### Manutenzione e Best Practices
-
-1. **Preferire i Selettori**: Utilizza i selettori esportati invece di accedere direttamente allo stato
-2. **Azioni Specifiche**: Crea azioni specifiche per modifiche semantiche dello stato
-3. **Evitare Mutazioni**: Non modificare direttamente lo stato Redux (usare dispatch)
-4. **Separazione delle Responsabilità**: Mantieni la logica di state management nei reducer, non nei componenti
-5. **Utilizzare i Custom Hooks**: Usa `useAppDispatch` e `useAppSelector` per mantenere la tipizzazione
-
---- 
+Ultimo aggiornamento: 8 luglio 2024

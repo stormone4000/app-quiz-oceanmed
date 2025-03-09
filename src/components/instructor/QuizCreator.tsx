@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Save, AlertCircle, Image as ImageIcon, Loader2, Compass, Shield, CloudSun, Book, GraduationCap, Wrench, Anchor, Ship, Navigation, Map, Waves, Wind, Thermometer, LifeBuoy } from 'lucide-react';
 import { supabase, supabaseAdmin } from '../../services/supabase';
+import { v4 as uuidv4 } from 'uuid';
 
 interface QuizCreatorProps {
   quizType: 'exam' | 'learning' | 'interactive';
@@ -77,6 +78,19 @@ const COLOR_OPTIONS = [
   { name: 'pink', label: 'Rosa' },
   { name: 'teal', label: 'Turchese' }
 ];
+
+// Funzione di utilità per verificare se un valore è un UUID valido
+function isValidUUID(value: any): boolean {
+  if (!value || typeof value !== 'string') return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(value);
+}
+
+// Funzione per generare un PIN a 6 cifre
+function generatePin(): string {
+  const randomPin = Math.floor(100000 + Math.random() * 900000).toString();
+  return `QUIZ-${randomPin}`;
+}
 
 export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSuccess }: QuizCreatorProps) {
   const [title, setTitle] = useState<string>(editQuiz?.title || '');
@@ -168,8 +182,12 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
         return;
       }
 
+      // Determina la tabella corretta per le domande in base al tipo di quiz
+      const questionsTableName = quizType === 'interactive' ? 'interactive_quiz_questions' : 'quiz_questions';
+      console.log(`Loading questions from table: ${questionsTableName} for quiz type: ${quizType}`);
+
       const { data, error } = await supabase
-        .from('quiz_questions')
+        .from(questionsTableName)
         .select(`
           id,
           question_text,
@@ -181,17 +199,32 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
         .eq('quiz_id', editQuiz.id)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      console.log('Questions loaded from DB:', data);
+      if (error) {
+        console.error(`Errore nel caricamento delle domande da ${questionsTableName}:`, error);
+        throw error;
+      }
+      
+      console.log(`Questions loaded from ${questionsTableName}:`, data);
 
       // Transform data to match our Question interface
-      const formattedQuestions = data?.map(q => ({
-        question_text: q.question_text,
-        options: q.options || [],
-        correct_answer: q.correct_answer,
-        explanation: q.explanation || '',
-        image_url: q.image_url
-      })) || [];
+      const formattedQuestions = data?.map(q => {
+        // Assicurati che correct_answer sia un numero
+        let correctAnswer = q.correct_answer;
+        if (typeof correctAnswer === 'string') {
+          correctAnswer = parseInt(correctAnswer, 10);
+          if (isNaN(correctAnswer)) {
+            correctAnswer = 0; // Valore predefinito
+          }
+        }
+        
+        return {
+          question_text: q.question_text || '',
+          options: Array.isArray(q.options) ? q.options : [],
+          correct_answer: correctAnswer,
+          explanation: q.explanation || '',
+          image_url: q.image_url || ''
+        };
+      }) || [];
 
       console.log('Formatted questions:', formattedQuestions);
       setQuestions(formattedQuestions);
@@ -322,29 +355,54 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
       setLoading(true);
       setError('');
       
+      // Validazione delle domande
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        if (!q.question_text) {
+          setError(`La domanda ${i+1} non ha un testo`);
+          setLoading(false);
+          return;
+        }
+        if (q.options.length === 0) {
+          setError(`La domanda ${i+1} non ha opzioni di risposta`);
+          setLoading(false);
+          return;
+        }
+        if (typeof q.correct_answer !== 'number' || isNaN(q.correct_answer)) {
+          setError(`La domanda ${i+1} ha un indice di risposta corretta non valido`);
+          setLoading(false);
+          return;
+        }
+        if (q.correct_answer < 0 || q.correct_answer >= q.options.length) {
+          setError(`La domanda ${i+1} ha un indice di risposta corretta fuori range`);
+          setLoading(false);
+          return;
+        }
+      }
+      
       const userEmail = localStorage.getItem('userEmail');
       if (!userEmail) {
         throw new Error('Email utente non trovata nel localStorage');
       }
 
-      // Ottieni l'ID dell'utente basato sull'email
-      const { data: userData, error: userError } = await supabase
-        .from('auth_users')
-        .select('id')
-        .eq('email', userEmail)
-        .single();
+      // Salva l'ID utente in localStorage per utilizzi futuri
+      try {
+        // Ottieni l'ID dell'utente basato sull'email
+        const { data: userData, error: userError } = await supabase
+          .from('auth_users')
+          .select('id')
+          .eq('email', userEmail)
+          .single();
 
-      if (userError) {
-        console.error('Errore nel recuperare l\'ID utente:', userError);
-        throw new Error(`Errore nel recuperare l'ID utente: ${userError.message}`);
+        if (userError) {
+          console.error('Errore nel recuperare l\'ID utente:', userError);
+        } else if (userData) {
+          localStorage.setItem('userId', userData.id);
+          console.log('ID utente salvato in localStorage:', userData.id);
+        }
+      } catch (fetchError) {
+        console.error('Errore di connessione durante il recupero dell\'ID utente:', fetchError);
       }
-
-      if (!userData) {
-        throw new Error('Utente non trovato nel database');
-      }
-
-      const userId = userData.id;
-      console.log('ID utente per la creazione del quiz:', userId);
       
       // Preparazione dei dati del quiz
       const quizData = {
@@ -357,14 +415,26 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
         duration_minutes: duration,
         icon,
         icon_color: iconColor,
-        created_by: userId // Utilizzo l'ID utente invece dell'email
+        created_by: userEmail // Utilizziamo sempre l'email dell'utente per il campo created_by
       };
 
       // Aggiungi host_email solo per i quiz interattivi
       if (quizType === 'interactive') {
+        // Genera un PIN per il quiz interattivo se non è in modalità modifica
+        const quizPin = editQuiz?.quiz_code || generatePin();
+        
         Object.assign(quizData, {
           host_email: hostEmail || userEmail
+          // Rimuovo quiz_code perché la colonna non esiste nella tabella
         });
+        
+        // Salviamo il PIN in una variabile per utilizzarlo dopo la creazione del quiz
+        console.log(`Quiz interattivo con PIN generato: ${quizPin}`);
+        
+        // Salviamo il PIN in localStorage per recuperarlo dopo la creazione del quiz
+        if (!editQuiz) {
+          localStorage.setItem('lastGeneratedPin', quizPin);
+        }
       }
 
       console.log(`Quiz template data for ${quizType} quiz:`, quizData);
@@ -420,30 +490,75 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
       
       if (questions.length > 0) {
         console.log('Saving questions for quiz:', quizId);
-        const questionsData = questions.map(q => ({
-          quiz_id: quizId,
-          question_text: q.question_text,
-          options: q.options,
-          correct_answer: q.correct_answer,
-          explanation: q.explanation,
-          image_url: q.image_url
-        }));
+        
+        // Debug log per i valori di correct_answer
+        questions.forEach((q, idx) => {
+          console.log(`Question ${idx+1} - correct_answer:`, q.correct_answer, `(type: ${typeof q.correct_answer})`);
+        });
+        
+        // Verifica che quizId sia un UUID valido
+        if (!isValidUUID(quizId)) {
+          console.error('ID quiz non valido:', quizId);
+          throw new Error(`ID quiz non valido: ${quizId}. È necessario un UUID valido.`);
+        }
+        
+        // Prepara i dati delle domande con controlli rigorosi sui tipi
+        const questionsData = questions.map((q, idx) => {
+          // Assicurati che correct_answer sia un numero
+          let correctAnswer = q.correct_answer;
+          if (typeof correctAnswer === 'string') {
+            correctAnswer = parseInt(correctAnswer, 10);
+            if (isNaN(correctAnswer)) {
+              console.error(`Domanda ${idx+1}: Valore di correct_answer non valido:`, q.correct_answer);
+              correctAnswer = 0; // Valore predefinito
+            }
+          }
+          
+          // Assicurati che options sia un array
+          let options = q.options;
+          if (!Array.isArray(options)) {
+            console.error(`Domanda ${idx+1}: options non è un array:`, options);
+            options = [];
+          }
+          
+          // Crea l'oggetto domanda con tipi corretti
+          return {
+            quiz_id: quizId, // UUID valido
+            question_text: q.question_text || '',
+            options: options,
+            correct_answer: correctAnswer,
+            explanation: q.explanation || '',
+            image_url: q.image_url || null
+          };
+        });
 
-        console.log('Questions data:', questionsData);
+        console.log('Questions data:', JSON.stringify(questionsData, null, 2));
         
         // Determina la tabella corretta per le domande in base al tipo di quiz
         const questionsTableName = quizType === 'interactive' ? 'interactive_quiz_questions' : 'quiz_questions';
         console.log(`Using questions table: ${questionsTableName} for quiz type: ${quizType}`);
         
-        const { error: questionsError } = await supabaseAdmin
-          .from(questionsTableName)
-          .insert(questionsData);
-
-        if (questionsError) {
-          console.error('Errore nel salvataggio delle domande:', questionsError);
-          throw new Error(`Errore nel salvataggio delle domande: ${questionsError.message}`);
+        try {
+          // Inserisci le domande una alla volta per identificare meglio eventuali errori
+          for (let i = 0; i < questionsData.length; i++) {
+            const questionData = questionsData[i];
+            console.log(`Inserimento domanda ${i+1}:`, JSON.stringify(questionData, null, 2));
+            
+            const { error: questionError } = await supabaseAdmin
+              .from(questionsTableName)
+              .insert([questionData]);
+              
+            if (questionError) {
+              console.error(`Errore nell'inserimento della domanda ${i+1}:`, questionError);
+              throw new Error(`Errore nell'inserimento della domanda ${i+1}: ${questionError.message}`);
+            }
+          }
+          
+          console.log('Questions saved successfully');
+        } catch (insertError) {
+          console.error('Eccezione durante il salvataggio delle domande:', insertError);
+          throw new Error(`Errore nel salvataggio delle domande: ${insertError instanceof Error ? insertError.message : 'Errore sconosciuto'}`);
         }
-        console.log('Questions saved successfully');
       }
 
       // Verify questions were saved
@@ -534,42 +649,40 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
               />
             </div>
 
-            {quizType === 'interactive' && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                    Visibilità *
-                  </label>
-                  <select
-                    value={visibility}
-                    onChange={(e) => setVisibility(e.target.value as 'private' | 'public')}
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
-                  >
-                    <option value="private">Privato</option>
-                    <option value="public">Pubblico</option>
-                  </select>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-                    {visibility === 'private' 
-                      ? 'Può essere trovato dalle persone con cui lo condividi'
-                      : 'Tutti possono trovarlo'
-                    }
-                  </p>
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                Visibilità *
+              </label>
+              <select
+                value={visibility}
+                onChange={(e) => setVisibility(e.target.value as 'private' | 'public')}
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+              >
+                <option value="private">Privato</option>
+                <option value="public">Pubblico</option>
+              </select>
+              <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+                {visibility === 'private' 
+                  ? 'Solo tu puoi vedere questo quiz. Gli studenti non lo vedranno nella lista dei quiz disponibili.'
+                  : 'Questo quiz sarà visibile a tutti gli studenti nella lista dei quiz disponibili.'
+                }
+              </p>
+            </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                    Formato Quiz *
-                  </label>
-                  <select
-                    value={quizFormat}
-                    onChange={(e) => setQuizFormat(e.target.value as 'multiple_choice' | 'true_false')}
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
-                  >
-                    <option value="multiple_choice">Risposta Multipla</option>
-                    <option value="true_false">Vero o Falso</option>
-                  </select>
-                </div>
-              </>
+            {quizType === 'interactive' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                  Formato Quiz *
+                </label>
+                <select
+                  value={quizFormat}
+                  onChange={(e) => setQuizFormat(e.target.value as 'multiple_choice' | 'true_false')}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                >
+                  <option value="multiple_choice">Risposta Multipla</option>
+                  <option value="true_false">Vero o Falso</option>
+                </select>
+              </div>
             )}
 
             {quizType !== 'interactive' && (

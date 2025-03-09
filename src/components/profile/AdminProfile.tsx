@@ -96,7 +96,7 @@ export function AdminProfile({ userEmail }: AdminProfileProps) {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6">
+      <div className="bg-white dark:bg-slate-900 rounded-xl p-6">
         <h2 className="text-2xl font-bold mb-6 dark:text-slate-100 flex items-center gap-2">
           <User className="w-6 h-6 text-blue-600" />
           Admin Master

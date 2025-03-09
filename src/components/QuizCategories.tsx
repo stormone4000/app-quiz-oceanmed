@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Book, Anchor, Compass, CloudSun, Shield, Wrench, ArrowLeft, GraduationCap, Ship, Navigation, Map, Waves, Wind, Thermometer, LifeBuoy, ArrowRight, HelpCircle, Clock, CheckCircle, Key, Filter, X, Users } from 'lucide-react';
+import { Book, Anchor, Compass, CloudSun, Shield, Wrench, ArrowLeft, GraduationCap, Ship, Navigation, Map, Waves, Wind, Thermometer, LifeBuoy, ArrowRight, HelpCircle, Clock, CheckCircle, Key, Filter, X, Users, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../services/supabase';
 import { COLORS } from './instructor/QuizCreator';
 import type { QuizType } from '../types';
+import { useNavigate } from 'react-router-dom';
 
 interface Category {
   name: string;
@@ -47,6 +48,7 @@ interface Quiz {
   icon: string;
   icon_color: string;
   quiz_code?: string;
+  created_by?: string;
 }
 
 export function QuizCategories({ type, onBack, onSelectCategory }: QuizCategoryProps) {
@@ -54,7 +56,10 @@ export function QuizCategories({ type, onBack, onSelectCategory }: QuizCategoryP
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedInstructor, setSelectedInstructor] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [instructors, setInstructors] = useState<{id: string, name: string}[]>([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
     console.log("QuizCategories - Tipo di quiz selezionato:", type);
@@ -78,40 +83,153 @@ export function QuizCategories({ type, onBack, onSelectCategory }: QuizCategoryP
         return acc;
       }, {} as Record<string, Category>);
 
+      // Extract unique instructors
+      const uniqueInstructors = [...new Set(quizzes.map(quiz => quiz.created_by || 'Sconosciuto'))];
+      setInstructors(uniqueInstructors.map(instructor => ({ id: instructor, name: instructor })));
+
       console.log("QuizCategories - Categorie estratte:", Object.keys(categoryMap));
+      console.log("QuizCategories - Istruttori estratti:", uniqueInstructors);
       setCategories(Object.values(categoryMap));
     } else {
       console.log("QuizCategories - Nessun quiz trovato per estrarre categorie");
     }
   }, [quizzes]);
 
+  // Aggiungi questo useEffect per verificare la validità del codice di accesso
+  useEffect(() => {
+    // Verifica se il codice di accesso è ancora valido all'avvio del componente
+    const checkAccessCode = async () => {
+      const storedAccessCode = localStorage.getItem('accessCode');
+      if (storedAccessCode) {
+        console.log('Verifica validità del codice:', storedAccessCode);
+        
+        const { data, error } = await supabase
+          .from('access_codes')
+          .select('is_active, expiration_date')
+          .eq('code', storedAccessCode)
+          .single();
+          
+        if (error || !data) {
+          console.error('Errore nella verifica del codice di accesso:', error);
+          // Rimuovi il codice non valido
+          localStorage.removeItem('accessCode');
+          setError('Il codice di accesso non è più valido');
+          return;
+        }
+        
+        if (!data.is_active) {
+          console.log('Codice di accesso disattivato');
+          localStorage.removeItem('accessCode');
+          setError('Il tuo codice di accesso è stato disattivato');
+          setQuizzes([]);
+          return;
+        }
+        
+        if (data.expiration_date && new Date(data.expiration_date) < new Date()) {
+          console.log('Codice di accesso scaduto');
+          localStorage.removeItem('accessCode');
+          setError('Il tuo codice di accesso è scaduto');
+          setQuizzes([]);
+          return;
+        }
+      }
+    };
+    
+    checkAccessCode();
+  }, []);
+
   const loadQuizzes = async () => {
     try {
       setLoading(true);
       setError(null);
-      const quizCode = localStorage.getItem('quizCode');
       
       const userEmail = localStorage.getItem('userEmail');
-
-      // Log per debug
-      console.log(`Caricamento quiz di tipo: ${type}, codice: ${quizCode}, email: ${userEmail}`);
-      console.log("URL Supabase:", import.meta.env.VITE_SUPABASE_URL);
-
-      // Costruisci la query
+      const quizCode = localStorage.getItem('quizCode');
+      const accessCode = localStorage.getItem('accessCode');
+      
+      console.log(`Caricamento quiz di tipo: ${type}, codice quiz: ${quizCode}, codice accesso: ${accessCode}, email: ${userEmail}`);
+      
+      // Costruisci la query di base
       let query = supabase
         .from('quiz_templates')
         .select('*')
         .eq('quiz_type', type)
         .order('created_at', { ascending: false });
 
-      // Aggiungi filtro per visibilità
-      if (quizCode) {
-        query = query.or(`visibility.eq.public,quiz_code.eq.${quizCode}`);
-      } else {
-        query = query.eq('visibility', 'public');
+      // NUOVA LOGICA DI VISIBILITÀ
+      // 1. Recuperiamo gli istruttori associati allo studente (se esistono)
+      let instructorEmails: string[] = [];
+      
+      if (userEmail) {
+        // Ottieni gli istruttori associati allo studente
+        const { data: instructorData, error: instructorError } = await supabase
+          .from('student_instructor')
+          .select('instructor_email')
+          .eq('student_email', userEmail);
+          
+        if (instructorError) {
+          console.error('Errore nel recupero degli istruttori associati:', instructorError);
+        } else if (instructorData && instructorData.length > 0) {
+          instructorEmails = instructorData.map(i => i.instructor_email);
+          console.log('Istruttori associati trovati:', instructorEmails);
+        }
+        
+        // Backup: ottieni gli istruttori dai codici di accesso usati
+        if (instructorEmails.length === 0) {
+          const { data: usageData, error: usageError } = await supabase
+            .from('access_code_usage')
+            .select('instructor_email')
+            .eq('student_email', userEmail)
+            .not('instructor_email', 'is', null);
+            
+          if (usageError) {
+            console.error('Errore nel recupero dei codici usati:', usageError);
+          } else if (usageData && usageData.length > 0) {
+            const emails = usageData.map(u => u.instructor_email).filter(Boolean);
+            instructorEmails = [...new Set([...instructorEmails, ...emails])];
+            console.log('Istruttori trovati da codici usati:', instructorEmails);
+          }
+        }
       }
-
-      console.log("Query costruita per caricare i quiz");
+      
+      // Costruisci la clausola di ricerca
+      // Quiz pubblici dell'admin sono visibili a tutti
+      let searchClause = 'created_by.eq.marcosrenatobruno@gmail.com,created_by.eq.system';
+      
+      // Aggiungi i quiz pubblici degli istruttori associati
+      if (instructorEmails.length > 0) {
+        instructorEmails.forEach(email => {
+          if (email && email !== 'marcosrenatobruno@gmail.com') {
+            searchClause += `,created_by.eq.${email}`;
+          }
+        });
+      }
+      
+      // Filtro aggiuntivo per la visibilità
+      searchClause = `(${searchClause}),visibility.eq.public`;
+      
+      // Se abbiamo un codice quiz specifico, aggiungiamolo alla clausola AND/OR
+      if (quizCode) {
+        console.log('Filtro con codice quiz:', quizCode);
+        
+        // Facciamo una ricerca compatibile sia con il formato "QUIZ-XXXX" che "XXXX"
+        if (quizCode.startsWith('QUIZ-')) {
+          // Se il codice ha già il prefisso, cerchiamo sia con che senza prefisso
+          const codeWithoutPrefix = quizCode.replace('QUIZ-', '');
+          searchClause = `(${searchClause}),quiz_code.eq.${quizCode},quiz_code.eq.${codeWithoutPrefix}`;
+          console.log(`Cerco quiz con codice ${quizCode} o ${codeWithoutPrefix}`);
+        } else {
+          // Se il codice non ha il prefisso, cerchiamo sia con che senza prefisso
+          const codeWithPrefix = `QUIZ-${quizCode}`;
+          searchClause = `(${searchClause}),quiz_code.eq.${quizCode},quiz_code.eq.${codeWithPrefix}`;
+          console.log(`Cerco quiz con codice ${quizCode} o ${codeWithPrefix}`);
+        }
+      }
+      
+      // Applica la clausola OR alla query
+      query = query.or(searchClause);
+      
+      console.log("Query costruita per caricare i quiz:", searchClause);
       
       const { data: quizData, error: quizError } = await query;
 
@@ -126,9 +244,27 @@ export function QuizCategories({ type, onBack, onSelectCategory }: QuizCategoryP
         console.log('Primo quiz trovato:', quizData[0]);
       } else {
         console.log('Nessun quiz trovato nel database per il tipo:', type);
+        // Se non ci sono quiz pubblici o con il codice specifico, mostra un messaggio
+        if (!accessCode) {
+          setError('Per visualizzare i quiz privati, inserisci un codice di accesso valido');
+        }
       }
       
-      setQuizzes(quizData || []);
+      // Filtra i quiz "system" - mostra solo quelli creati dall'admin
+      const filteredQuizData = quizData?.filter(quiz => 
+        quiz.created_by !== 'system'
+      ) || [];
+      
+      // Formatta i nomi degli istruttori per una migliore visualizzazione
+      const formattedQuizData = filteredQuizData.map(quiz => {
+        // Se l'istruttore è l'admin, mostra "Admin" invece dell'email
+        if (quiz.created_by === 'marcosrenatobruno@gmail.com') {
+          return { ...quiz, created_by: 'Admin' };
+        }
+        return quiz;
+      });
+      
+      setQuizzes(formattedQuizData);
     } catch (error) {
       console.error('Error loading quizzes:', error);
       setError('Errore durante il caricamento dei quiz');
@@ -146,8 +282,13 @@ export function QuizCategories({ type, onBack, onSelectCategory }: QuizCategoryP
     });
   };
 
+  const handleInstructorChange = (instructor: string | null) => {
+    setSelectedInstructor(instructor);
+  };
+
   const filteredQuizzes = quizzes.filter(quiz => 
-    selectedCategories.length === 0 || selectedCategories.includes(quiz.category || 'Uncategorized')
+    (selectedCategories.length === 0 || selectedCategories.includes(quiz.category || 'Uncategorized')) &&
+    (selectedInstructor === null || quiz.created_by === selectedInstructor)
   );
 
   if (error) {
@@ -155,7 +296,7 @@ export function QuizCategories({ type, onBack, onSelectCategory }: QuizCategoryP
       <div className="p-6 max-w-6xl mx-auto">
         <button
           onClick={onBack}
-          className="mb-6 text-white hover:text-blue-100 flex items-center gap-2"
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white rounded-lg flex items-center gap-2 shadow-sm transition-colors mb-4"
         >
           <ArrowLeft className="w-5 h-5" />
           Torna alla selezione
@@ -168,49 +309,66 @@ export function QuizCategories({ type, onBack, onSelectCategory }: QuizCategoryP
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="px-4 sm:px-6 md:px-8 py-6 max-w-7xl mx-auto">
       <button
         onClick={onBack}
-        className="mb-6 text-white hover:text-blue-100 flex items-center gap-2"
+        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white rounded-lg flex items-center gap-2 shadow-sm transition-colors mb-4"
       >
-        <ArrowLeft className="w-5 h-5" />
-        Torna alla selezione
+        <ArrowLeft className="w-4 h-4" />
+        <span>Torna alla selezione</span>
       </button>
 
-      <h1 className="text-4xl font-light text-white mb-3">
+      <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-3">
         {type === 'exam' ? 'Quiz di Esame' : 
          type === 'learning' ? 'Moduli di Apprendimento' : 
-         'Quiz Interattivi'}
+         'Quiz Live'}
       </h1>
-      <p className="text-blue-100 mb-8">
+      <p className="text-slate-800 dark:text-slate-200 mb-8 font-medium">
         {type === 'exam' 
           ? 'Seleziona il tipo di patente per iniziare la simulazione d\'esame'
           : type === 'learning'
             ? 'Scegli un argomento per iniziare ad imparare'
-            : 'Seleziona un quiz interattivo creato da altri studenti'
+            : 'Sessioni live gestite da un istruttore con leaderboard in tempo reale'
         }
       </p>
+
+      {/* Info message */}
+      {!localStorage.getItem('quizCode') && type === 'interactive' && (
+        <div className="bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-500 p-4 rounded-lg mb-8">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <Info className="h-5 w-5 text-blue-600 dark:text-blue-300" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-blue-800 dark:text-blue-100 font-medium">
+                Stai visualizzando i quiz live pubblici. Gli studenti partecipano in tempo reale usando un codice PIN.
+                Per accedere a quiz privati, inserisci un codice nella pagina <strong>Quiz Disponibili</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Category Filters */}
       {categories.length > 0 && (
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
-            <Filter className="w-5 h-5 text-white" />
-            <h3 className="text-lg font-medium text-white">Filtra per Categoria</h3>
+            <Filter className="w-5 h-5 text-slate-800 dark:text-white" />
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Filtra per Categoria</h3>
           </div>
           <div className="flex flex-wrap gap-2">
             {categories.map((category) => (
               <button
                 key={category.name}
                 onClick={() => handleCategoryToggle(category.name)}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
+                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors font-medium ${
                   selectedCategories.includes(category.name)
                     ? 'bg-blue-600 text-white'
-                    : 'bg-white/10 text-white hover:bg-white/20'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600'
                 }`}
               >
                 {category.name}
-                <span className="text-sm opacity-75">({category.count})</span>
+                <span className="text-sm opacity-90">({category.count})</span>
                 {selectedCategories.includes(category.name) && (
                   <X className="w-4 h-4" />
                 )}
@@ -220,12 +378,53 @@ export function QuizCategories({ type, onBack, onSelectCategory }: QuizCategoryP
         </div>
       )}
 
+      {/* Instructor Filter */}
+      {instructors.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-5 h-5 text-slate-800 dark:text-white" />
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Filtra per Istruttore</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => handleInstructorChange(null)}
+              className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors font-medium ${
+                selectedInstructor === null
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600'
+              }`}
+            >
+              Tutti gli istruttori
+            </button>
+            {instructors.map((instructor) => (
+              instructor.id !== 'system' && (
+                <button
+                  key={instructor.id}
+                  onClick={() => handleInstructorChange(instructor.id)}
+                  className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors font-medium ${
+                    selectedInstructor === instructor.id
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600'
+                  }`}
+                >
+                  {instructor.name}
+                  {selectedInstructor === instructor.id && (
+                    <X className="w-4 h-4" />
+                  )}
+                </button>
+              )
+            ))}
+          </div>
+        </div>
+      )}
+
       {loading ? (
-        <div className="text-center text-white">
-          Caricamento quiz...
+        <div className="text-center text-slate-800 dark:text-white py-8 font-medium">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+          <p>Caricamento quiz...</p>
         </div>
       ) : filteredQuizzes.length === 0 ? (
-        <div className="text-center text-white">
+        <div className="text-center text-slate-800 dark:text-white py-8 font-medium">
           {selectedCategories.length > 0
             ? 'Nessun quiz disponibile per le categorie selezionate'
             : 'Nessun quiz disponibile al momento'
@@ -240,71 +439,82 @@ export function QuizCategories({ type, onBack, onSelectCategory }: QuizCategoryP
             return (
               <motion.div
                 key={quiz.id}
-                className="group relative rounded-xl bg-slate-800/10 dark:bg-slate-800/20 backdrop-blur-lg border border-white/30 dark:border-violet-100/30 shadow-lg p-6 hover:scale-[1.02] transition-all"
+                className="group relative rounded-xl bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 overflow-hidden shadow-md hover:shadow-lg transition-all"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                whileHover={{ scale: 1.02 }}
+                whileHover={{ y: -5 }}
+                transition={{ duration: 0.3 }}
               >
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={`p-3 ${color.bg} dark:bg-opacity-30 rounded-lg shadow-md`}>
-                    <IconComponent className={`w-8 h-8 ${color.text} dark:text-opacity-90`} />
-                  </div>
-                  <h2 className="text-2xl font-light text-white dark:text-slate-100">{quiz.title}</h2>
-                </div>
-                <p className="text-gray-200 dark:text-slate-300">
-                  {quiz.description}
-                </p>
-                <div className="space-y-6">
-                  <div className="flex items-center gap-6 text-sm text-gray-300 dark:text-slate-400">
-                    <div className="flex items-center gap-2">
-                      <HelpCircle className="w-4 h-4" />
-                      <span>
-                        {quiz.question_count} domande</span>
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-blue-600"></div>
+                <div className="p-8">
+                  <div className="flex items-center gap-4 mb-5">
+                    <div className={`p-3.5 ${color.bg} dark:bg-opacity-60 rounded-xl shadow-sm`}>
+                      <IconComponent className={`w-8 h-8 ${color.text} dark:text-opacity-100`} />
                     </div>
-                    {type === 'exam' ? (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4" />
-                          <span>{quiz.duration_minutes} minuti</span>
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">{quiz.title}</h2>
+                  </div>
+                  <p className="text-slate-700 dark:text-slate-200 mb-6 min-h-[60px] font-medium">
+                    {quiz.description}
+                  </p>
+                  <div className="space-y-6">
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-slate-700 dark:text-slate-300 font-medium">
+                      <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full">
+                        <HelpCircle className="w-4 h-4" />
+                        <span>{quiz.question_count} domande</span>
+                      </div>
+                      {type === 'exam' ? (
+                        <>
+                          <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full">
+                            <Clock className="w-4 h-4" />
+                            <span>{quiz.duration_minutes} minuti</span>
+                          </div>
+                          <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full">
+                            <GraduationCap className="w-4 h-4" />
+                            <span>75% per superare</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full">
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Feedback immediato</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <GraduationCap className="w-4 h-4" />
-                          <span>75% per superare</span>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4" />
-                        <span>Feedback immediato</span>
+                      )}
+                    </div>
+                    {quiz.created_by && (
+                      <div className="flex items-center gap-2 mt-4 text-slate-600 dark:text-slate-400">
+                        <Users className="w-4 h-4" />
+                        <span className="text-sm font-medium">
+                          Creato da: {quiz.created_by}
+                        </span>
                       </div>
                     )}
-                  </div>
-                  {quizCode && (
-                    <div className="flex items-center gap-2 mt-2">
-                      <Key className="w-4 h-4 text-gray-300" />
-                      <span className="text-sm text-gray-300 font-mono">
-                        Codice: {quizCode}
-                      </span>
-                    </div>
-                  )}
-                  <button
-                    onClick={() => onSelectCategory(quiz.id)} 
-                    className={`w-full ${
-                      type === 'exam' 
-                        ? 'bg-indigo-600 hover:bg-indigo-700' 
+                    {quizCode && (
+                      <div className="flex items-center gap-2 mt-2 text-slate-600 dark:text-slate-400">
+                        <Key className="w-4 h-4" />
+                        <span className="text-sm font-medium font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                          Codice: {quizCode}
+                        </span>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => onSelectCategory(quiz.id)} 
+                      className={`w-full mt-6 ${
+                        type === 'exam' 
+                          ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800' 
+                          : type === 'interactive'
+                            ? 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800'
+                            : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
+                      } text-white py-3.5 px-6 rounded-lg font-medium shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2`}
+                    >
+                      {type === 'exam' 
+                        ? 'Inizia Simulazione' 
                         : type === 'interactive'
-                          ? 'bg-purple-600 hover:bg-purple-700'
-                          : color.accent
-                    } text-white py-3 px-6 rounded-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 text-base font-medium`}
-                  >
-                    {type === 'exam' 
-                      ? 'Inizia Simulazione' 
-                      : type === 'interactive'
-                        ? 'Inizia Quiz Interattivo'
-                        : 'Inizia il Quiz'
-                    }
-                    <ArrowRight className="w-5 h-5" />
-                  </button>
+                          ? 'Inizia Quiz Live'
+                          : 'Inizia il Quiz'
+                      }
+                      <ArrowRight className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             );

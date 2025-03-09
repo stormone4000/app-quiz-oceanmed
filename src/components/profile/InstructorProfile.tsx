@@ -233,81 +233,39 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       });
       
       // Utilizziamo la funzione checkActiveCode per verificare se il codice è valido
-      const isCodeValid = await checkActiveCode(formData.masterCode);
-      
-      if (!isCodeValid) {
-        setVerificationStep('error');
-        // Non serve impostare un messaggio di errore qui perché checkActiveCode già lo imposta
-        throw new Error('Codice non valido');
-      }
-      
-      // Get password hash from storage
-      const passwordHash = localStorage.getItem('passwordHash');
-      
-      // Verifica se l'utente è un istruttore
-      const { data: instructorData, error: instructorError } = await supabase
-        .from('auth_users')
-        .select('*')
-        .eq('email', userEmail)
-        .single();
+      try {
+        const isCodeValid = await checkActiveCode(formData.masterCode);
         
-      if (instructorError) {
-        console.error('Errore durante la verifica dello stato istruttore:', instructorError);
-        setVerificationStep('error');
-        throw new Error('Errore durante la verifica delle credenziali. Riprova più tardi.');
-      }
-      
-      if (!instructorData || !instructorData.is_instructor) {
-        setVerificationStep('error');
-        throw new Error('Account non autorizzato come istruttore. Contatta l\'amministratore.');
-      }
-
-      // Otteniamo i dettagli del codice dal database
-      const { data: accessCode, error: accessCodeError } = await supabase
-        .from('access_codes')
-        .select('*')
-        .eq('code', formData.masterCode)
-        .single();
-        
-      if (accessCodeError) {
-        console.error('Errore durante l\'ottenimento dei dettagli del codice:', accessCodeError);
-        setVerificationStep('error');
-        throw new Error('Errore durante la verifica del codice. Riprova più tardi.');
-      }
-      
-      // Registra l'utilizzo del codice
-      if (accessCode) {
-        const { error: usageInsertError } = await supabase
-          .from('access_code_usage')
-          .insert({
-            code_id: accessCode.id,
-            student_email: userEmail,
-            first_name: instructorData.first_name,
-            last_name: instructorData.last_name
-          });
-          
-        if (usageInsertError) {
-          console.error('Errore durante la registrazione dell\'utilizzo del codice:', usageInsertError);
-        } else {
-          // Aggiorna la cronologia dei codici
-          loadCodeHistory();
+        if (!isCodeValid) {
+          setVerificationStep('error');
+          // Non serve impostare un messaggio di errore qui perché checkActiveCode già lo imposta
+          throw new Error('Codice non valido');
         }
+        
+        setVerificationStep('success');
+        setSuccess(`Codice ${formData.masterCode} verificato con successo!`);
+        
+        // Aggiorniamo lo stato locale
+        setHasInstructorAccess(true);
+        setMasterCode(formData.masterCode);
+        
+        // Aggiorniamo localStorage
+        localStorage.setItem('hasInstructorAccess', 'true');
+        localStorage.setItem('masterCode', formData.masterCode);
+        localStorage.setItem('hasActiveAccess', 'true');
+        
+        // Forziamo un evento per aggiornare localStorage
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new Event('localStorageUpdated'));
+        
+        // Aggiorniamo la cronologia dei codici
+        loadCodeHistory();
+      } catch (checkError: any) {
+        console.error('Errore durante la verifica del codice:', checkError);
+        setVerificationStep('error');
+        // L'errore è già stato impostato da checkActiveCode
+        throw new Error(checkError.message || 'Errore durante la verifica del codice');
       }
-      
-      // I flag per l'accesso sono già stati impostati dalla funzione checkActiveCode
-      
-      setVerificationStep('success');
-      setSuccess('Codice master verificato con successo! Profilo istruttore attivato. Tutte le funzionalità sono ora disponibili.');
-      
-      // Aggiungiamo un evento per aggiornare lo stato dell'utente senza ricaricare la pagina
-      window.dispatchEvent(new Event('storage'));
-      window.dispatchEvent(new Event('localStorageUpdated'));
-      
-      // Aggiungiamo un breve ritardo per mostrare il messaggio di successo prima del reload
-      setTimeout(() => {
-        window.location.reload(); // Reload to update UI
-      }, 2000);
-      
     } catch (error) {
       console.error('Error verifying master code:', error);
       setError(error instanceof Error ? error.message : 'Errore durante la verifica del codice');
@@ -485,9 +443,96 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
     console.log(`Verifica codice ${code} per ${userEmail}`);
     setVerifying(true);
     setError('');
+    setSuccess(''); // Reset anche il messaggio di successo all'inizio
     
     try {
-      // Verifichiamo se il codice è attivo nel database
+      // Verifichiamo che il codice non abbia il prefisso "QUIZ-"
+      if (code.startsWith('QUIZ-')) {
+        console.error(`Il codice ${code} è un codice per studenti, non per istruttori`);
+        setError('Questo è un codice per studenti. Per attivare un account istruttore, utilizza un codice istruttore valido.');
+        setSuccess(''); // Reset del messaggio di successo in caso di errore
+        setVerifying(false);
+        return false;
+      }
+      
+      // Verifichiamo se è un codice PRO (instructor_activation_codes)
+      if (code.startsWith('PRO-')) {
+        console.log('Verificando codice PRO nella tabella instructor_activation_codes');
+        const { data: proCodeData, error: proCodeError } = await supabase
+          .from('instructor_activation_codes')
+          .select('*')
+          .eq('code', code)
+          .eq('is_active', true)
+          .single();
+        
+        if (proCodeError) {
+          console.error(`Errore verifica codice PRO ${code}:`, proCodeError);
+          setError(`Errore durante la verifica del codice: ${proCodeError.message}`);
+          setSuccess(''); // Reset del messaggio di successo in caso di errore
+          setVerifying(false);
+          return false;
+        }
+        
+        if (!proCodeData) {
+          console.warn(`Codice PRO ${code} non attivo o non trovato`);
+          setError('Codice non valido o disattivato');
+          setSuccess(''); // Reset del messaggio di successo in caso di errore
+          setVerifying(false);
+          return false;
+        }
+        
+        // Verifichiamo se il codice è assegnato a questo utente
+        if (proCodeData.assigned_to_email && proCodeData.assigned_to_email !== userEmail) {
+          console.warn(`Codice PRO ${code} assegnato a ${proCodeData.assigned_to_email}, non a ${userEmail}`);
+          setError(`Questo codice PRO è stato assegnato specificamente all'email ${proCodeData.assigned_to_email}. Non puoi utilizzarlo con l'email ${userEmail}.`);
+          setSuccess(''); // Reset del messaggio di successo in caso di errore
+          setVerifying(false);
+          return false;
+        }
+        
+        console.log(`Tentativo di aggiornamento del codice PRO ${code} (ID: ${proCodeData.id}) per ${userEmail}`);
+        
+        try {
+          // Aggiorniamo il record per marcare il codice come utilizzato
+          const { data: updateData, error: updateError } = await supabase
+            .from('instructor_activation_codes')
+            .update({
+              used_at: new Date().toISOString(),
+              used_by: userEmail
+            })
+            .eq('id', proCodeData.id)
+            .select();
+          
+          if (updateError) {
+            console.error('Errore nell\'aggiornamento del codice PRO:', updateError);
+            // Non blocchiamo l'attivazione, ma logghiamo l'errore
+            console.log('Il codice è stato verificato ma lo stato di utilizzo non è stato registrato.');
+          } else {
+            console.log('Aggiornamento del codice PRO riuscito:', updateData);
+          }
+        } catch (updateCatchError) {
+          console.error('Eccezione durante l\'aggiornamento del codice PRO:', updateCatchError);
+          // Continuiamo comunque perché l'utente può usare il codice
+        }
+        
+        console.log(`Codice PRO ${code} attivato per ${userEmail}`);
+        
+        // Se il codice è attivo, impostiamo i flag necessari
+        localStorage.setItem('hasInstructorAccess', 'true');
+        localStorage.setItem('hasActiveAccess', 'true');
+        localStorage.setItem('needsSubscription', 'false');
+        localStorage.removeItem('alertShown');
+        
+        // Forziamo un evento per aggiornare localStorage
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new Event('localStorageUpdated'));
+        
+        setError(''); // Reset del messaggio di errore in caso di successo
+        setSuccess(`Codice PRO ${code} verificato con successo!`);
+        return true;
+      }
+      
+      // Se non è un codice PRO, verifichiamo i codici tradizionali (access_codes)
       const { data, error } = await supabase
         .from('access_codes')
         .select('*')
@@ -498,12 +543,15 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       if (error) {
         console.error(`Errore verifica codice ${code}:`, error);
         setError(`Errore durante la verifica del codice: ${error.message}`);
+        setSuccess(''); // Reset del messaggio di successo in caso di errore
         setVerifying(false);
         return false;
       }
       
       if (!data) {
         console.warn(`Codice ${code} non attivo o non trovato`);
+        setError('Codice non valido o disattivato');
+        setSuccess(''); // Reset del messaggio di successo in caso di errore
         
         // Se il codice non è attivo, rimuoviamo gli elementi da localStorage
         localStorage.removeItem('hasInstructorAccess');
@@ -540,11 +588,13 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       window.dispatchEvent(new Event('storage'));
       window.dispatchEvent(new Event('localStorageUpdated'));
       
+      setError(''); // Reset del messaggio di errore in caso di successo
       setSuccess(`Codice ${code} verificato con successo!`);
       return true;
     } catch (error) {
       console.error('Errore durante la verifica del codice:', error);
       setError('Si è verificato un errore durante la verifica del codice. Riprova più tardi.');
+      setSuccess(''); // Reset del messaggio di successo in caso di errore
       return false;
     } finally {
       setVerifying(false);

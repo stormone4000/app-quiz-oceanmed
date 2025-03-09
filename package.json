@@ -17,7 +17,15 @@
     "create:tables": "node src/scripts/createMissingTables.cjs",
     "fix:tables": "node src/scripts/fixTableStructures.cjs",
     "update:config": "node src/scripts/updateSupabaseConfig.cjs",
-    "import:questions": "node src/scripts/importQuizQuestions.js"
+    "import:questions": "node src/scripts/importQuizQuestions.js",
+    "db:remote": "node connect-db.js",
+    "db:local": "node connect-db.js local",
+    "db:info": "node db-connection.config.js",
+    "db:connect": "node src/scripts/databaseConnector.js",
+    "db:connect:local": "node src/scripts/databaseConnector.js --local",
+    "db:test": "node src/scripts/databaseConnector.js --test",
+    "db:diagnose": "node src/scripts/databaseConnector.js --diagnose",
+    "config:mcp": "node src/scripts/configure-mcp-database.js"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.0.6",
@@ -40,7 +48,8 @@
     "react-router-dom": "^6.22.0",
     "redux-persist": "^6.0.0",
     "stripe": "^14.14.0",
-    "tailwind-merge": "^2.6.0"
+    "tailwind-merge": "^2.6.0",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
@@ -48,6 +57,7 @@
     "@types/node": "^22.13.5",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
+    "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.18",
     "esbuild": "^0.20.2",
@@ -55,6 +65,7 @@
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.11",
     "globals": "^15.9.0",
+    "node-fetch": "^2.7.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "ts-node": "^10.9.2",

@@ -17,11 +17,39 @@ if (!supabaseAnonKey) {
 // Log per debug
 console.log('Inizializzazione client Supabase con URL:', supabaseUrl);
 
+// Opzioni di configurazione per migliorare la gestione degli errori
+const supabaseOptions = {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+  },
+  global: {
+    fetch: (input: RequestInfo | URL, init?: RequestInit) => {
+      // Aumenta il timeout per le richieste a 30 secondi
+      const timeout = 30000;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+      
+      const fetchPromise = fetch(input, {
+        ...init,
+        signal: controller.signal
+      });
+      
+      return fetchPromise.finally(() => clearTimeout(timeoutId));
+    }
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 1 // Limita la frequenza degli eventi per evitare sovraccarichi
+    }
+  }
+};
+
 // Client per operazioni pubbliche
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, supabaseOptions);
 
 // Client con service role per operazioni amministrative
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRole);
+export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRole, supabaseOptions);
 
 // Funzione per testare la connessione
 export const testConnection = async () => {
@@ -39,6 +67,19 @@ export const testConnection = async () => {
   }
 };
 
+// Funzione per riconnettere in caso di errore
+export const reconnect = async () => {
+  try {
+    console.log('Tentativo di riconnessione a Supabase...');
+    await supabase.auth.refreshSession();
+    const result = await testConnection();
+    return result.success;
+  } catch (err) {
+    console.error('Errore durante il tentativo di riconnessione:', err);
+    return false;
+  }
+};
+
 // Esegui test di connessione all'avvio
 testConnection()
   .then(result => {
@@ -46,6 +87,16 @@ testConnection()
       console.log('✅ Connessione a Supabase stabilita con successo');
     } else {
       console.error('❌ Impossibile connettersi a Supabase');
+      // Tentativo di riconnessione dopo 2 secondi
+      setTimeout(() => {
+        reconnect().then(success => {
+          if (success) {
+            console.log('✅ Riconnessione a Supabase riuscita');
+          } else {
+            console.error('❌ Impossibile riconnettersi a Supabase');
+          }
+        });
+      }, 2000);
     }
   })
   .catch(err => {
