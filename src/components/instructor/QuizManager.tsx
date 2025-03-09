@@ -95,12 +95,17 @@ export function QuizManager({ mode = 'manage' }: QuizManagerProps) {
             : query.eq('created_by', email);
         } else if (mode === 'all') {
           // In modalità "all", gli istruttori vedono SOLO i quiz pubblici DELL'ADMIN e i propri quiz
-          const creatorFilter = userId 
-            ? `created_by.eq.${email},created_by.eq.${userId}` 
-            : `created_by.eq.${email}`;
           
-          // Aggiungiamo solo i quiz pubblici dell'admin (marcosrenatobruno@gmail.com)
-          query = query.or(`(visibility.eq.public,created_by.eq.marcosrenatobruno@gmail.com),${creatorFilter}`);
+          // Costruiamo la query in modo più semplice e chiaro
+          // Prima filtriamo per i quiz dell'istruttore
+          if (userId) {
+            query = query.or(`created_by.eq.${email},created_by.eq.${userId}`);
+          } else {
+            query = query.or(`created_by.eq.${email}`);
+          }
+          
+          // Poi aggiungiamo i quiz pubblici dell'admin
+          query = query.or(`visibility.eq.public,created_by.eq.marcosrenatobruno@gmail.com`);
         }
       }
 

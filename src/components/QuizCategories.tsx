@@ -170,17 +170,19 @@ export function QuizCategories({ type, onBack, onSelectCategory }: QuizCategoryP
         if (isInstructor && !isMasterAdmin) {
           // Se è un istruttore (ma non admin), mostra solo i suoi quiz e quelli pubblici dell'admin
           const userId = localStorage.getItem('userId');
-          const creatorFilter = userId 
-            ? `created_by.eq.${userEmail},created_by.eq.${userId}` 
-            : `created_by.eq.${userEmail}`;
           
-          // Aggiungiamo solo i quiz pubblici dell'admin (marcosrenatobruno@gmail.com)
-          searchClause = `(${creatorFilter}),(visibility.eq.public,created_by.eq.marcosrenatobruno@gmail.com)`;
+          // Costruiamo la query in modo più semplice e chiaro
+          // Prima filtriamo per i quiz dell'istruttore
+          if (userId) {
+            query = query.or(`created_by.eq.${userEmail},created_by.eq.${userId}`);
+          } else {
+            query = query.or(`created_by.eq.${userEmail}`);
+          }
           
-          // Applica la clausola OR alla query
-          query = query.or(searchClause);
+          // Poi aggiungiamo i quiz pubblici dell'admin
+          query = query.or(`visibility.eq.public,created_by.eq.marcosrenatobruno@gmail.com`);
           
-          console.log("Query costruita per istruttore:", searchClause);
+          console.log("Query costruita per istruttore");
           
           const { data: quizData, error: quizError } = await query;
           
