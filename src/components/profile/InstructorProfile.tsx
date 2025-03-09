@@ -329,7 +329,7 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
         const { data: proCodeData, error: proCodeError } = await supabase
           .from('instructor_activation_codes')
           .select('code')
-          .eq('used_by', userEmail)
+          .filter('used_by', 'ilike', `%${userEmail}%`)
           .single();
         
         // Se troviamo un codice PRO, lo utilizziamo
@@ -413,9 +413,14 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       const formattedHistory = usageData.map(item => ({
         ...item.access_codes,
         used_at: item.used_at
-      })) as CodeUsage[];
+      }));
 
-      setCodeHistory(formattedHistory);
+      // Verifica che i dati siano conformi al tipo CodeUsage prima di assegnarli
+      const validHistory = formattedHistory.filter(item => 
+        item && typeof item === 'object' && 'code' in item && 'type' in item
+      ) as CodeUsage[];
+
+      setCodeHistory(validHistory);
     } catch (error) {
       console.error('Error loading code history:', error);
       setError('Errore durante il caricamento della cronologia dei codici');
