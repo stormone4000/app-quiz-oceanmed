@@ -45,6 +45,8 @@ export function StudentManagement() {
     status: '',
     plan: ''
   });
+  const [fixingRelations, setFixingRelations] = useState(false);
+  const [fixStatus, setFixStatus] = useState<string | null>(null);
 
   useEffect(() => {
     loadStudents();
@@ -62,6 +64,8 @@ export function StudentManagement() {
         throw new Error('Email dell\'istruttore non trovata');
       }
       
+      console.log('-----------------------------------------------------------');
+      console.log('DEBUG: GESTIONE STUDENTI - INIZIO CARICAMENTO');
       console.log('Caricamento studenti per l\'istruttore:', instructorEmail);
       
       // APPROCCIO SEMPLIFICATO: Raccogliamo prima tutte le email degli studenti associati all'istruttore
@@ -77,8 +81,10 @@ export function StudentManagement() {
       if (relationError) {
         console.error('Errore nel recupero da student_instructor:', relationError);
       } else if (relationData && relationData.length > 0) {
-        console.log('Email trovate in student_instructor:', relationData.length);
+        console.log('Email trovate in student_instructor:', relationData.length, relationData.map(r => r.student_email).join(', '));
         studentEmails = [...studentEmails, ...relationData.map(r => r.student_email)];
+      } else {
+        console.log('Nessuna relazione trovata in student_instructor');
       }
       
       // 2. Recuperiamo le email dalla tabella access_code_usage
@@ -91,8 +97,10 @@ export function StudentManagement() {
       if (usageError) {
         console.error('Errore nel recupero da access_code_usage:', usageError);
       } else if (usageData && usageData.length > 0) {
-        console.log('Email trovate in access_code_usage:', usageData.length);
+        console.log('Email trovate in access_code_usage:', usageData.length, usageData.map(u => u.student_email).join(', '));
         studentEmails = [...studentEmails, ...usageData.map(u => u.student_email)];
+      } else {
+        console.log('Nessuna email trovata in access_code_usage');
       }
       
       // 3. Recuperiamo le email degli studenti che hanno utilizzato codici creati dall'istruttore
@@ -113,13 +121,13 @@ export function StudentManagement() {
         // Ora usiamo l'ID per cercare i codici
         const { data: codesData, error: codesError } = await supabase
           .from('access_codes')
-          .select('id')
+          .select('id, code')
           .eq('created_by', userData.id);
         
         if (codesError) {
           console.error('Errore nel recupero dei codici:', codesError);
         } else if (codesData && codesData.length > 0) {
-          console.log('Codici trovati:', codesData.length);
+          console.log('Codici trovati:', codesData.length, codesData.map(c => c.code).join(', '));
           
           const codeIds = codesData.map(code => code.id);
           const { data: codeUsageData, error: codeUsageError } = await supabase
@@ -130,10 +138,11 @@ export function StudentManagement() {
           if (codeUsageError) {
             console.error('Errore nel recupero degli utilizzi dei codici:', codeUsageError);
           } else if (codeUsageData && codeUsageData.length > 0) {
-            console.log('Email trovate tramite codici:', codeUsageData.length);
+            console.log('Email trovate tramite utilizzi codici:', codeUsageData.length, codeUsageData.map(u => u.student_email).join(', '));
             studentEmails = [...studentEmails, ...codeUsageData.map(u => u.student_email)];
             
             // Aggiorniamo i record per includere l'email dell'istruttore
+            console.log('Aggiornamento dei record esistenti per impostare instructor_email...');
             for (const usage of codeUsageData) {
               // Aggiorna access_code_usage
               const { error: updateError } = await supabase
@@ -144,6 +153,8 @@ export function StudentManagement() {
               
               if (updateError) {
                 console.warn('Errore nell\'aggiornamento dell\'instructor_email:', updateError);
+              } else {
+                console.log('Record access_code_usage aggiornato per:', usage.student_email);
               }
               
               // Inserisci in student_instructor
@@ -156,10 +167,18 @@ export function StudentManagement() {
               
               if (insertError) {
                 console.warn('Errore nell\'inserimento in student_instructor:', insertError);
+              } else {
+                console.log('Record student_instructor creato/aggiornato per:', usage.student_email);
               }
             }
+          } else {
+            console.log('Nessun utilizzo codice trovato per i codici dell\'istruttore');
           }
+        } else {
+          console.log('Nessun codice trovato creato dall\'istruttore');
         }
+      } else {
+        console.log('ID istruttore non trovato per:', instructorEmail);
       }
       
       // 4. Recuperiamo anche gli studenti dai risultati dei quiz creati dall'istruttore
@@ -193,7 +212,7 @@ export function StudentManagement() {
       // Rimuoviamo i duplicati e l'email dell'istruttore stesso
       studentEmails = [...new Set(studentEmails)].filter(email => email !== instructorEmail);
       
-      console.log('Totale email uniche trovate:', studentEmails.length);
+      console.log('Totale email uniche trovate:', studentEmails.length, studentEmails.join(', '));
       
       // APPROCCIO ALTERNATIVO: Se non abbiamo trovato studenti, proviamo con una query JOIN diretta
       if (studentEmails.length === 0) {
@@ -334,6 +353,7 @@ export function StudentManagement() {
       }
       
       // Recuperiamo i dettagli completi degli studenti
+      console.log('Recupero informazioni complete degli studenti:', studentEmails.length);
       const { data: studentsData, error: studentsError } = await supabase
         .from('auth_users')
         .select(`
@@ -349,42 +369,39 @@ export function StudentManagement() {
           account_status
         `)
         .in('email', studentEmails);
-      
+
       if (studentsError) {
         console.error('Errore nel recupero dei dettagli degli studenti:', studentsError);
-        throw studentsError;
+        setError('Errore nel recupero degli studenti. Riprova più tardi.');
+        setLoading(false);
+        return;
       }
+
+      console.log('Studenti trovati dopo query auth_users:', studentsData?.length || 0);
       
-      if (!studentsData || studentsData.length === 0) {
-        console.log('Nessun dettaglio studente trovato');
+      // Formattazione dei dati degli studenti
+      const formattedStudents = (studentsData || []).map(student => {
+        const subscription = student.subscriptions && student.subscriptions.length > 0 ? student.subscriptions[0] : null;
         
-        // Fallback: creiamo oggetti studente dalle email
-        const fallbackStudents = studentEmails.map(email => ({
-          id: email, // Usiamo l'email come ID temporaneo
-          email: email,
-          first_name: '',
-          last_name: '',
-          last_login: '',
-          account_status: 'active' as const
-        }));
-        
-        setStudents(fallbackStudents);
-      } else {
-        console.log('Dettagli studenti trovati:', studentsData.length);
-        
-        // Formattazione dei dati degli studenti
-        const formattedStudents = studentsData.map(user => ({
-          id: user.id,
-          email: user.email,
-          first_name: user.first_name || '',
-          last_name: user.last_name || '',
-          last_login: user.last_login || '',
-          subscription: user.subscriptions?.[0],
-          account_status: (user.account_status || 'active') as 'active' | 'suspended'
-        }));
-        
-        setStudents(formattedStudents);
-      }
+        return {
+          id: student.id,
+          email: student.email,
+          first_name: student.first_name || '',
+          last_name: student.last_name || '',
+          last_login: student.last_login || '',
+          subscription: subscription ? {
+            plan_id: subscription.plan_id,
+            status: subscription.status
+          } : undefined,
+          account_status: (student.account_status || 'active') as 'active' | 'suspended'
+        };
+      });
+
+      console.log('Studenti formattati:', formattedStudents.length, formattedStudents.map(s => s.email).join(', '));
+      setStudents(formattedStudents);
+      
+      console.log('DEBUG: GESTIONE STUDENTI - FINE CARICAMENTO');
+      console.log('-----------------------------------------------------------');
     } catch (error) {
       console.error('Error loading students:', error);
       setError('Errore durante il caricamento degli studenti');
@@ -573,6 +590,125 @@ export function StudentManagement() {
     return searchMatch && statusMatch && planMatch;
   });
 
+  const fixStudentRelations = async () => {
+    try {
+      setFixingRelations(true);
+      setFixStatus('Analisi relazioni in corso...');
+      
+      // Ottieni l'email dell'istruttore corrente dal localStorage
+      const instructorEmail = localStorage.getItem('userEmail');
+      
+      if (!instructorEmail) {
+        throw new Error('Email dell\'istruttore non trovata');
+      }
+      
+      // STEP 1: Recupera gli utilizzi dei codici di accesso creati dall'istruttore
+      setFixStatus('Recupero codici creati dall\'istruttore...');
+      
+      // Recupera l'ID dell'istruttore
+      const { data: userData, error: userError } = await supabase
+        .from('auth_users')
+        .select('id')
+        .eq('email', instructorEmail)
+        .single();
+      
+      if (userError) {
+        throw new Error('Errore nel recupero dell\'ID dell\'istruttore');
+      }
+      
+      // Recupera i codici creati dall'istruttore
+      const { data: codesData, error: codesError } = await supabase
+        .from('access_codes')
+        .select('id, code')
+        .eq('created_by', userData.id);
+      
+      if (codesError) {
+        throw new Error('Errore nel recupero dei codici di accesso');
+      }
+      
+      if (!codesData || codesData.length === 0) {
+        setFixStatus('Nessun codice trovato creato dall\'istruttore');
+        return;
+      }
+      
+      setFixStatus(`Trovati ${codesData.length} codici. Recupero utilizzi...`);
+      
+      // Recupera gli utilizzi dei codici
+      const codeIds = codesData.map(code => code.id);
+      const { data: usageData, error: usageError } = await supabase
+        .from('access_code_usage')
+        .select('student_email')
+        .in('code_id', codeIds);
+      
+      if (usageError) {
+        throw new Error('Errore nel recupero degli utilizzi dei codici');
+      }
+      
+      if (!usageData || usageData.length === 0) {
+        setFixStatus('Nessun utilizzo trovato per i codici dell\'istruttore');
+        return;
+      }
+      
+      // Estrai le email degli studenti
+      const studentEmails = [...new Set(usageData.map(usage => usage.student_email))];
+      
+      setFixStatus(`Trovati ${studentEmails.length} studenti. Aggiornamento relazioni...`);
+      
+      // STEP 2: Aggiorna i record in access_code_usage e student_instructor
+      let updatedCount = 0;
+      let createdCount = 0;
+      
+      for (const studentEmail of studentEmails) {
+        // Aggiorna access_code_usage
+        const { error: updateError } = await supabase
+          .from('access_code_usage')
+          .update({ instructor_email: instructorEmail })
+          .eq('student_email', studentEmail)
+          .is('instructor_email', null);
+        
+        if (!updateError) {
+          updatedCount++;
+        }
+        
+        // Verifica se esiste già una relazione in student_instructor
+        const { data: existingRelation, error: relationError } = await supabase
+          .from('student_instructor')
+          .select('*')
+          .eq('student_email', studentEmail)
+          .eq('instructor_email', instructorEmail);
+        
+        if (!relationError && (!existingRelation || existingRelation.length === 0)) {
+          // Crea la relazione se non esiste
+          const { error: insertError } = await supabase
+            .from('student_instructor')
+            .insert([{
+              student_email: studentEmail,
+              instructor_email: instructorEmail,
+              created_at: new Date().toISOString()
+            }]);
+          
+          if (!insertError) {
+            createdCount++;
+          }
+        }
+      }
+      
+      setFixStatus(`Relazioni sistemate: ${updatedCount} record aggiornati, ${createdCount} relazioni create`);
+      
+      // STEP 3: Ricarica gli studenti
+      await loadStudents();
+      
+    } catch (error) {
+      console.error('Error fixing student relations:', error);
+      setFixStatus(`Errore: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`);
+    } finally {
+      setTimeout(() => {
+        setFixingRelations(false);
+        setFixStatus(null);
+      }, 5000);
+    }
+  };
+
   if (selectedStudent) {
     return (
       <StudentDetails
@@ -754,6 +890,32 @@ export function StudentManagement() {
           onCancel={() => setShowDeleteModal(null)}
           isLoading={loading}
         />
+      )}
+
+      {/* Fix button */}
+      {students.length === 0 && !loading && (
+        <div className="mb-4">
+          <button
+            onClick={fixStudentRelations}
+            disabled={fixingRelations}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
+          >
+            {fixingRelations ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Sistema in corso...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4" />
+                Sistema Relazioni Studenti
+              </>
+            )}
+          </button>
+          {fixStatus && (
+            <p className="mt-2 text-sm text-blue-600">{fixStatus}</p>
+          )}
+        </div>
       )}
     </div>
   );
