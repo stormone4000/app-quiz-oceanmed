@@ -159,8 +159,59 @@ export function QuizCategories({ type, onBack, onSelectCategory }: QuizCategoryP
       // NUOVA LOGICA DI VISIBILITÀ
       // 1. Recuperiamo gli istruttori associati allo studente (se esistono)
       let instructorEmails: string[] = [];
+      // Dichiariamo searchClause qui per evitare errori
+      let searchClause = '';
       
       if (userEmail) {
+        // Verifichiamo se l'utente è un istruttore
+        const isInstructor = localStorage.getItem('isProfessor') === 'true';
+        const isMasterAdmin = localStorage.getItem('isMasterAdmin') === 'true';
+        
+        if (isInstructor && !isMasterAdmin) {
+          // Se è un istruttore (ma non admin), mostra solo i suoi quiz e quelli pubblici dell'admin
+          const userId = localStorage.getItem('userId');
+          const creatorFilter = userId 
+            ? `created_by.eq.${userEmail},created_by.eq.${userId}` 
+            : `created_by.eq.${userEmail}`;
+          
+          // Aggiungiamo solo i quiz pubblici dell'admin (marcosrenatobruno@gmail.com)
+          searchClause = `(${creatorFilter}),(visibility.eq.public,created_by.eq.marcosrenatobruno@gmail.com)`;
+          
+          // Applica la clausola OR alla query
+          query = query.or(searchClause);
+          
+          console.log("Query costruita per istruttore:", searchClause);
+          
+          const { data: quizData, error: quizError } = await query;
+          
+          if (quizError) {
+            console.error("Errore nella query Supabase:", quizError);
+            throw quizError;
+          }
+          
+          // Log per debug
+          console.log(`Quiz trovati per istruttore: ${quizData?.length || 0}`);
+          
+          // Filtra i quiz "system" - mostra solo quelli creati dall'admin
+          const filteredQuizData = quizData?.filter(quiz => 
+            quiz.created_by !== 'system'
+          ) || [];
+          
+          // Formatta i nomi degli istruttori per una migliore visualizzazione
+          const formattedQuizData = filteredQuizData.map(quiz => {
+            // Se l'istruttore è l'admin, mostra "Admin" invece dell'email
+            if (quiz.created_by === 'marcosrenatobruno@gmail.com') {
+              return { ...quiz, created_by: 'Admin' };
+            }
+            return quiz;
+          });
+          
+          setQuizzes(formattedQuizData);
+          setLoading(false);
+          return;
+        }
+        
+        // Se è uno studente o admin, continua con la logica esistente
         // Ottieni gli istruttori associati allo studente
         const { data: instructorData, error: instructorError } = await supabase
           .from('student_instructor')
@@ -194,7 +245,7 @@ export function QuizCategories({ type, onBack, onSelectCategory }: QuizCategoryP
       
       // Costruisci la clausola di ricerca
       // Quiz pubblici dell'admin sono visibili a tutti
-      let searchClause = 'created_by.eq.marcosrenatobruno@gmail.com,created_by.eq.system';
+      searchClause = 'created_by.eq.marcosrenatobruno@gmail.com,created_by.eq.system';
       
       // Aggiungi i quiz pubblici degli istruttori associati
       if (instructorEmails.length > 0) {

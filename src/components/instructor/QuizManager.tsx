@@ -94,11 +94,13 @@ export function QuizManager({ mode = 'manage' }: QuizManagerProps) {
             ? query.or(`created_by.eq.${email},created_by.eq.${userId}`) 
             : query.eq('created_by', email);
         } else if (mode === 'all') {
-          // In modalità "all", gli istruttori vedono i quiz pubblici e i propri
+          // In modalità "all", gli istruttori vedono SOLO i quiz pubblici DELL'ADMIN e i propri quiz
           const creatorFilter = userId 
             ? `created_by.eq.${email},created_by.eq.${userId}` 
             : `created_by.eq.${email}`;
-          query = query.or(`visibility.eq.public,${creatorFilter}`);
+          
+          // Aggiungiamo solo i quiz pubblici dell'admin (marcosrenatobruno@gmail.com)
+          query = query.or(`(visibility.eq.public,created_by.eq.marcosrenatobruno@gmail.com),${creatorFilter}`);
         }
       }
 
