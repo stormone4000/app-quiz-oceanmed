@@ -319,60 +319,52 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       const isProfessor = localStorage.getItem('isProfessor') === 'true';
       const userEmail = localStorage.getItem('userEmail');
       
-      // Caso speciale per istruttore1@io.it - garantiamo sempre l'accesso
+      // Caso speciale per istruttore1@io.it - ora utilizziamo il codice PRO reale
       const isIstruttore1 = userEmail === 'istruttore1@io.it';
       
       if (isIstruttore1 && isProfessor) {
-        console.log('Garantiamo accesso per istruttore1@io.it nel profilo');
-        localStorage.setItem('hasInstructorAccess', 'true');
-        localStorage.setItem('masterCode', '392673');
-        localStorage.setItem('hasActiveAccess', 'true');
-        localStorage.setItem('isCodeDeactivated', 'false');
-        localStorage.setItem('needsSubscription', 'false');
+        console.log('Accesso per istruttore1@io.it nel profilo - utilizziamo il codice PRO reale');
         
-        // Forziamo un evento di storage per aggiornare tutti i componenti
-        window.dispatchEvent(new Event('localStorageUpdated'));
+        // Cerchiamo prima il codice PRO reale nel database
+        const { data: proCodeData, error: proCodeError } = await supabase
+          .from('instructor_activation_codes')
+          .select('code')
+          .eq('used_by', userEmail)
+          .single();
         
-        // Creiamo una cronologia fittizia per istruttore1@io.it
-        const fallbackHistory = [{
-          id: 'special-code-istruttore1',
-          code: '392673',
-          type: 'master',
-          expiration_date: '2099-12-31T23:59:59',
-          is_active: true,
-          created_at: new Date().toISOString(),
-          duration_months: 999,
-          duration_type: 'unlimited',
-          used_at: new Date().toISOString()
-        }];
-        
-        setCodeHistory(fallbackHistory);
-        setLoading(false);
-        
-        // Registriamo comunque l'utilizzo nel database
-        try {
-          const { data: codeData, error: codeError } = await supabase
-            .from('access_codes')
-            .select('id')
-            .eq('code', '392673')
-            .single();
-            
-          if (!codeError && codeData) {
-            // Registra l'utilizzo del codice
-            await supabase.from('access_code_usage').upsert({
-              code_id: codeData.id,
-              student_email: userEmail,
-              used_at: new Date().toISOString()
-            }, { onConflict: 'code_id,student_email' });
-          }
-        } catch (err) {
-          console.error('Errore nel registrare l\'utilizzo del codice per istruttore1:', err);
+        // Se troviamo un codice PRO, lo utilizziamo
+        if (!proCodeError && proCodeData && proCodeData.code) {
+          localStorage.setItem('hasInstructorAccess', 'true');
+          localStorage.setItem('masterCode', proCodeData.code);
+          localStorage.setItem('hasActiveAccess', 'true');
+          localStorage.setItem('isCodeDeactivated', 'false');
+          localStorage.setItem('needsSubscription', 'false');
+          
+          // Forziamo un evento di storage per aggiornare tutti i componenti
+          window.dispatchEvent(new Event('localStorageUpdated'));
+          
+          // Creiamo una cronologia con il codice PRO reale
+          const fallbackHistory = [{
+            id: 'pro-code-istruttore1',
+            code: proCodeData.code,
+            type: 'instructor' as const,
+            expiration_date: '2099-12-31T23:59:59',
+            is_active: true,
+            created_at: new Date().toISOString(),
+            duration_months: 999,
+            duration_type: 'unlimited',
+            used_at: new Date().toISOString()
+          }];
+          
+          setCodeHistory(fallbackHistory);
+          setLoading(false);
+          return;
+        } else {
+          console.log('Nessun codice PRO trovato per istruttore1@io.it, utilizziamo il comportamento standard');
         }
-        
-        return;
       }
       
-      // Per gli altri istruttori, procediamo normalmente
+      // Per gli altri istruttori o se non troviamo un codice PRO, procediamo normalmente
       const { data: usageData, error: usageError } = await supabase
         .from('access_code_usage')
         .select(`
@@ -401,7 +393,7 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
           const fallbackHistory = [{
             id: 'fallback-code',
             code: localStorage.getItem('masterCode') || '000000',
-            type: 'master',
+            type: 'master' as const,
             expiration_date: '2099-12-31T23:59:59',
             is_active: true,
             created_at: new Date().toISOString(),
@@ -421,7 +413,7 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       const formattedHistory = usageData.map(item => ({
         ...item.access_codes,
         used_at: item.used_at
-      }));
+      })) as CodeUsage[];
 
       setCodeHistory(formattedHistory);
     } catch (error) {
