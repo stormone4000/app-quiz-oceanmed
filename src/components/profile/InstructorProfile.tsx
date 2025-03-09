@@ -329,7 +329,7 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
         const { data: proCodeData, error: proCodeError } = await supabase
           .from('instructor_activation_codes')
           .select('code')
-          .filter('used_by', 'ilike', `%${userEmail}%`)
+          .eq('assigned_to_email', userEmail)
           .single();
         
         // Se troviamo un codice PRO, lo utilizziamo
