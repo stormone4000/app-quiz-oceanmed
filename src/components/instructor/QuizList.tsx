@@ -1,7 +1,9 @@
-import React from 'react';
-import { Book, GraduationCap, Edit, Trash2, Users, Compass, Shield, CloudSun, Wrench, Anchor, Ship, Navigation, Map, Waves, Wind, Thermometer, LifeBuoy, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import React, { useState } from 'react';
+import { Book, GraduationCap, Edit, Trash2, Users, Compass, Shield, CloudSun, Wrench, Anchor, Ship, Navigation, Map, Waves, Wind, Thermometer, LifeBuoy, RefreshCw, Eye, EyeOff, Copy, Check, Code } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { COLORS } from './QuizCreator';
+import { toast } from 'react-hot-toast';
+import { useModal } from '../../hooks/useModal';
 
 const ICONS: { [key: string]: React.ComponentType<React.SVGProps<SVGSVGElement>> } = {
   'compass': Compass,
@@ -49,6 +51,33 @@ interface QuizListProps {
 }
 
 export function QuizList({ quizzes, onEdit, onDelete, onAssign, onVisibilityChange, onRegenerateCode, onTestQuiz, isMaster, viewMode = 'manage' }: QuizListProps) {
+  const [copiedCodes, setCopiedCodes] = useState<{[key: string]: boolean}>({});
+  const { showSuccess, showError } = useModal();
+  
+  const handleCopyCode = (quizCode: string, quizId: string) => {
+    navigator.clipboard.writeText(quizCode)
+      .then(() => {
+        // Imposta lo stato di copia per questo quiz
+        setCopiedCodes(prev => ({ ...prev, [quizId]: true }));
+        
+        // Mostra un toast di conferma
+        toast.success('Codice quiz copiato negli appunti!');
+        
+        // Mostra anche una modale di conferma
+        showSuccess('Codice Copiato', 'Il codice quiz è stato copiato negli appunti.');
+        
+        // Resetta lo stato dopo 2 secondi
+        setTimeout(() => {
+          setCopiedCodes(prev => ({ ...prev, [quizId]: false }));
+        }, 2000);
+      })
+      .catch(err => {
+        console.error('Errore durante la copia del codice:', err);
+        toast.error('Impossibile copiare il codice');
+        showError('Errore', 'Impossibile copiare il codice negli appunti.');
+      });
+  };
+
   return (
     <div className="space-y-6">
       {quizzes.map((quiz) => {
@@ -80,6 +109,48 @@ export function QuizList({ quizzes, onEdit, onDelete, onAssign, onVisibilityChan
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-xl font-bold text-slate-800 dark:text-white truncate">{quiz.title}</h3>
+                  
+                  {/* Aggiungiamo il codice quiz qui, subito sotto il titolo, sempre visibile anche se non c'è un codice */}
+                  <div className="mt-2 mb-2">
+                    {quiz.quiz_code ? (
+                      <span className="flex items-center gap-1 inline-flex font-mono bg-blue-100 dark:bg-blue-900/30 px-3 py-1.5 rounded-md text-blue-700 dark:text-blue-300 text-sm">
+                        <Code className="w-4 h-4" />
+                        <span>Codice: {quiz.quiz_code}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopyCode(quiz.quiz_code || '', quiz.id);
+                          }}
+                          className="ml-2 p-1 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-md transition-colors"
+                          aria-label="Copia codice quiz"
+                          title="Copia codice quiz"
+                        >
+                          {copiedCodes[quiz.id] ? (
+                            <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                          ) : (
+                            <Copy className="w-4 h-4" />
+                          )}
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 inline-flex font-mono bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-md text-gray-500 dark:text-gray-400 text-sm">
+                        <Code className="w-4 h-4" />
+                        <span>Nessun codice</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRegenerateCode(quiz.id);
+                          }}
+                          className="ml-2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
+                          aria-label="Genera codice quiz"
+                          title="Genera codice quiz"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                  
                   <p className="text-slate-600 dark:text-gray-200 mt-2 line-clamp-2">{quiz.description}</p>
                   {quiz.created_by && (
                     <p className="text-sm text-slate-500 dark:text-gray-300 mt-2">
@@ -96,14 +167,33 @@ export function QuizList({ quizzes, onEdit, onDelete, onAssign, onVisibilityChan
                         <span className="bg-slate-100 dark:bg-slate-700/50 px-2 py-1 rounded">{quiz.category}</span>
                       </>
                     )}
+                    
+                    {/* Codice Quiz con pulsante per copiare */}
                     {quiz.quiz_code && (
                       <>
                         <span className="hidden sm:inline">•</span>
-                        <span className="font-mono bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded text-blue-700 dark:text-blue-300">
-                          Codice: {quiz.quiz_code}
+                        <span className="flex items-center gap-1 font-mono bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded text-blue-700 dark:text-blue-300">
+                          <Code className="w-3.5 h-3.5" />
+                          <span>{quiz.quiz_code}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyCode(quiz.quiz_code || '', quiz.id);
+                            }}
+                            className="ml-1 p-0.5 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-md transition-colors"
+                            aria-label="Copia codice quiz"
+                            title="Copia codice quiz"
+                          >
+                            {copiedCodes[quiz.id] ? (
+                              <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
                         </span>
                       </>
                     )}
+                    
                     {quiz.activations_count !== undefined && (
                       <>
                         <span className="hidden sm:inline">•</span>
@@ -141,7 +231,7 @@ export function QuizList({ quizzes, onEdit, onDelete, onAssign, onVisibilityChan
                       </button>
                     ) : (
                       <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-2 ${
-                        quiz.visibility === 'public'
+                        quiz.visibility === 'public' 
                           ? 'bg-green-100/70 text-green-700 dark:bg-green-900/20 dark:text-green-300/70'
                           : 'bg-gray-100/70 text-gray-700 dark:bg-gray-900/20 dark:text-gray-300/70'
                       }`}>

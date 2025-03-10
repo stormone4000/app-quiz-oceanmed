@@ -32,6 +32,9 @@ export function Sidebar({
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isCodeDeactivated, setIsCodeDeactivated] = useState(false);
   const [needsSubscription, setNeedsSubscription] = useState(false);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [businessName, setBusinessName] = useState<string | null>(null);
+  const [imageKey, setImageKey] = useState(0);
 
   useEffect(() => {
     // Inizializza gli stati locali dai valori in localStorage
@@ -43,6 +46,22 @@ export function Sidebar({
       const userEmailValue = localStorage.getItem('userEmail');
       const isCodeDeactivatedValue = localStorage.getItem('isCodeDeactivated') === 'true';
       const needsSubscriptionValue = localStorage.getItem('needsSubscription') === 'true';
+      const profileImageUrlValue = localStorage.getItem('profileImageUrl');
+      const businessNameValue = localStorage.getItem('businessName');
+
+      // Verifichiamo se l'immagine del profilo è cambiata
+      if (profileImageUrlValue !== profileImageUrl) {
+        console.log('Immagine profilo aggiornata da:', profileImageUrl, 'a:', profileImageUrlValue);
+        setProfileImageUrl(profileImageUrlValue);
+        // Incrementiamo il key per forzare il re-render dell'immagine
+        setImageKey(prev => prev + 1);
+      }
+
+      // Verifichiamo se il nome dell'attività è cambiato
+      if (businessNameValue !== businessName) {
+        console.log('Nome attività aggiornato da:', businessName, 'a:', businessNameValue);
+        setBusinessName(businessNameValue);
+      }
 
       // Sincronizziamo i flag per gli istruttori
       if (isProfessorValue && hasActiveAccessValue && !hasInstructorAccessValue) {
@@ -64,7 +83,9 @@ export function Sidebar({
         isMaster: isMasterValue,
         userEmail: userEmailValue,
         isCodeDeactivated: isCodeDeactivatedValue,
-        needsSubscription: needsSubscriptionValue
+        needsSubscription: needsSubscriptionValue,
+        profileImageUrl: profileImageUrlValue,
+        businessName: businessNameValue
       });
     };
 
@@ -73,17 +94,30 @@ export function Sidebar({
 
     // Aggiorna gli stati quando localStorage cambia
     const handleStorageChange = () => {
+      console.log('Evento storage rilevato in Sidebar - aggiornamento dati');
       updateFromLocalStorage();
     };
 
     window.addEventListener('localStorageUpdated', handleStorageChange);
     window.addEventListener('storage', handleStorageChange);
 
+    // Chiediamo esplicitamente un aggiornamento all'intervallo di 5 secondi per verificare cambiamenti
+    const intervalId = setInterval(() => {
+      const currentImageUrl = localStorage.getItem('profileImageUrl');
+      const currentBusinessName = localStorage.getItem('businessName');
+      
+      if (currentImageUrl !== profileImageUrl || currentBusinessName !== businessName) {
+        console.log('Immagine profilo o nome attività cambiati durante il polling: aggiornamento');
+        updateFromLocalStorage();
+      }
+    }, 5000);
+
     return () => {
       window.removeEventListener('localStorageUpdated', handleStorageChange);
       window.removeEventListener('storage', handleStorageChange);
+      clearInterval(intervalId);
     };
-  }, []);
+  }, [profileImageUrl, businessName]);
 
   const menuItems: MenuItem[] = [
     {
@@ -202,12 +236,21 @@ export function Sidebar({
       return false;
     }).map(({ id, icon: Icon, label, requiresAccess, lockedMessage }) => {
       // Caso speciale per istruttore1@io.it
-      const isIstruttore1 = userEmail === 'istruttore1@io.it';
+      if (userEmail === 'istruttore1@io.it') {
+        console.log('Garantiamo accesso per istruttore1@io.it');
+        
+        // Generiamo un codice più significativo basato sull'email dell'utente
+        const customCode = `PRO-${userEmail.split('@')[0].toUpperCase()}`;
+        
+        localStorage.setItem('hasInstructorAccess', 'true');
+        localStorage.setItem('masterCode', customCode);
+        localStorage.setItem('hasActiveAccess', 'true');
+        localStorage.setItem('isMasterAdmin', 'true');
+        localStorage.setItem('needsSubscription', 'false');
+      }
       
       // Verifica se l'elemento dovrebbe essere disabilitato per istruttore1
-      const shouldDisableForIstruttore1 = isIstruttore1 && 
-                                         (isCodeDeactivated || needsSubscription) && 
-                                         requiresAccess;
+      const isIstruttore1 = userEmail === 'istruttore1@io.it';
       
       // Verifica se l'utente è un istruttore senza accesso
       const isInstructorWithoutAccess = isProfessor && !hasInstructorAccess && !isIstruttore1;
@@ -227,8 +270,6 @@ export function Sidebar({
         requiresAccess, 
         hasInstructorAccess, 
         isProfessor,
-        shouldDisableForIstruttore1,
-        isInstructorWithoutAccess,
         isIstruttore1
       });
                         
@@ -272,7 +313,7 @@ export function Sidebar({
             
             // Se è un istruttore senza accesso o istruttore1 con problemi, reindirizza al profilo
             if ((requiresAccess && !hasInstructorAccess && isProfessor) || 
-                shouldDisableForIstruttore1) {
+                isInstructorWithoutAccess) {
               onTabChange('profile');
               return;
             }
@@ -294,7 +335,7 @@ export function Sidebar({
           }`}
           disabled={!hasAccess}
           style={{ opacity: hasAccess ? 1 : 0.5 }}
-          title={!hasAccess ? (isInstructorWithoutAccess ? 'Inserisci il codice di attivazione per accedere' : (shouldDisableForIstruttore1 ? 'Inserisci il codice di attivazione per accedere' : (lockedMessage || 'Inserisci il codice master per accedere'))) : ''}
+          title={!hasAccess ? (isInstructorWithoutAccess ? 'Inserisci il codice di attivazione per accedere' : (lockedMessage || 'Inserisci il codice master per accedere')) : ''}
         >
           {id === 'notifications' && studentEmail ? (
             <div className={`${!isSidebarOpen ? 'lg:mx-auto' : ''}`}>
@@ -359,22 +400,71 @@ export function Sidebar({
         } transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
       >
         <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="p-4 mb-6">
-            <img
-              src={isSidebarOpen 
-                ? `https://uqutbomzymeklyowfewp.supabase.co/storage/v1/object/public/img//${
-                    theme === 'dark' ? 'logo-white.svg' : 'logo.svg'
-                  }`
-                : `https://uqutbomzymeklyowfewp.supabase.co/storage/v1/object/public/img//${
-                    theme === 'dark' ? 'pittogramma-white.svg' : 'pittogramma.svg'
-                  }`
-              }
-              alt="OceanMed Logo"
-              className={`h-12 w-auto mx-auto transition-all duration-300 ${
-                !isSidebarOpen ? 'lg:h-10' : ''
-              }`}
-            />
+          {/* Logo o Immagine del Profilo */}
+          <div className="p-4 mb-2">
+            {profileImageUrl && isProfessor ? (
+              // Se c'è un'immagine di profilo e l'utente è un istruttore, la usiamo
+              <div className={`relative mx-auto transition-all duration-300 ${
+                !isSidebarOpen ? 'lg:h-10 lg:w-10' : 'h-12 w-12'
+              }`}>
+                <img
+                  key={imageKey}
+                  src={`${profileImageUrl}?t=${imageKey}`}
+                  alt="Profilo Istruttore"
+                  className={`h-full w-full mx-auto transition-all duration-300 rounded-full object-cover border-2 border-blue-500 ${
+                    !isSidebarOpen ? 'lg:h-10 lg:w-10' : 'h-12 w-12'
+                  }`}
+                  onError={(e) => {
+                    console.error('Errore caricamento immagine profilo:', e);
+                    // Se l'immagine non si carica, falliamo elegantemente al logo predefinito
+                    e.currentTarget.style.display = 'none';
+                    // e utilizziamo il logo predefinito attraverso gli elementi HTML successivi
+                  }}
+                />
+                {/* Logo di fallback in caso di errore nell'immagine, nascosto normalmente */}
+                <div className="hidden" id="fallbackLogo">
+                  <img
+                    src={isSidebarOpen 
+                      ? `https://uqutbomzymeklyowfewp.supabase.co/storage/v1/object/public/img//${
+                          theme === 'dark' ? 'logo-white.svg' : 'logo.svg'
+                        }`
+                      : `https://uqutbomzymeklyowfewp.supabase.co/storage/v1/object/public/img//${
+                          theme === 'dark' ? 'pittogramma-white.svg' : 'pittogramma.svg'
+                        }`
+                    }
+                    alt="OceanMed Logo"
+                    className={`h-12 w-auto mx-auto transition-all duration-300 ${
+                      !isSidebarOpen ? 'lg:h-10' : ''
+                    }`}
+                  />
+                </div>
+              </div>
+            ) : (
+              // Altrimenti, usiamo il logo predefinito
+              <img
+                src={isSidebarOpen 
+                  ? `https://uqutbomzymeklyowfewp.supabase.co/storage/v1/object/public/img//${
+                      theme === 'dark' ? 'logo-white.svg' : 'logo.svg'
+                    }`
+                  : `https://uqutbomzymeklyowfewp.supabase.co/storage/v1/object/public/img//${
+                      theme === 'dark' ? 'pittogramma-white.svg' : 'pittogramma.svg'
+                    }`
+                }
+                alt="OceanMed Logo"
+                className={`h-12 w-auto mx-auto transition-all duration-300 ${
+                  !isSidebarOpen ? 'lg:h-10' : ''
+                }`}
+              />
+            )}
+            
+            {/* Nome dell'attività, mostrato solo se siamo istruttori e se esiste */}
+            {isProfessor && businessName && isSidebarOpen && (
+              <div className="mt-2 text-center">
+                <p className="text-sm font-medium text-blue-600 dark:text-blue-400 truncate max-w-full">
+                  {businessName}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Navigation */}

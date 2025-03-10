@@ -23,6 +23,8 @@ import { useAppSelector, useAppDispatch } from './redux/hooks';
 import { selectAuth, logout, syncFromStorage, login } from './redux/slices/authSlice';
 import { purgeStore } from './redux/store';
 import { QuizLiveMain } from './components/interactive/QuizLiveMain';
+import { setupAllStorage } from './utils/setupStorage';
+import { Toaster } from 'react-hot-toast';
 
 // Creazione componenti wrapper per InstructorProfile e StudentProfile
 function ProfileWrapper({component}: {component: React.ElementType}) {
@@ -233,139 +235,172 @@ function App() {
     });
   };
 
+  // Eseguiamo lo script all'avvio dell'applicazione
+  if (typeof window !== 'undefined') {
+    console.log('Avvio configurazione storage...');
+    setupAllStorage().then(result => {
+      console.log('Configurazione storage completata:', result);
+    }).catch(error => {
+      console.error('Errore durante la configurazione dello storage:', error);
+    });
+  }
+
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <Router>
-        <div className="min-h-screen antialiased">
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login-demo" element={<LoginDemo />} />
-            
-            {/* Auth routes */}
-            <Route
-              path="/login"
-              element={
-                !auth.isStudent && !auth.isProfessor ? (
-                  <AuthScreen mode="student" />
-                ) : (
-                  <Navigate to="/dashboard" />
-                )
-              }
-            />
-            
-            <Route
-              path="/login-instructor"
-              element={
-                !auth.isStudent && !auth.isProfessor ? (
-                  <AuthScreen mode="instructor" />
-                ) : (
-                  <Navigate to="/dashboard" />
-                )
-              }
-            />
-            
-            <Route
-              path="/register"
-              element={
-                !auth.isStudent && !auth.isProfessor ? (
-                  <RegistrationPage />
-                ) : (
-                  <Navigate to="/dashboard" />
-                )
-              }
-            />
-            
-            {/* Quiz Live routes - Sistema esistente */}
-            <Route path="/quiz-live" element={<QuizLiveLayout />}>
-              <Route index element={
-                auth.isProfessor 
-                  ? <QuizLive hostEmail={auth.userEmail || ''} />
-                  : <Navigate to="/quiz-live/join" />
-              } />
-              <Route path="join" element={<QuizJoin />} />
-              <Route path="join/:pin" element={<QuizJoin />} />
-              <Route path="waiting/:id" element={
-                localStorage.getItem('nickname') || auth.isProfessor 
-                  ? <QuizWaiting />
-                  : <Navigate to="/quiz-live/join" />
-              } />
-              <Route path="play/:id" element={
-                (localStorage.getItem('nickname') && localStorage.getItem('quizId')) || auth.isProfessor
-                  ? <QuizPlay />
-                  : <Navigate to="/quiz-live/join" />
-              } />
-              <Route path="leaderboard/:id" element={<QuizLeaderboard />} />
-            </Route>
-            
-            {/* Protected dashboard route */}
-            <Route 
-              path="/dashboard" 
-              element={
-                auth.isAuthenticated ? (
-                  auth.isProfessor ? (
-                    <ProfessorDashboard 
-                      results={results} 
-                      onLogout={handleLogout} 
-                      needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess && !auth.isMasterAdmin}
-                      hostEmail={auth.userEmail || ''}
-                    />
-                  ) : auth.userEmail ? (
+        <div className="App">
+          {/* Toaster per le notifiche */}
+          <Toaster 
+            position="top-right"
+            toastOptions={{
+              duration: 2000,
+              style: {
+                background: '#333',
+                color: '#fff',
+              },
+              success: {
+                style: {
+                  background: '#10B981',
+                },
+              },
+              error: {
+                style: {
+                  background: '#EF4444',
+                },
+              },
+            }}
+          />
+          <div className="min-h-screen antialiased">
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login-demo" element={<LoginDemo />} />
+              
+              {/* Auth routes */}
+              <Route
+                path="/login"
+                element={
+                  !auth.isStudent && !auth.isProfessor ? (
+                    <AuthScreen mode="student" />
+                  ) : (
+                    <Navigate to="/dashboard" />
+                  )
+                }
+              />
+              
+              <Route
+                path="/login-instructor"
+                element={
+                  !auth.isStudent && !auth.isProfessor ? (
+                    <AuthScreen mode="instructor" />
+                  ) : (
+                    <Navigate to="/dashboard" />
+                  )
+                }
+              />
+              
+              <Route
+                path="/register"
+                element={
+                  !auth.isStudent && !auth.isProfessor ? (
+                    <RegistrationPage />
+                  ) : (
+                    <Navigate to="/dashboard" />
+                  )
+                }
+              />
+              
+              {/* Quiz Live routes - Sistema esistente */}
+              <Route path="/quiz-live" element={<QuizLiveLayout />}>
+                <Route index element={
+                  auth.isProfessor 
+                    ? <QuizLive hostEmail={auth.userEmail || ''} />
+                    : <Navigate to="/quiz-live/join" />
+                } />
+                <Route path="join" element={<QuizJoin />} />
+                <Route path="join/:pin" element={<QuizJoin />} />
+                <Route path="waiting/:id" element={
+                  localStorage.getItem('nickname') || auth.isProfessor 
+                    ? <QuizWaiting />
+                    : <Navigate to="/quiz-live/join" />
+                } />
+                <Route path="play/:id" element={
+                  (localStorage.getItem('nickname') && localStorage.getItem('quizId')) || auth.isProfessor
+                    ? <QuizPlay />
+                    : <Navigate to="/quiz-live/join" />
+                } />
+                <Route path="leaderboard/:id" element={<QuizLeaderboard />} />
+              </Route>
+              
+              {/* Protected dashboard route */}
+              <Route 
+                path="/dashboard" 
+                element={
+                  auth.isAuthenticated ? (
+                    auth.isProfessor ? (
+                      <ProfessorDashboard 
+                        results={results} 
+                        onLogout={handleLogout} 
+                        needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess && !auth.isMasterAdmin}
+                        hostEmail={auth.userEmail || ''}
+                      />
+                    ) : auth.userEmail ? (
+                      <StudentDashboard 
+                        results={results.filter(r => r.email === auth.userEmail)}
+                        studentEmail={auth.userEmail || ''}
+                        onLogout={handleLogout}
+                      />
+                    ) : (
+                      <Navigate to="/login" />
+                    )
+                  ) : (
+                    <Navigate to="/login" />
+                  )
+                }
+              />
+              
+              {/* Profili accessibili anche senza autenticazione */}
+              <Route path="/profile/student" element={<ProfileWrapper component={StudentProfile} />} />
+              <Route path="/profile/instructor" element={<ProfileWrapper component={InstructorProfile} />} />
+              
+              {/* Rotte protette - Studente */}
+              <Route
+                path="/student/*"
+                element={
+                  auth.isStudent ? (
                     <StudentDashboard 
-                      results={results.filter(r => r.email === auth.userEmail)}
-                      studentEmail={auth.userEmail || ''}
-                      onLogout={handleLogout}
+                      studentEmail={auth.userEmail || ''} 
+                      results={[]} 
+                      onLogout={handleLogout} 
                     />
                   ) : (
                     <Navigate to="/login" />
                   )
-                ) : (
-                  <Navigate to="/login" />
-                )
-              }
-            />
-            
-            {/* Profili accessibili anche senza autenticazione */}
-            <Route path="/profile/student" element={<ProfileWrapper component={StudentProfile} />} />
-            <Route path="/profile/instructor" element={<ProfileWrapper component={InstructorProfile} />} />
-            
-            {/* Rotte protette - Studente */}
-            <Route
-              path="/student/*"
-              element={
-                auth.isStudent ? (
-                  <StudentDashboard 
-                    studentEmail={auth.userEmail || ''} 
-                    results={[]} 
-                    onLogout={handleLogout} 
-                  />
-                ) : (
-                  <Navigate to="/login" />
-                )
-              }
-            />
-            
-            {/* Rotte protette - Admin/Istruttore */}
-            <Route
-              path="/admin/*"
-              element={
-                auth.isProfessor ? (
-                  <ProfessorDashboard 
-                    results={results} 
-                    onLogout={handleLogout} 
-                    needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess}
-                    hostEmail={auth.userEmail || ''}
-                  />
-                ) : (
-                  <Navigate to="/login" />
-                )
-              }
-            />
-            
-            {/* Test Quiz Route */}
-            <Route path="/test-quiz/:quizType/:quizId" element={<TestQuizPage />} />
-            
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
+                }
+              />
+              
+              {/* Rotte protette - Admin/Istruttore */}
+              <Route
+                path="/admin/*"
+                element={
+                  auth.isProfessor ? (
+                    <ProfessorDashboard 
+                      results={results} 
+                      onLogout={handleLogout} 
+                      needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess}
+                      hostEmail={auth.userEmail || ''}
+                    />
+                  ) : (
+                    <Navigate to="/login" />
+                  )
+                }
+              />
+              
+              {/* Test Quiz Route */}
+              <Route path="/test-quiz/:quizType/:quizId" element={<TestQuizPage />} />
+              
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </div>
         </div>
       </Router>
     </ThemeProvider>

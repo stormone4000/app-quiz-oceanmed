@@ -621,7 +621,7 @@ export function UserManagement() {
         </div>
       )}
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
         <div className="p-6 border-b border-gray-200 dark:border-slate-800">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="relative flex-1">
@@ -811,7 +811,7 @@ export function UserManagement() {
       {/* User Details Modal */}
       {showUserDetails && userDetails && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
             <div className="p-6 border-b border-gray-200 dark:border-slate-800 flex justify-between items-center">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                 Dettagli Utente: {userDetails.name}

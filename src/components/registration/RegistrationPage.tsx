@@ -365,10 +365,10 @@ export function RegistrationPage() {
             <p className="text-sm text-gray-100 dark:text-slate-400">
               Sei un istruttore?{' '}
               <button
-                onClick={() => navigate('/instructor')}
+                onClick={() => navigate('/login-instructor')}
                 className="text-blue-300 hover:text-blue-700 font-medium"
               >
-                Accedi
+                Accedi come istruttore
               </button>
             </p>
           </div>

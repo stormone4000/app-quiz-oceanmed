@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Save, AlertCircle, Image as ImageIcon, Loader2, Compass, Shield, CloudSun, Book, GraduationCap, Wrench, Anchor, Ship, Navigation, Map, Waves, Wind, Thermometer, LifeBuoy } from 'lucide-react';
+import { X, Plus, Save, AlertCircle, Image as ImageIcon, Loader2, Compass, Shield, CloudSun, Book, GraduationCap, Wrench, Anchor, Ship, Navigation, Map, Waves, Wind, Thermometer, LifeBuoy, ArrowLeft } from 'lucide-react';
 import { supabase, supabaseAdmin } from '../../services/supabase';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -600,18 +600,21 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center p-4 z-50 overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl max-w-4xl w-full my-16">
-        <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-slate-800 flex justify-between items-center">
-          <h2 className="text-lg sm:text-xl font-bold dark:text-slate-100">
-            {editQuiz ? 'Modifica Quiz' : 'Crea Nuovo Quiz'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
-          >
-            <X className="w-5 h-5 sm:w-6 sm:h-6" />
-          </button>
+    <div className="flex justify-center items-center min-h-screen p-4 bg-gray-50 dark:bg-slate-950">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 max-w-4xl w-full my-16">
+        <div className="p-6 border-b border-gray-200 dark:border-slate-800">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+              {editQuiz ? 'Modifica Quiz' : 'Crea Nuovo Quiz'}
+            </h1>
+            <button
+              onClick={onClose}
+              className="flex items-center gap-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Torna indietro
+            </button>
+          </div>
         </div>
 
         <div className="p-4 sm:p-6">

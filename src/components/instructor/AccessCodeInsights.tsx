@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Key, Users, CheckCircle2, XCircle, Calendar, Search, ArrowUpDown } from 'lucide-react';
+import { Key, Users, CheckCircle2, XCircle, Calendar, Search, ArrowUpDown, Activity, CheckSquare } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
@@ -127,20 +127,20 @@ export function AccessCodeInsights() {
       <h2 className="text-2xl font-bold text-white">Statistiche Codici di Accesso</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl shadow-md p-6">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6">
           <div className="flex items-center gap-3 mb-4">
-            <Key className="w-6 h-6 text-blue-600" />
-            <h3 className="text-lg font-semibold">Codici Totali</h3>
+            <Key className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Codici Totali</h3>
           </div>
-          <p className="text-3xl font-bold text-blue-600">{stats.totalCodes}</p>
+          <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.totalCodes}</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md p-6">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6">
           <div className="flex items-center gap-3 mb-4">
-            <CheckCircle2 className="w-6 h-6 text-green-600" />
-            <h3 className="text-lg font-semibold">Tasso di Utilizzo</h3>
+            <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Tasso di Utilizzo</h3>
           </div>
-          <p className="text-3xl font-bold text-green-600">
+          <p className="text-3xl font-bold text-green-600 dark:text-green-400">
             {stats.totalCodes > 0 
               ? `${((stats.usedCodes / stats.totalCodes) * 100).toFixed(1)}%`
               : '0%'
@@ -148,25 +148,38 @@ export function AccessCodeInsights() {
           </p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md p-6">
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6">
           <div className="flex items-center gap-3 mb-4">
-            <Users className="w-6 h-6 text-purple-600" />
-            <h3 className="text-lg font-semibold">Codici Attivi</h3>
+            <Users className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Codici Attivi</h3>
           </div>
-          <p className="text-3xl font-bold text-purple-600">{stats.unusedCodes}</p>
+          <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{stats.unusedCodes}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h3 className="text-lg font-semibold mb-4">Distribuzione Utilizzo</h3>
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Distribuzione Utilizzo</h3>
           <div className="h-64">
-            <Pie data={pieData} options={{ maintainAspectRatio: false }} />
+            <Pie 
+              data={pieData} 
+              options={{ 
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    position: 'bottom',
+                    labels: {
+                      color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#334155'
+                    }
+                  }
+                } 
+              }} 
+            />
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <h3 className="text-lg font-semibold mb-4">Trend Utilizzo Mensile</h3>
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Trend Utilizzo Mensile</h3>
           <div className="h-64">
             <Bar 
               data={barData} 
@@ -176,7 +189,26 @@ export function AccessCodeInsights() {
                   y: {
                     beginAtZero: true,
                     ticks: {
-                      stepSize: 1
+                      stepSize: 1,
+                      color: document.documentElement.classList.contains('dark') ? '#94a3b8' : '#64748b'
+                    },
+                    grid: {
+                      color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                    }
+                  },
+                  x: {
+                    ticks: {
+                      color: document.documentElement.classList.contains('dark') ? '#94a3b8' : '#64748b'
+                    },
+                    grid: {
+                      color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                    }
+                  }
+                },
+                plugins: {
+                  legend: {
+                    labels: {
+                      color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#334155'
                     }
                   }
                 }

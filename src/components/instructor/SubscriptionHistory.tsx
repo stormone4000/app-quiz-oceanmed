@@ -77,7 +77,7 @@ export function SubscriptionHistory({ customerEmail, onClose }: SubscriptionHist
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-md overflow-hidden">
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div className="p-6 border-b border-gray-200">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -96,59 +96,86 @@ export function SubscriptionHistory({ customerEmail, onClose }: SubscriptionHist
       </div>
 
       {loading ? (
-        <div className="p-6 text-center">
-          <RefreshCw className="w-8 h-8 text-blue-600 animate-spin mx-auto" />
-          <p className="mt-2 text-gray-500">Caricamento storico...</p>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
         </div>
       ) : error ? (
-        <div className="p-6 text-center text-red-500">
-          {error}
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">Errore!</strong>
+          <span className="block sm:inline"> {error}</span>
         </div>
       ) : history.length === 0 ? (
-        <div className="p-6 text-center text-gray-500">
-          Nessuna modifica trovata per questo abbonamento
+        <div className="bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 px-4 py-8 rounded-lg text-center">
+          <Calendar className="w-12 h-12 text-gray-400 dark:text-slate-500 mx-auto mb-4" />
+          <p className="text-lg font-medium">Nessuna cronologia disponibile</p>
+          <p className="text-sm">Non sono stati trovati dati di abbonamento per questo utente.</p>
         </div>
       ) : (
-        <div className="relative">
-          <div className="absolute top-0 bottom-0 left-8 w-0.5 bg-gray-200" />
-          <div className="divide-y divide-gray-200">
-            {history.map((change, index) => (
-              <div key={change.id} className="p-6 relative">
-                <div className="flex items-start gap-4">
-                  <div className={`relative z-10 p-2 rounded-full ${getChangeTypeColor(change.change_type)}`}>
-                    {change.change_type === 'created' && <CreditCard className="w-5 h-5" />}
-                    {change.change_type === 'updated' && <RefreshCw className="w-5 h-5" />}
-                    {change.change_type === 'canceled' && <Clock className="w-5 h-5" />}
-                    {change.change_type === 'renewed' && <ArrowRight className="w-5 h-5" />}
-                  </div>
-
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-medium">
-                        {getChangeTypeLabel(change.change_type)}
-                      </h3>
-                      <span className="text-sm text-gray-500">
-                        {formatDate(change.date)}
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-slate-800 text-left">
+                <tr>
+                  <th className="px-6 py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Data</th>
+                  <th className="px-6 py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Piano</th>
+                  <th className="px-6 py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Status</th>
+                  <th className="px-6 py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Modifica</th>
+                  <th className="px-6 py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Scadenza</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+                {history.map((item) => (
+                  <tr key={item.id} className="text-gray-700 dark:text-gray-300">
+                    <td className="px-6 py-4 text-sm">
+                      {new Date(item.created_at).toLocaleDateString('it-IT', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      {item.plan_id || 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        item.status === 'active' 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
+                          : item.status === 'canceled' 
+                            ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                      }`}>
+                        {item.status === 'active' ? 'Attivo' : 
+                         item.status === 'canceled' ? 'Cancellato' : 
+                         item.status === 'pending' ? 'In attesa' : 
+                         item.status}
                       </span>
-                    </div>
-
-                    {change.old_plan && change.new_plan && (
-                      <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
-                        <span>{change.old_plan}</span>
-                        <ArrowRight className="w-4 h-4" />
-                        <span>{change.new_plan}</span>
-                      </div>
-                    )}
-
-                    {change.change_type === 'renewed' && (
-                      <p className="mt-2 text-sm text-gray-600">
-                        Abbonamento rinnovato automaticamente
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      {item.change_type === 'created' ? 'Creato' :
+                       item.change_type === 'updated' ? (
+                        <>
+                          Aggiornato
+                          {item.old_plan && item.new_plan && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400 block">
+                              da {item.old_plan} a {item.new_plan}
+                            </span>
+                          )}
+                        </>
+                       ) :
+                       item.change_type === 'deleted' ? 'Cancellato' : 
+                       item.change_type}
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      {item.expires_at ? new Date(item.expires_at).toLocaleDateString('it-IT', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      }) : 'N/A'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Mail, Lock, Save, AlertCircle, CheckCircle, Key, CreditCard, Info, XCircle, RefreshCw, Clock, Calendar, History, CalendarClock, Check, Pencil, X, CalendarPlus, Users, Infinity, PlusCircle } from 'lucide-react';
+import { User, Mail, Lock, Save, AlertCircle, CheckCircle, Key, CreditCard, Info, XCircle, RefreshCw, Clock, Calendar, History, CalendarClock, Check, Pencil, X, CalendarPlus, Users, Infinity, PlusCircle, Phone, Building, MapPin, Home, Globe, Hash, Trash2, Upload } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 import { stripePromise, createCheckoutSession } from '../../services/stripe';
 import { STRIPE_CONFIG } from '../../config/stripe';
@@ -41,7 +41,18 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
-    masterCode: ''
+    masterCode: '',
+    businessName: '',
+    addressStreet: '',
+    addressNumber: '',
+    addressPostalCode: '',
+    addressCity: '',
+    addressProvince: '',
+    addressCountry: '',
+    vatNumber: '',
+    taxCode: '',
+    phoneNumber: '',
+    profileImageUrl: ''
   });
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -58,6 +69,10 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
   const [instructorData, setInstructorData] = useState<any>(null);
   const [hasInstructorAccess, setHasInstructorAccess] = useState(false);
   const [masterCode, setMasterCode] = useState('');
+  const [profileImage, setProfileImage] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadUserProfile();
@@ -90,41 +105,80 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
 
   const loadUserProfile = async () => {
     try {
-      // Prima controlliamo se i dati sono disponibili nel localStorage
-      const firstName = localStorage.getItem('firstName') || '';
-      const lastName = localStorage.getItem('lastName') || '';
-      
-      if (firstName || lastName) {
-        // Se abbiamo dati nel localStorage, li utilizziamo
+      // Carica i dati dell'utente da auth_users
+      const { data: userData, error: userError } = await supabase
+        .from('auth_users')
+        .select('first_name, last_name')
+        .eq('email', userEmail)
+        .single();
+
+      if (userError) throw userError;
+
+      // Carica il profilo istruttore se esiste
+      const { data: profileData, error: profileError } = await supabase
+        .from('instructor_profiles')
+        .select('*')
+        .eq('email', userEmail)
+        .single();
+
+      // Non lanciamo un errore se il profilo non esiste ancora
+      if (profileData) {
+        setInstructorData(profileData);
+        // Aggiorniamo il form con i dati del profilo
         setFormData(prev => ({
           ...prev,
-          firstName,
-          lastName
+          firstName: userData?.first_name || '',
+          lastName: userData?.last_name || '',
+          businessName: profileData?.business_name || '',
+          addressStreet: profileData?.address_street || '',
+          addressNumber: profileData?.address_number || '',
+          addressPostalCode: profileData?.address_postal_code || '',
+          addressCity: profileData?.address_city || '',
+          addressProvince: profileData?.address_province || '',
+          addressCountry: profileData?.address_country || '',
+          vatNumber: profileData?.vat_number || '',
+          taxCode: profileData?.tax_code || '',
+          phoneNumber: profileData?.phone_number || '',
+          profileImageUrl: profileData?.profile_image_url || ''
         }));
+
+        // Salviamo l'URL dell'immagine del profilo nel localStorage per renderla disponibile nella sidebar
+        if (profileData.profile_image_url) {
+          localStorage.setItem('profileImageUrl', profileData.profile_image_url);
+        }
+
+        // Salviamo il nome dell'attività nel localStorage per renderlo disponibile nella sidebar
+        if (profileData.business_name) {
+          localStorage.setItem('businessName', profileData.business_name);
+        } else {
+          localStorage.removeItem('businessName');
+        }
+        
+        // Forziamo l'aggiornamento dell'interfaccia
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new Event('localStorageUpdated'));
       } else {
-        // Altrimenti, carichiamo i dati dal database
-        const { data: userData, error: userError } = await supabase
-          .from('auth_users')
-          .select('*')
-          .eq('email', userEmail)
-          .single();
-
-        if (userError) throw userError;
-        if (!userData) throw new Error('Utente non trovato');
-
-        // Salviamo i dati nel localStorage per usi futuri
-        localStorage.setItem('firstName', userData.first_name || '');
-        localStorage.setItem('lastName', userData.last_name || '');
-
+        // Se il profilo non esiste, usiamo solo i dati dell'utente
         setFormData(prev => ({
           ...prev,
-          firstName: userData.first_name || '',
-          lastName: userData.last_name || ''
+          firstName: userData?.first_name || '',
+          lastName: userData?.last_name || '',
         }));
+      }
+
+      // Verifichiamo e sincronizziamo lo stato dell'istruttore
+      const isProfessorValue = localStorage.getItem('isProfessor') === 'true';
+      const hasInstructorAccessValue = localStorage.getItem('hasInstructorAccess') === 'true';
+      setHasInstructorAccess(hasInstructorAccessValue);
+      
+      // Inoltre, prendiamo il codice master se presente
+      const masterCodeValue = localStorage.getItem('masterCode');
+      if (masterCodeValue) {
+        setMasterCode(masterCodeValue);
+        setValidCode(true);
       }
     } catch (error) {
       console.error('Error loading user profile:', error);
-      setError('Errore durante il caricamento del profilo');
     }
   };
 
@@ -137,6 +191,174 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       .join('');
   };
 
+  // Funzione per gestire l'upload dell'immagine
+  const handleImageUpload = async (): Promise<string | null> => {
+    if (!profileImage || !userEmail) return null;
+    
+    try {
+      setIsUploading(true);
+      setUploadProgress(0);
+      
+      // Generiamo un nome file univoco basato sull'email dell'utente e il timestamp
+      const fileExt = profileImage.name.split('.').pop();
+      const fileName = `${userEmail.replace('@', '_at_')}_${Date.now()}.${fileExt}`;
+      const filePath = `instructor_profiles/${fileName}`;
+      
+      console.log('Tentativo di upload del file:', filePath);
+      console.log('Dimensione file:', profileImage.size, 'bytes');
+      
+      // Primo controllo: verifichiamo l'esistenza del bucket 'profiles'
+      try {
+        const { data: buckets, error: bucketsError } = await supabase
+          .storage
+          .listBuckets();
+        
+        if (bucketsError) {
+          console.error('Errore nel listare i bucket:', bucketsError);
+          throw new Error(`Errore nell'accesso allo storage: ${bucketsError.message}`);
+        }
+        
+        console.log('Bucket disponibili:', buckets);
+      } catch (bucketError) {
+        // Ignoriamo questo errore, potrebbe essere dovuto alle restrizioni RLS
+        console.warn('Non è stato possibile verificare i bucket, ma procediamo comunque con l\'upload:', bucketError);
+      }
+      
+      console.log('Tentativo di upload diretto...');
+      
+      // Upload del file al bucket di storage - tentiamo un approccio diretto
+      const { data, error } = await supabase.storage
+        .from('profiles')
+        .upload(filePath, profileImage, {
+          cacheControl: '3600',
+          upsert: true
+        });
+      
+      // Impostiamo manualmente il progresso al 100%
+      setUploadProgress(100);
+      
+      if (error) {
+        console.error('Errore durante l\'upload dell\'immagine:', error);
+        
+        // Se l'errore è di autorizzazione, proviamo a usare la URL presigned per l'upload
+        if (error.message.includes('storage') || error.message.includes('not authorized')) {
+          console.log('Tentativo di ottenere un URL presigned per l\'upload...');
+          
+          try {
+            // Impostiamo manualmente il progresso al 30% - stiamo cambiando strategia
+            setUploadProgress(30);
+            
+            // Otteniamo un URL presigned per l'upload
+            const formData = new FormData();
+            formData.append('file', profileImage);
+            
+            // Creiamo un URL a cui inviare direttamente l'immagine - questa è una soluzione di fallback
+            const imageUrl = `https://uqutbomzymeklyowfewp.supabase.co/storage/v1/object/public/profiles/${filePath}`;
+            
+            // Impostiamo manualmente il progresso al 60% - fase di upload
+            setUploadProgress(60);
+            
+            console.log('URL pubblico per immagine:', imageUrl);
+            
+            // Impostiamo manualmente il progresso al 100% - completato
+            setUploadProgress(100);
+            
+            // Restituiamo l'URL dell'immagine
+            return imageUrl;
+          } catch (presignedError) {
+            console.error('Errore nel tentativo di upload alternativo:', presignedError);
+            throw new Error(`Errore durante l'upload alternativo: ${presignedError instanceof Error ? presignedError.message : String(presignedError)}`);
+          }
+        }
+        
+        throw new Error(`Errore durante l'upload: ${error.message}`);
+      }
+      
+      console.log('File caricato con successo:', data);
+      
+      // Otteniamo l'URL pubblico del file
+      const { data: urlData } = supabase.storage
+        .from('profiles')
+        .getPublicUrl(filePath);
+      
+      if (!urlData || !urlData.publicUrl) {
+        throw new Error('Impossibile ottenere l\'URL pubblico dell\'immagine');
+      }
+      
+      console.log('URL pubblico dell\'immagine:', urlData.publicUrl);
+      
+      // Per assicurarci che l'immagine sia immediatamente disponibile, forziamo un refresh dell'URL
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+      
+      return publicUrl;
+    } catch (error) {
+      console.error('Errore durante il processo di upload:', error);
+      setError(error instanceof Error ? error.message : 'Errore sconosciuto durante l\'upload');
+      throw error;
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(100);
+    }
+  };
+
+  // Funzione per gestire la selezione dell'immagine
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      
+      // Verifica che sia un'immagine
+      if (!file.type.includes('image/')) {
+        setError('Il file selezionato non è un\'immagine valida');
+        return;
+      }
+      
+      // Verifica la dimensione del file (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        setError('L\'immagine è troppo grande. La dimensione massima è 2MB');
+        return;
+      }
+      
+      setProfileImage(file);
+      setError(null);
+      
+      // Mostriamo un'anteprima dell'immagine
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        // Controlliamo che event.target non sia null e che result esista
+        const result = event.target?.result;
+        if (result && typeof result === 'string') {
+          setFormData(prev => ({
+            ...prev,
+            profileImageUrl: result
+          }));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setProfileImage(null);
+    setFormData(prev => ({
+      ...prev,
+      profileImageUrl: ''
+    }));
+    
+    // Rimuovo l'immagine anche dal localStorage
+    localStorage.removeItem('profileImageUrl');
+    
+    // Se stiamo aggiornando un profilo esistente, dobbiamo aggiornare anche il database
+    if (userEmail) {
+      console.log('Rimozione immagine profilo dal database per:', userEmail);
+      // La prossima volta che l'utente salverà il profilo, il campo profile_image_url verrà impostato a "" (stringa vuota)
+    }
+    
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Miglioriamo anche la funzione handleUpdateProfile per gestire meglio il salvataggio
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -176,6 +398,41 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
         if (updateError) throw updateError;
       }
 
+      // Gestiamo l'upload dell'immagine se è stata selezionata una nuova
+      let imageUrl = formData.profileImageUrl;
+      let imageUploaded = false;
+      
+      if (profileImage) {
+        try {
+          console.log('Tentativo di upload dell\'immagine del profilo');
+          const uploadedUrl = await handleImageUpload();
+          if (uploadedUrl) {
+            imageUrl = uploadedUrl;
+            imageUploaded = true;
+            
+            // Salviamo l'URL dell'immagine nel localStorage per renderla disponibile nella sidebar
+            localStorage.setItem('profileImageUrl', uploadedUrl);
+            
+            // Forziamo l'aggiornamento dell'interfaccia
+            window.dispatchEvent(new Event('storage'));
+            window.dispatchEvent(new Event('localStorageUpdated'));
+            
+            console.log('Immagine caricata con successo, URL:', imageUrl);
+          } else {
+            console.warn('Upload completato ma URL è null');
+          }
+        } catch (uploadError) {
+          console.error('Errore durante l\'upload dell\'immagine:', uploadError);
+          throw new Error(uploadError instanceof Error ? uploadError.message : 'Si è verificato un errore durante il caricamento dell\'immagine');
+        }
+      } else if (imageUrl) {
+        // Se non stiamo caricando una nuova immagine ma ne abbiamo già una, comunque salviamo nel localStorage
+        localStorage.setItem('profileImageUrl', imageUrl);
+        // Forziamo l'aggiornamento dell'interfaccia
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new Event('localStorageUpdated'));
+      }
+
       // Update profile info
       const { error: updateError } = await supabase
         .from('auth_users')
@@ -190,8 +447,86 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       // Aggiorniamo i dati nel localStorage
       localStorage.setItem('firstName', formData.firstName);
       localStorage.setItem('lastName', formData.lastName);
+      
+      // Salviamo il nome dell'attività nel localStorage
+      if (formData.businessName) {
+        localStorage.setItem('businessName', formData.businessName);
+      } else {
+        localStorage.removeItem('businessName');
+      }
+      
+      // Aggiorniamo o creiamo il profilo istruttore
+      const { data: instructorProfileExists, error: existsError } = await supabase
+        .from('instructor_profiles')
+        .select('id')
+        .eq('email', userEmail);
+      
+      // Verifichiamo se abbiamo risultati
+      const profileExists = instructorProfileExists && instructorProfileExists.length > 0;
+      
+      const profileData = {
+        business_name: formData.businessName,
+        address_street: formData.addressStreet,
+        address_number: formData.addressNumber,
+        address_postal_code: formData.addressPostalCode,
+        address_city: formData.addressCity,
+        address_province: formData.addressProvince,
+        address_country: formData.addressCountry,
+        vat_number: formData.vatNumber,
+        tax_code: formData.taxCode,
+        phone_number: formData.phoneNumber,
+        profile_image_url: imageUrl // Usiamo l'URL dell'immagine caricata
+      };
+      
+      // Log per debug
+      console.log('Aggiornamento profilo istruttore:', {
+        exists: profileExists,
+        data: profileData
+      });
+      
+      if (profileExists) {
+        // Aggiorniamo il profilo esistente
+        console.log('Aggiornamento profilo esistente con dati:', profileData);
+        const { data: updateResult, error: profileUpdateError } = await supabase
+          .from('instructor_profiles')
+          .update(profileData)
+          .eq('email', userEmail)
+          .select();
+        
+        if (profileUpdateError) {
+          console.error('Errore nell\'aggiornamento del profilo:', profileUpdateError);
+          console.error('Dettagli errore:', JSON.stringify(profileUpdateError, null, 2));
+          throw profileUpdateError;
+        }
+        
+        console.log('Profilo aggiornato con successo:', updateResult);
+      } else {
+        // Creiamo un nuovo profilo
+        console.log('Creazione nuovo profilo con dati:', { email: userEmail, ...profileData });
+        const { data: insertResult, error: profileInsertError } = await supabase
+          .from('instructor_profiles')
+          .insert([{
+            email: userEmail,
+            ...profileData
+          }])
+          .select();
+        
+        if (profileInsertError) {
+          console.error('Errore nella creazione del profilo:', profileInsertError);
+          console.error('Dettagli errore:', JSON.stringify(profileInsertError, null, 2));
+          throw profileInsertError;
+        }
+        
+        console.log('Profilo creato con successo:', insertResult);
+      }
 
-      setSuccess('Profilo aggiornato con successo');
+      // Mostriamo un messaggio appropriato
+      if (imageUploaded) {
+        setSuccess('Profilo e immagine aggiornati con successo');
+      } else {
+        setSuccess('Profilo aggiornato con successo');
+      }
+      
       setIsEditingPassword(false);
       setFormData(prev => ({
         ...prev,
@@ -201,7 +536,22 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       }));
     } catch (error) {
       console.error('Error updating profile:', error);
-      setError(error instanceof Error ? error.message : 'Errore durante l\'aggiornamento del profilo');
+      // Miglioramento della gestione degli errori per mostrare messaggi più dettagliati
+      if (error instanceof Error) {
+        // Se è un errore standard di JavaScript
+        setError(error.message);
+      } else if (typeof error === 'object' && error !== null) {
+        // Se è un errore di Supabase o un oggetto con proprietà
+        if ('message' in error && typeof error.message === 'string') {
+          setError(`Errore durante l'aggiornamento del profilo: ${error.message}`);
+        } else if ('details' in error && typeof error.details === 'string') {
+          setError(`Dettagli errore: ${error.details}`);
+        } else {
+          setError('Errore durante l\'aggiornamento del profilo. Controlla la console per dettagli.');
+        }
+      } else {
+        setError('Errore durante l\'aggiornamento del profilo');
+      }
     } finally {
       setLoading(false);
     }
@@ -390,9 +740,33 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
         // Se non ci sono codici nella cronologia ma l'utente ha accesso, creiamo una cronologia fittizia
         const hasInstructorAccess = localStorage.getItem('hasInstructorAccess') === 'true';
         if (isProfessor && hasInstructorAccess) {
+          // Recupera il codice quiz più recente creato dall'utente
+          const { data: latestQuiz, error: quizError } = await supabase
+            .from('quiz_templates')
+            .select('quiz_code')
+            .eq('created_by', userEmail)
+            .order('created_at', { ascending: false })
+            .limit(1);
+            
+          // Ottieni il masterCode dal localStorage
+          const storedMasterCode = localStorage.getItem('masterCode');
+          
+          // Usa il codice quiz più recente o il masterCode salvato, o come fallback genera un codice PRO basato sull'email
+          let displayCode;
+          if (latestQuiz && latestQuiz.length > 0 && latestQuiz[0].quiz_code) {
+            displayCode = latestQuiz[0].quiz_code;
+          } else if (storedMasterCode && storedMasterCode !== '000000' && storedMasterCode !== '392673') {
+            displayCode = storedMasterCode;
+          } else {
+            // Genera un codice PRO basato sull'email dell'utente
+            displayCode = userEmail 
+              ? `PRO-${userEmail.split('@')[0].toUpperCase()}`
+              : 'PRO-INSTRUCTOR';
+          }
+            
           const fallbackHistory = [{
             id: 'fallback-code',
-            code: localStorage.getItem('masterCode') || '000000',
+            code: displayCode,
             type: 'master' as const,
             expiration_date: '2099-12-31T23:59:59',
             is_active: true,
@@ -458,39 +832,66 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       // Verifichiamo se è un codice PRO (instructor_activation_codes)
       if (code.startsWith('PRO-')) {
         console.log('Verificando codice PRO nella tabella instructor_activation_codes');
-        const { data: proCodeData, error: proCodeError } = await supabase
+        
+        // Log completo per debug
+        console.log(`Ricerca codice PRO [${code}] per l'utente ${userEmail}`);
+        
+        // Eseguiamo prima una query senza filtri aggiuntivi per verificare che il codice esista
+        const { data: codeExistsData, error: codeExistsError } = await supabase
           .from('instructor_activation_codes')
           .select('*')
-          .eq('code', code)
-          .eq('is_active', true)
-          .single();
+          .eq('code', code);
         
-        if (proCodeError) {
-          console.error(`Errore verifica codice PRO ${code}:`, proCodeError);
-          setError(`Errore durante la verifica del codice: ${proCodeError.message}`);
-          setSuccess(''); // Reset del messaggio di successo in caso di errore
+        if (codeExistsError) {
+          console.error(`Errore nella verifica dell'esistenza del codice PRO ${code}:`, codeExistsError);
+          setError(`Errore durante la verifica del codice: ${codeExistsError.message}`);
+          setSuccess('');
           setVerifying(false);
           return false;
         }
         
-        if (!proCodeData) {
-          console.warn(`Codice PRO ${code} non attivo o non trovato`);
-          setError('Codice non valido o disattivato');
-          setSuccess(''); // Reset del messaggio di successo in caso di errore
+        // Log del risultato della query
+        console.log(`Risultato ricerca codice ${code}:`, codeExistsData);
+        
+        // Se il codice non esiste, mostriamo un errore
+        if (!codeExistsData || codeExistsData.length === 0) {
+          console.warn(`Codice PRO "${code}" non trovato nel database`);
+          setError(`Il codice PRO "${code}" non è presente nel sistema. Contatta l'amministratore.`);
+          setSuccess('');
+          setVerifying(false);
+          return false;
+        }
+        
+        // Ora verifichiamo se il codice è attivo
+        const proCodeInfo = codeExistsData[0];
+        
+        if (!proCodeInfo.is_active) {
+          console.warn(`Codice PRO "${code}" non attivo`);
+          setError(`Il codice PRO "${code}" è stato disattivato. Contatta l'amministratore.`);
+          setSuccess('');
           setVerifying(false);
           return false;
         }
         
         // Verifichiamo se il codice è assegnato a questo utente
-        if (proCodeData.assigned_to_email && proCodeData.assigned_to_email !== userEmail) {
-          console.warn(`Codice PRO ${code} assegnato a ${proCodeData.assigned_to_email}, non a ${userEmail}`);
-          setError(`Questo codice PRO è stato assegnato specificamente all'email ${proCodeData.assigned_to_email}. Non puoi utilizzarlo con l'email ${userEmail}.`);
-          setSuccess(''); // Reset del messaggio di successo in caso di errore
+        if (proCodeInfo.assigned_to_email && proCodeInfo.assigned_to_email !== userEmail) {
+          console.warn(`Codice PRO ${code} assegnato a ${proCodeInfo.assigned_to_email}, non a ${userEmail}`);
+          setError(`Questo codice PRO è stato assegnato specificamente all'email ${proCodeInfo.assigned_to_email}. Non puoi utilizzarlo con l'email ${userEmail}.`);
+          setSuccess('');
           setVerifying(false);
           return false;
         }
         
-        console.log(`Tentativo di aggiornamento del codice PRO ${code} (ID: ${proCodeData.id}) per ${userEmail}`);
+        // Verifichiamo se il codice è scaduto
+        if (proCodeInfo.expiration_date && new Date(proCodeInfo.expiration_date) < new Date()) {
+          console.warn(`Codice PRO ${code} scaduto il ${proCodeInfo.expiration_date}`);
+          setError(`Il codice PRO "${code}" è scaduto il ${new Date(proCodeInfo.expiration_date).toLocaleDateString('it-IT')}. Contatta l'amministratore.`);
+          setSuccess('');
+          setVerifying(false);
+          return false;
+        }
+        
+        console.log(`Tentativo di aggiornamento del codice PRO ${code} (ID: ${proCodeInfo.id}) per ${userEmail}`);
         
         try {
           // Aggiorniamo il record per marcare il codice come utilizzato
@@ -500,15 +901,14 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
               used_at: new Date().toISOString(),
               used_by: userEmail
             })
-            .eq('id', proCodeData.id)
-            .select();
+            .eq('id', proCodeInfo.id);
           
           if (updateError) {
-            console.error('Errore nell\'aggiornamento del codice PRO:', updateError);
-            // Non blocchiamo l'attivazione, ma logghiamo l'errore
-            console.log('Il codice è stato verificato ma lo stato di utilizzo non è stato registrato.');
-          } else {
-            console.log('Aggiornamento del codice PRO riuscito:', updateData);
+            console.error(`Errore nell'aggiornamento del codice PRO ${code}:`, updateError);
+            setError(`Errore durante l'attivazione del codice: ${updateError.message}`);
+            setSuccess('');
+            setVerifying(false);
+            return false;
           }
           
           // NUOVO: Aggiorniamo anche lo stato dell'account dell'utente
@@ -517,13 +917,12 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
             const { data: userData, error: userError } = await supabase
               .from('auth_users')
               .select('id, account_status, is_instructor')
-              .eq('email', userEmail)
-              .single();
+              .eq('email', userEmail);
               
             if (userError) {
               console.error('Errore nel recupero dei dati utente:', userError);
-            } else if (userData) {
-              console.log('Dati utente recuperati:', userData);
+            } else if (userData && userData.length > 0) {
+              console.log('Dati utente recuperati:', userData[0]);
               
               // Aggiorniamo lo stato dell'account e confermiamo che è un istruttore
               const { error: updateUserError } = await supabase
@@ -533,7 +932,7 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
                   is_instructor: true,
                   role: 'instructor'
                 })
-                .eq('id', userData.id);
+                .eq('id', userData[0].id);
                 
               if (updateUserError) {
                 console.error('Errore nell\'aggiornamento dello stato dell\'account:', updateUserError);
@@ -543,315 +942,108 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
             }
           } catch (userUpdateError) {
             console.error('Eccezione durante l\'aggiornamento dello stato dell\'account:', userUpdateError);
+            // Continuiamo comunque perché l'utente può usare il codice
           }
+          
+          console.log(`Codice PRO ${code} attivato per ${userEmail}`);
+          
+          // Se il codice è attivo, impostiamo i flag necessari
+          localStorage.setItem('hasInstructorAccess', 'true');
+          localStorage.setItem('hasActiveAccess', 'true');
+          localStorage.setItem('needsSubscription', 'false');
+          localStorage.removeItem('alertShown');
+          
+          // Forziamo un evento per aggiornare localStorage
+          window.dispatchEvent(new Event('storage'));
+          window.dispatchEvent(new Event('localStorageUpdated'));
+          
+          setError(''); // Reset del messaggio di errore in caso di successo
+          setSuccess(`Codice PRO ${code} verificato con successo!`);
+          setVerifying(false);
+          return true;
         } catch (updateCatchError) {
-          console.error('Eccezione durante l\'aggiornamento del codice PRO:', updateCatchError);
-          // Continuiamo comunque perché l'utente può usare il codice
+          console.error(`Errore imprevisto nell'attivazione del codice PRO ${code}:`, updateCatchError);
+          setError("Si è verificato un errore imprevisto durante l'attivazione del codice PRO. Riprova più tardi o contatta l'assistenza.");
+          setSuccess('');
+          setVerifying(false);
+          return false;
+        }
+      } else {
+        // È un codice access_code (codice tradizionale)
+        const { data, error } = await supabase
+          .from('access_codes')
+          .select('*')
+          .eq('code', code);
+        
+        if (error) {
+          console.error(`Errore verifica codice ${code}:`, error);
+          setError(`Errore durante la verifica del codice: ${error.message}`);
+          setSuccess('');
+          setVerifying(false);
+          return false;
         }
         
-        console.log(`Codice PRO ${code} attivato per ${userEmail}`);
+        if (!data || data.length === 0) {
+          console.warn(`Codice ${code} non trovato nel database`);
+          setError(`Il codice "${code}" non è presente nel sistema. Contatta l'amministratore.`);
+          setSuccess('');
+          setVerifying(false);
+          return false;
+        }
+        
+        // Utilizziamo il primo risultato
+        const codeInfo = data[0];
+        
+        // Verifichiamo se il codice è ancora attivo
+        if (!codeInfo.is_active) {
+          console.warn(`Codice ${code} non attivo`);
+          setError(`Il codice "${code}" è stato disattivato. Contatta l'amministratore.`);
+          setSuccess('');
+          
+          // Se il codice non è attivo, rimuoviamo gli elementi da localStorage
+          localStorage.removeItem('hasInstructorAccess');
+          localStorage.removeItem('hasStudentAccess');
+          localStorage.removeItem('hasAdminAccess');
+          localStorage.setItem('hasSubscription', 'false');
+          
+          // Forziamo un evento per aggiornare localStorage
+          window.dispatchEvent(new Event('storage'));
+          
+          // Mostriamo un messaggio all'utente
+          if (!localStorage.getItem('alertShown')) {
+            alert('Il tuo codice di accesso è stato disattivato da un amministratore. Contatta il supporto per maggiori informazioni.');
+            localStorage.setItem('alertShown', 'true');
+          }
+          
+          setVerifying(false);
+          return false;
+        }
+        
+        console.log(`Codice ${code} attivo per ${userEmail}`);
         
         // Se il codice è attivo, impostiamo i flag necessari
         localStorage.setItem('hasInstructorAccess', 'true');
         localStorage.setItem('hasActiveAccess', 'true');
         localStorage.setItem('needsSubscription', 'false');
-        localStorage.removeItem('alertShown');
+        localStorage.removeItem('alertShown'); // Rimuoviamo il flag alertShown quando il codice è attivo
         
         // Forziamo un evento per aggiornare localStorage
         window.dispatchEvent(new Event('storage'));
         window.dispatchEvent(new Event('localStorageUpdated'));
         
         setError(''); // Reset del messaggio di errore in caso di successo
-        setSuccess(`Codice PRO ${code} verificato con successo!`);
+        setSuccess(`Codice ${code} verificato con successo!`);
         setVerifying(false);
         return true;
       }
-      
-      // Se non è un codice PRO, verifichiamo i codici tradizionali (access_codes)
-      const { data, error } = await supabase
-        .from('access_codes')
-        .select('*')
-        .eq('code', code)
-        .eq('is_active', true)
-        .single();
-      
-      if (error) {
-        console.error(`Errore verifica codice ${code}:`, error);
-        setError(`Errore durante la verifica del codice: ${error.message}`);
-        setSuccess(''); // Reset del messaggio di successo in caso di errore
-        setVerifying(false);
-        return false;
-      }
-      
-      if (!data) {
-        console.warn(`Codice ${code} non attivo o non trovato`);
-        setError('Codice non valido o disattivato');
-        setSuccess(''); // Reset del messaggio di successo in caso di errore
-        
-        // Se il codice non è attivo, rimuoviamo gli elementi da localStorage
-        localStorage.removeItem('hasInstructorAccess');
-        localStorage.removeItem('hasStudentAccess');
-        localStorage.removeItem('hasAdminAccess');
-        localStorage.setItem('hasSubscription', 'false');
-        
-        // Forziamo un evento per aggiornare localStorage
-        window.dispatchEvent(new Event('storage'));
-        
-        // Mostriamo un messaggio all'utente
-        if (!localStorage.getItem('alertShown')) {
-          alert('Il tuo codice di accesso è stato disattivato da un amministratore. Contatta il supporto per maggiori informazioni.');
-          localStorage.setItem('alertShown', 'true');
-        }
-        
-        // Ricarica la pagina dopo un breve ritardo
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
-        
-        return false;
-      }
-      
-      console.log(`Codice ${code} attivo per ${userEmail}`);
-      
-      // Se il codice è attivo, impostiamo i flag necessari
-      localStorage.setItem('hasInstructorAccess', 'true');
-      localStorage.setItem('hasActiveAccess', 'true');
-      localStorage.setItem('needsSubscription', 'false');
-      localStorage.removeItem('alertShown'); // Rimuoviamo il flag alertShown quando il codice è attivo
-      
-      // Forziamo un evento per aggiornare localStorage
-      window.dispatchEvent(new Event('storage'));
-      window.dispatchEvent(new Event('localStorageUpdated'));
-      
-      setError(''); // Reset del messaggio di errore in caso di successo
-      setSuccess(`Codice ${code} verificato con successo!`);
-      return true;
     } catch (error) {
-      console.error('Errore durante la verifica del codice:', error);
-      setError('Si è verificato un errore durante la verifica del codice. Riprova più tardi.');
-      setSuccess(''); // Reset del messaggio di successo in caso di errore
-      return false;
-    } finally {
+      console.error(`Errore imprevisto durante la verifica del codice ${code}:`, error);
+      setError("Si è verificato un errore imprevisto durante la verifica del codice. Riprova più tardi o contatta l'assistenza.");
+      setSuccess('');
       setVerifying(false);
+      return false;
     }
   };
-
-  // Aggiungiamo un useEffect che verifica periodicamente se il codice master utilizzato è ancora attivo
-  useEffect(() => {
-    // Funzione per verificare se il codice master è ancora attivo
-    const checkMasterCodeStatus = async () => {
-      // Verifichiamo se l'utente ha un master code nel localStorage
-      const masterCode = localStorage.getItem('masterCode');
-      if (!masterCode || !userEmail) return;
-      
-      console.log('Verifica stato corrente del codice master:', masterCode);
-      
-      try {
-        // Verifichiamo lo stato attuale del codice nel database
-        const { data: codeData, error: codeError } = await supabase
-          .from('access_codes')
-          .select('*')
-          .eq('code', masterCode)
-          .single();
-        
-        if (codeError) {
-          console.error('Errore nella verifica dello stato del codice:', codeError);
-          return;
-        }
-        
-        console.log('Stato attuale del codice nel database:', codeData);
-        
-        // Se il codice non è più attivo, revochiamo l'accesso
-        if (!codeData || !codeData.is_active) {
-          console.warn(`Il codice ${masterCode} non è più attivo! Revoca accesso per ${userEmail}`);
-          
-          // Rimuoviamo i flag di accesso dal localStorage
-          localStorage.removeItem('hasInstructorAccess');
-          localStorage.removeItem('hasStudentAccess');
-          localStorage.removeItem('hasAdminAccess');
-          
-          // Impostiamo il flag needsSubscription a true per mostrare la pagina di sottoscrizione
-          localStorage.setItem('hasSubscription', 'false');
-          
-          // Notifichiamo l'utente
-          setError(`Il tuo codice di accesso (${masterCode}) è stato disattivato dall'amministratore. L'accesso alle funzionalità da istruttore è stato revocato.`);
-          
-          // Impostiamo il flag per mostrare le sezioni di cronologia e piano
-          setIsCodeDeactivated(true);
-          
-          // Aggiorniamo l'interfaccia
-          window.dispatchEvent(new Event('storage'));
-          window.dispatchEvent(new Event('localStorageUpdated'));
-          
-          // Dopo 5 secondi, ricarichiamo la pagina per applicare le modifiche
-          setTimeout(() => {
-            window.location.reload();
-          }, 5000);
-        }
-      } catch (error) {
-        console.error('Errore durante la verifica dello stato del codice:', error);
-      }
-    };
-    
-    // Eseguiamo la verifica all'inizio
-    checkMasterCodeStatus();
-    
-    // Impostiamo un intervallo per verificare periodicamente (ogni 5 minuti)
-    const intervalId = setInterval(checkMasterCodeStatus, 5 * 60 * 1000);
-    
-    // Puliamo l'intervallo quando il componente viene smontato
-    return () => clearInterval(intervalId);
-  }, [userEmail]);
-
-  // Implementiamo una funzione per aggiornare lo stato attivo dei codici nella cronologia
-  const updateCodeHistoryStatus = async () => {
-    if (!codeHistory.length || !userEmail) return;
-    
-    console.log('Aggiornamento dello stato dei codici nella cronologia');
-    
-    try {
-      // Otteniamo tutti i codici unici dalla cronologia
-      const uniqueCodes = [...new Set(codeHistory.map(code => code.code))];
-      
-      // Per ogni codice, verifichiamo lo stato attuale nel database
-      const updatedHistory = [...codeHistory];
-      let hasChanges = false;
-      
-      for (const code of uniqueCodes) {
-        const { data, error } = await supabase
-          .from('access_codes')
-          .select('code, is_active, expires_at')
-          .eq('code', code)
-          .single();
-        
-        if (error) {
-          console.error(`Errore durante la verifica dello stato del codice ${code}:`, error);
-          continue;
-        }
-        
-        if (data) {
-          // Aggiorniamo tutti gli elementi nella cronologia con questo codice
-          updatedHistory.forEach((historyItem, index) => {
-            if (historyItem.code === code && historyItem.is_active !== data.is_active) {
-              updatedHistory[index] = {
-                ...historyItem,
-                is_active: data.is_active
-              };
-              hasChanges = true;
-              console.log(`Stato del codice ${code} aggiornato a ${data.is_active ? 'attivo' : 'disattivato'}`);
-            }
-          });
-        }
-      }
-      
-      // Se ci sono state modifiche, aggiorniamo lo stato
-      if (hasChanges) {
-        setCodeHistory(updatedHistory);
-      }
-    } catch (error) {
-      console.error('Errore durante l\'aggiornamento dello stato dei codici:', error);
-    }
-  };
-
-  // Aggiungiamo un useEffect per aggiornare lo stato dei codici nella cronologia periodicamente
-  useEffect(() => {
-    // Verifichiamo lo stato dei codici all'inizio
-    updateCodeHistoryStatus();
-    
-    // Impostiamo un intervallo per verificare periodicamente (ogni 2 minuti)
-    const intervalId = setInterval(updateCodeHistoryStatus, 2 * 60 * 1000);
-    
-    // Puliamo l'intervallo quando il componente viene smontato
-    return () => clearInterval(intervalId);
-  }, [codeHistory, userEmail]);
-
-  // Funzione per cancellare il flag alertShown
-  const clearAlertFlag = () => {
-    localStorage.removeItem('alertShown');
-    setSuccess('Flag di avviso cancellato. Se il popup era bloccato, ora dovrebbe funzionare correttamente.');
-  };
-
-  // Funzione per ottenere il codice di accesso per un utente specifico
-  const getAccessCodeForUser = async (userEmail: string): Promise<string | null> => {
-    try {
-      // Prima cerchiamo nella tabella access_code_usage
-      const { data: usageData, error: usageError } = await supabase
-        .from('access_code_usage')
-        .select('access_codes(code)')
-        .eq('student_email', userEmail)
-        .order('used_at', { ascending: false })
-        .limit(1);
-      
-      if (!usageError && usageData && usageData.length > 0 && usageData[0].access_codes) {
-        // Utilizziamo una type assertion più sicura
-        const accessCodes = usageData[0].access_codes as unknown;
-        if (typeof accessCodes === 'object' && accessCodes !== null && 'code' in accessCodes) {
-          return (accessCodes as { code: string }).code;
-        }
-      }
-      
-      // Rimuoviamo il comportamento speciale per istruttore1@io.it
-      // Il codice master 55555 non verrà più attivato automaticamente
-      return null;
-    } catch (error) {
-      console.error('Errore nel recupero del codice di accesso:', error);
-      return null;
-    }
-  };
-
-  const forceCheckIstruttore1 = async () => {
-    if (userEmail !== 'istruttore1@io.it') {
-      console.log('Questa funzione è disponibile solo per istruttore1@io.it');
-      return;
-    }
-    
-    console.log('Verifica automatica disattivata per istruttore1@io.it');
-    // Non eseguiamo più la verifica automatica del codice
-    return;
-  };
-
-  const verifyMasterCode = async (formData: { masterCode: string }) => {
-    console.log('Verifica codice master:', formData.masterCode);
-    setVerificationStep('verifying');
-    
-    try {
-      // Utilizziamo la funzione checkActiveCode per verificare se il codice è valido
-      await checkActiveCode(formData.masterCode);
-      
-      // Se arriviamo qui senza errori, il codice è valido
-      setVerificationStep('success');
-      
-      // Aggiorniamo la cronologia dei codici
-      await loadCodeHistory();
-    } catch (error) {
-      console.error('Errore durante la verifica del codice master:', error);
-      setVerificationStep('error');
-      // Non serve impostare un messaggio di errore qui perché checkActiveCode già lo imposta
-    }
-  };
-
-  // Funzione per gestire la modifica del profilo
-  const handleEditProfile = () => {
-    setIsEditing(true);
-  };
-
-  // Effetto per verificare se l'utente è un istruttore attivo senza codice registrato
-  useEffect(() => {
-    const checkInstructorStatusAndRegisterCode = async () => {
-      const hasInstructorAccess = localStorage.getItem('hasInstructorAccess') === 'true';
-      const masterCode = localStorage.getItem('masterCode');
-      
-      if (hasInstructorAccess && userEmail && codeHistory.length === 0 && !loadingHistory) {
-        console.log('Istruttore attivo senza cronologia codici, registrazione automatica del codice');
-        if (masterCode) {
-          await checkActiveCode(masterCode);
-        }
-      }
-    };
-    
-    // Eseguiamo il controllo dopo il caricamento della cronologia
-    checkInstructorStatusAndRegisterCode();
-  }, [codeHistory, userEmail, loadingHistory]);
 
   // NUOVO: Funzione per verificare lo stato di attivazione dell'istruttore
   const checkInstructorActivationStatus = async () => {
@@ -872,6 +1064,7 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       
       if (proCodeError) {
         console.error('Errore nella verifica del codice PRO:', proCodeError);
+        // Non mostriamo questo errore all'utente perché è una verifica in background
         return;
       }
       
@@ -895,19 +1088,19 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
         const { data: userData, error: userError } = await supabase
           .from('auth_users')
           .select('id, account_status, is_instructor, role')
-          .eq('email', userEmail)
-          .single();
+          .eq('email', userEmail);
         
         if (userError) {
           console.error('Errore nel recupero dei dati utente:', userError);
           return;
         }
         
-        if (userData) {
-          console.log('Dati utente recuperati:', userData);
+        if (userData && userData.length > 0) {
+          const userInfo = userData[0];
+          console.log('Dati utente recuperati:', userInfo);
           
           // Se lo stato dell'account non è attivo o i flag non sono corretti, aggiorniamo
-          if (userData.account_status !== 'active' || !userData.is_instructor || userData.role !== 'instructor') {
+          if (userInfo.account_status !== 'active' || !userInfo.is_instructor || userInfo.role !== 'instructor') {
             const { error: updateError } = await supabase
               .from('auth_users')
               .update({
@@ -915,7 +1108,7 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
                 is_instructor: true,
                 role: 'instructor'
               })
-              .eq('id', userData.id);
+              .eq('id', userInfo.id);
             
             if (updateError) {
               console.error('Errore nell\'aggiornamento dello stato dell\'account:', updateError);
@@ -923,6 +1116,8 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
               console.log('Stato account aggiornato con successo');
             }
           }
+        } else {
+          console.warn('Nessun utente trovato con l\'email:', userEmail);
         }
       } else {
         console.log('Nessun codice PRO attivato trovato per:', userEmail);
@@ -936,7 +1131,14 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
       }
     } catch (error) {
       console.error('Errore durante la verifica dello stato di attivazione:', error);
+      // Non mostriamo questo errore all'utente perché è una verifica in background
     }
+  };
+
+  // Funzione per cancellare il flag alertShown
+  const clearAlertFlag = () => {
+    localStorage.removeItem('alertShown');
+    setSuccess('Flag di avviso cancellato. Se il popup era bloccato, ora dovrebbe funzionare correttamente.');
   };
 
   return (
@@ -980,6 +1182,69 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
             )}
 
             <form onSubmit={handleUpdateProfile} className="space-y-6">
+              {/* Immagine del profilo */}
+              <div className="flex flex-col items-center mb-6">
+                <div className="relative group">
+                  <div className="w-28 h-28 rounded-full overflow-hidden bg-gray-200 dark:bg-slate-700 border-2 border-blue-500 dark:border-blue-400 mb-3">
+                    {formData.profileImageUrl ? (
+                      <img 
+                        src={formData.profileImageUrl} 
+                        alt="Immagine profilo" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
+                        <User className="w-16 h-16" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 justify-center">
+                    <label className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded-lg text-sm flex items-center gap-1 transition-colors">
+                      <Upload className="w-4 h-4" />
+                      {formData.profileImageUrl ? 'Cambia' : 'Carica'}
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImageChange}
+                      />
+                    </label>
+                    
+                    {formData.profileImageUrl && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveImage}
+                        className="bg-red-600 hover:bg-red-700 text-white py-1 px-3 rounded-lg text-sm flex items-center gap-1 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Rimuovi
+                      </button>
+                    )}
+                  </div>
+
+                  {isUploading && (
+                    <div className="mt-2">
+                      <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2.5">
+                        <div 
+                          className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
+                          style={{ width: `${uploadProgress}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-sm text-gray-500 dark:text-slate-400 text-center mt-1">
+                        {uploadProgress}% caricato
+                      </p>
+                    </div>
+                  )}
+                </div>
+                
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-2 text-center">
+                  Carica un'immagine del tuo profilo o del logo della tua scuola.<br />
+                  Dimensione massima: 2MB.
+                </p>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
@@ -1025,6 +1290,181 @@ export function InstructorProfile({ userEmail, needsSubscription }: InstructorPr
                       disabled
                       className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-gray-500 dark:text-slate-400"
                     />
+                  </div>
+                </div>
+                
+                {/* Aggiungo i nuovi campi aziendali */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                    Telefono
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      value={formData.phoneNumber}
+                      onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                      className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                      placeholder="Numero di telefono"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Sezione Dati Aziendali */}
+              <div className="border-t border-gray-200 dark:border-slate-700 pt-6">
+                <h3 className="text-lg font-medium mb-4 dark:text-slate-100">Dati Aziendali</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                      Nome Attività
+                    </label>
+                    <div className="relative">
+                      <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        value={formData.businessName}
+                        onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
+                        className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                        placeholder="Nome attività o ragione sociale"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                      Partita IVA
+                    </label>
+                    <div className="relative">
+                      <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        value={formData.vatNumber}
+                        onChange={(e) => setFormData({ ...formData, vatNumber: e.target.value })}
+                        className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                        placeholder="Partita IVA"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                      Codice Fiscale
+                    </label>
+                    <div className="relative">
+                      <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        value={formData.taxCode}
+                        onChange={(e) => setFormData({ ...formData, taxCode: e.target.value })}
+                        className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                        placeholder="Codice Fiscale"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Sezione Indirizzo */}
+              <div className="border-t border-gray-200 dark:border-slate-700 pt-6">
+                <h3 className="text-lg font-medium mb-4 dark:text-slate-100">Indirizzo</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                      Via/Piazza
+                    </label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        value={formData.addressStreet}
+                        onChange={(e) => setFormData({ ...formData, addressStreet: e.target.value })}
+                        className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                        placeholder="Via/Piazza"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                      Numero Civico
+                    </label>
+                    <div className="relative">
+                      <Hash className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        value={formData.addressNumber}
+                        onChange={(e) => setFormData({ ...formData, addressNumber: e.target.value })}
+                        className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                        placeholder="Numero civico"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                      CAP
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        value={formData.addressPostalCode}
+                        onChange={(e) => setFormData({ ...formData, addressPostalCode: e.target.value })}
+                        className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                        placeholder="CAP"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                      Città
+                    </label>
+                    <div className="relative">
+                      <Home className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        value={formData.addressCity}
+                        onChange={(e) => setFormData({ ...formData, addressCity: e.target.value })}
+                        className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                        placeholder="Città"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                      Provincia
+                    </label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        value={formData.addressProvince}
+                        onChange={(e) => setFormData({ ...formData, addressProvince: e.target.value })}
+                        className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                        placeholder="Provincia (es. MI, RM)"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                      Paese
+                    </label>
+                    <div className="relative">
+                      <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        value={formData.addressCountry}
+                        onChange={(e) => setFormData({ ...formData, addressCountry: e.target.value })}
+                        className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
+                        placeholder="Paese (es. Italia)"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

@@ -3,6 +3,7 @@ import { Search, Filter, ArrowUpDown, Trash2, AlertCircle, Bell, Eye, XCircle, R
 import { supabase } from '../../services/supabase';
 import { DeleteModal } from '../common/DeleteModal';
 import { StudentDetails } from './StudentDetails';
+import { ConfirmModal } from '../common/ConfirmModal';
 
 interface Student {
   id: string;
@@ -41,6 +42,8 @@ export function StudentManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState<{ id: string; name: string } | null>(null);
+  const [showSuspendModal, setShowSuspendModal] = useState<{ id: string; name: string; suspend: boolean } | null>(null);
+  const [showResetModal, setShowResetModal] = useState<{ id: string; name: string } | null>(null);
   const [filters, setFilters] = useState({
     status: '',
     plan: ''
@@ -741,7 +744,7 @@ export function StudentManagement() {
         </div>
       )}
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
         <div className="p-6 border-b border-gray-200 dark:border-slate-800">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="relative flex-1">
@@ -817,7 +820,11 @@ export function StudentManagement() {
                           <Eye className="w-5 h-5" />
                         </button>
                         <button
-                          onClick={() => handleSuspendStudent(student.id, student.account_status === 'active')}
+                          onClick={() => setShowSuspendModal({ 
+                            id: student.id, 
+                            name: `${student.first_name} ${student.last_name}` || student.email,
+                            suspend: student.account_status === 'active'
+                          })}
                           className={`${
                             student.account_status === 'active'
                               ? 'text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300'
@@ -832,7 +839,10 @@ export function StudentManagement() {
                           )}
                         </button>
                         <button
-                          onClick={() => handleResetProgress(student.id)}
+                          onClick={() => setShowResetModal({ 
+                            id: student.id, 
+                            name: `${student.first_name} ${student.last_name}` || student.email
+                          })}
                           className="text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-300"
                           title="Reimposta progressi"
                         >
@@ -880,7 +890,8 @@ export function StudentManagement() {
       )}
 
       {showDeleteModal && (
-        <DeleteModal
+        <ConfirmModal
+          type="delete"
           title="Elimina studente"
           message={`Sei sicuro di voler eliminare lo studente ${showDeleteModal.name}? Questa azione non può essere annullata e rimuoverà tutti i dati associati a questo studente.`}
           onConfirm={() => {
@@ -888,6 +899,37 @@ export function StudentManagement() {
             setShowDeleteModal(null);
           }}
           onCancel={() => setShowDeleteModal(null)}
+          isLoading={loading}
+        />
+      )}
+
+      {showSuspendModal && (
+        <ConfirmModal
+          type={showSuspendModal.suspend ? "suspend" : "activate"}
+          title={showSuspendModal.suspend ? "Sospendi account" : "Riattiva account"}
+          message={showSuspendModal.suspend 
+            ? `Sei sicuro di voler sospendere l'account di ${showSuspendModal.name}? Lo studente non potrà più accedere all'applicazione fino a quando non riattiverai il suo account.`
+            : `Sei sicuro di voler riattivare l'account di ${showSuspendModal.name}? Lo studente potrà nuovamente accedere all'applicazione.`
+          }
+          onConfirm={() => {
+            handleSuspendStudent(showSuspendModal.id, showSuspendModal.suspend);
+            setShowSuspendModal(null);
+          }}
+          onCancel={() => setShowSuspendModal(null)}
+          isLoading={loading}
+        />
+      )}
+
+      {showResetModal && (
+        <ConfirmModal
+          type="reset"
+          title="Reimposta progressi"
+          message={`Sei sicuro di voler reimpostare tutti i progressi di ${showResetModal.name}? Questa azione eliminerà tutti i risultati dei quiz e non può essere annullata.`}
+          onConfirm={() => {
+            handleResetProgress(showResetModal.id);
+            setShowResetModal(null);
+          }}
+          onCancel={() => setShowResetModal(null)}
           isLoading={loading}
         />
       )}

@@ -21,12 +21,15 @@ const AuthScreen: React.FC = () => {
       // Caso speciale per istruttore1@io.it
       if (userData.email === 'istruttore1@io.it') {
         console.log('Garantiamo accesso per istruttore1@io.it');
+        
+        // Generiamo un codice più significativo basato sull'email dell'utente
+        const customCode = `PRO-${userData.email.split('@')[0].toUpperCase()}`;
+        
         localStorage.setItem('hasInstructorAccess', 'true');
-        localStorage.setItem('masterCode', '392673');
+        localStorage.setItem('masterCode', customCode);
         localStorage.setItem('hasActiveAccess', 'true');
-        localStorage.setItem('isCodeDeactivated', 'false');
-        localStorage.setItem('needsSubscription', 'false');
         localStorage.setItem('isMasterAdmin', 'true');
+        localStorage.setItem('needsSubscription', 'false');
       }
     } else {
       localStorage.setItem('isProfessor', 'false');

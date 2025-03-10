@@ -717,7 +717,7 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
               <p className="text-sm text-gray-300 dark:text-slate-400 mt-2">
                 Sei uno studente?{' '}
                 <button
-                  onClick={() => navigate('/login', { state: { userType: 'student' } })}
+                  onClick={() => navigate('/login')}
                   className="text-blue-400 dark:text-blue-300 hover:text-blue-300 dark:hover:text-blue-200 font-medium"
                 >
                   Accedi come studente
@@ -727,7 +727,7 @@ export function AuthScreen({ onRoleSelect, mode }: AuthScreenProps) {
               <p className="text-sm text-gray-300 dark:text-slate-400">
                 Sei un istruttore?{' '}
                 <button
-                  onClick={() => navigate('/login', { state: { userType: 'professor' } })}
+                  onClick={() => navigate('/login-instructor')}
                   className="text-blue-400 dark:text-blue-300 hover:text-blue-300 dark:hover:text-blue-200 font-medium"
                 >
                   Accedi come istruttore

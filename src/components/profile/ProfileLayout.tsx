@@ -26,8 +26,12 @@ export function ProfileLayout({ userEmail, isInstructor, isMasterAdmin, needsSub
     // Caso speciale per istruttore1@io.it
     if (userEmail === 'istruttore1@io.it' && isInstructor) {
       console.log('Garantiamo accesso per istruttore1@io.it');
+      
+      // Generiamo un codice più significativo basato sull'email dell'utente
+      const customCode = `PRO-${userEmail.split('@')[0].toUpperCase()}`;
+      
       localStorage.setItem('hasInstructorAccess', 'true');
-      localStorage.setItem('masterCode', '392673');
+      localStorage.setItem('masterCode', customCode);
       localStorage.setItem('hasActiveAccess', 'true');
       localStorage.setItem('isMasterAdmin', 'true');
       localStorage.setItem('needsSubscription', 'false');

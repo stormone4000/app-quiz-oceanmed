@@ -247,7 +247,10 @@ export function QuizCategories({ type, onBack, onSelectCategory }: QuizCategoryP
       
       // Costruisci la clausola di ricerca
       // Quiz pubblici dell'admin sono visibili a tutti
-      searchClause = 'created_by.eq.marcosrenatobruno@gmail.com,created_by.eq.system';
+      searchClause = 'created_by.eq.marcosrenatobruno@gmail.com';
+      
+      // Aggiungi l'utente system se necessario
+      searchClause += ',created_by.eq.system';
       
       // Aggiungi i quiz pubblici degli istruttori associati
       if (instructorEmails.length > 0) {
@@ -258,10 +261,14 @@ export function QuizCategories({ type, onBack, onSelectCategory }: QuizCategoryP
         });
       }
       
-      // Filtro aggiuntivo per la visibilità
-      searchClause = `(${searchClause}),visibility.eq.public`;
+      // Costruiamo la query in modo più semplice per evitare errori di sintassi
+      // Prima aggiungiamo la clausola per i quiz creati dagli istruttori associati
+      query = query.or(searchClause);
       
-      // Se abbiamo un codice quiz specifico, aggiungiamolo alla clausola AND/OR
+      // Poi aggiungiamo la clausola per i quiz pubblici
+      query = query.or('visibility.eq.public');
+      
+      // Se abbiamo un codice quiz specifico, aggiungiamolo come clausola OR separata
       if (quizCode) {
         console.log('Filtro con codice quiz:', quizCode);
         
@@ -269,26 +276,28 @@ export function QuizCategories({ type, onBack, onSelectCategory }: QuizCategoryP
         if (quizCode.startsWith('QUIZ-')) {
           // Se il codice ha già il prefisso, cerchiamo sia con che senza prefisso
           const codeWithoutPrefix = quizCode.replace('QUIZ-', '');
-          searchClause = `(${searchClause}),quiz_code.eq.${quizCode},quiz_code.eq.${codeWithoutPrefix}`;
+          query = query.or(`quiz_code.eq.${quizCode}`);
+          query = query.or(`quiz_code.eq.${codeWithoutPrefix}`);
           console.log(`Cerco quiz con codice ${quizCode} o ${codeWithoutPrefix}`);
         } else {
           // Se il codice non ha il prefisso, cerchiamo sia con che senza prefisso
           const codeWithPrefix = `QUIZ-${quizCode}`;
-          searchClause = `(${searchClause}),quiz_code.eq.${quizCode},quiz_code.eq.${codeWithPrefix}`;
+          query = query.or(`quiz_code.eq.${quizCode}`);
+          query = query.or(`quiz_code.eq.${codeWithPrefix}`);
           console.log(`Cerco quiz con codice ${quizCode} o ${codeWithPrefix}`);
         }
       }
       
-      // Applica la clausola OR alla query
-      query = query.or(searchClause);
-      
-      console.log("Query costruita per caricare i quiz:", searchClause);
+      console.log("Query costruita per caricare i quiz. Criteri di filtro:", 
+        "1. Quiz pubblici", 
+        "2. Quiz degli istruttori associati", 
+        quizCode ? `3. Quiz con codice ${quizCode}` : "");
       
       const { data: quizData, error: quizError } = await query;
 
       if (quizError) {
         console.error("Errore nella query Supabase:", quizError);
-        throw quizError;
+        throw new Error(`Errore nella query: ${quizError.message}`);
       }
       
       // Log per debug

@@ -7,6 +7,9 @@ import { Provider } from 'react-redux';
 import { store, persistor } from './redux/store';
 import { PersistGate } from 'redux-persist/integration/react';
 
+// Importiamo lo script di configurazione del bucket di storage
+import './utils/setupStorage';
+
 // Registra tutti i componenti di Chart.js
 Chart.register(...registerables);
 

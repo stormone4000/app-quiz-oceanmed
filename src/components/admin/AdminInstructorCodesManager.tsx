@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
-import { PlusIcon, CheckCircle, AlertCircle, Copy, Calendar, User, RefreshCw, Trash2, XCircle } from 'lucide-react';
+import { PlusIcon, CheckCircle, AlertCircle, Copy, Calendar, User, RefreshCw, Trash2, XCircle, Clock } from 'lucide-react';
 
 export const AdminInstructorCodesManager = () => {
   const [instructorEmail, setInstructorEmail] = useState('');
@@ -11,6 +11,7 @@ export const AdminInstructorCodesManager = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [activationCodes, setActivationCodes] = useState<any[]>([]);
   const [expirationDays, setExpirationDays] = useState(30);
+  const [durationType, setDurationType] = useState<'fixed' | 'unlimited' | 'infinity'>('fixed');
 
   useEffect(() => {
     fetchActivationCodes();
@@ -85,18 +86,34 @@ export const AdminInstructorCodesManager = () => {
       const randomPart = Math.floor(100000 + Math.random() * 900000).toString();
       const proCode = `PRO-${randomPart}`;
 
-      const expirationDate = new Date();
-      expirationDate.setDate(expirationDate.getDate() + expirationDays);
+      let expirationDate = null;
+      
+      if (durationType === 'fixed') {
+        expirationDate = new Date();
+        expirationDate.setDate(expirationDate.getDate() + expirationDays);
+      } else if (durationType === 'unlimited') {
+        // Imposta una data molto lontana (10 anni in futuro)
+        expirationDate = new Date();
+        expirationDate.setFullYear(expirationDate.getFullYear() + 10);
+      }
+      // Per "infinity" l'expirationDate resta null
+
+      // Preparazione dei dati da inserire
+      const codeData = {
+        code: proCode,
+        assigned_to_email: instructorEmail,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        expiration_date: expirationDate ? expirationDate.toISOString() : null,
+        duration_type: durationType,
+        duration_months: durationType === 'fixed' ? Math.ceil(expirationDays / 30) : null
+      };
+
+      console.log('Creazione codice PRO con dati:', codeData);
 
       const { data, error } = await supabase
         .from('instructor_activation_codes')
-        .insert([{
-          code: proCode,
-          assigned_to_email: instructorEmail,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          expiration_date: expirationDate.toISOString()
-        }])
+        .insert([codeData])
         .select()
         .single();
 
@@ -341,23 +358,43 @@ export const AdminInstructorCodesManager = () => {
           
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1">
-              Validità (giorni)
+              Tipo di Durata
             </label>
             <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="number"
-                min="1"
-                max="365"
-                value={expirationDays}
-                onChange={(e) => setExpirationDays(parseInt(e.target.value))}
-                className="w-full pl-12 pr-4 py-2 rounded-lg border border-white/30 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 text-white placeholder-gray-400"
-              />
+              <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <select
+                value={durationType}
+                onChange={(e) => setDurationType(e.target.value as 'fixed' | 'unlimited' | 'infinity')}
+                className="w-full pl-12 pr-4 py-2 rounded-lg border border-white/30 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 text-white"
+              >
+                <option value="fixed">A tempo (giorni)</option>
+                <option value="unlimited">Prolungato (10 anni)</option>
+                <option value="infinity">Per sempre</option>
+              </select>
             </div>
-            <p className="mt-1 text-xs text-slate-400">
-              Il codice sarà valido per questo numero di giorni
-            </p>
           </div>
+          
+          {durationType === 'fixed' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">
+                Validità (giorni)
+              </label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={expirationDays}
+                  onChange={(e) => setExpirationDays(parseInt(e.target.value))}
+                  className="w-full pl-12 pr-4 py-2 rounded-lg border border-white/30 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 text-white placeholder-gray-400"
+                />
+              </div>
+              <p className="mt-1 text-xs text-slate-400">
+                Il codice sarà valido per questo numero di giorni
+              </p>
+            </div>
+          )}
 
           <button
             onClick={handleGenerateProCode}
@@ -392,7 +429,9 @@ export const AdminInstructorCodesManager = () => {
               </button>
             </div>
             <p className="mt-2 text-sm text-slate-400">
-              Invia questo codice all'istruttore per attivare il suo profilo. Il codice scadrà tra {expirationDays} giorni.
+              {durationType === 'fixed' && `Invia questo codice all'istruttore per attivare il suo profilo. Il codice scadrà tra ${expirationDays} giorni.`}
+              {durationType === 'unlimited' && `Invia questo codice all'istruttore per attivare il suo profilo. Il codice sarà valido per 10 anni.`}
+              {durationType === 'infinity' && `Invia questo codice all'istruttore per attivare il suo profilo. Il codice non scadrà mai.`}
             </p>
           </div>
         )}

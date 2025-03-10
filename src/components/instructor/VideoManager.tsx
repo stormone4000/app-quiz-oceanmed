@@ -616,13 +616,21 @@ export function VideoManager() {
 
       {/* Category Modal */}
       {showCategoryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-lg rounded-xl shadow-xl max-w-lg w-full border border-white/30 dark:border-slate-700/30">
-            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-lg rounded-xl border border-white/30 dark:border-slate-700/30 max-w-lg w-full">
+            <div className="p-6 border-b border-gray-200/50 dark:border-slate-700/50 flex justify-between items-center">
               <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">Nuova Categoria</h2>
               <button
-                onClick={() => setShowCategoryModal(false)}
-                className="text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
+                onClick={() => {
+                  setShowCategoryModal(false);
+                  setCategoryForm({
+                    title: '',
+                    icon_color: 'blue',
+                    publish_date: new Date().toISOString().split('T')[0]
+                  });
+                }}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                aria-label="Chiudi"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -678,7 +686,20 @@ export function VideoManager() {
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-end">
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowCategoryModal(false);
+                  setCategoryForm({
+                    title: '',
+                    icon_color: 'blue',
+                    publish_date: new Date().toISOString().split('T')[0]
+                  });
+                }}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-all transform hover:scale-105"
+              >
+                Annulla
+              </button>
               <button
                 onClick={handleSaveCategory}
                 disabled={loading}
@@ -694,25 +715,47 @@ export function VideoManager() {
 
       {/* Delete Confirmation Modal */}
       {deleteModal && (
-        <DeleteModal 
-          title={`Eliminare ${deleteModal.type === 'category' ? 'la categoria' : 'il video'} "${deleteModal.title}"?`}
-          message={`Questa azione non può essere annullata.`}
-          onConfirm={() => {
-            if (deleteModal.type === 'video') {
-              handleDeleteVideo(deleteModal.id);
-            }
-          }}
-          onCancel={() => setDeleteModal(null)}
-          isLoading={loading}
-        />
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-lg rounded-xl border border-white/30 dark:border-slate-700/30 max-w-lg w-full">
+            <div className="p-6 border-b border-gray-200/50 dark:border-slate-700/50">
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                Conferma Eliminazione
+              </h3>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-slate-700 dark:text-white">
+                Sei sicuro di voler eliminare {deleteModal.type === 'category' ? 'la categoria' : 'il video'} "{deleteModal.title}"?
+              </p>
+              <div className="flex justify-end gap-4">
+                <button
+                  onClick={() => {
+                    if (deleteModal.type === 'video') {
+                      handleDeleteVideo(deleteModal.id);
+                    }
+                  }}
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+                >
+                  Elimina
+                </button>
+                <button
+                  onClick={() => setDeleteModal(null)}
+                  className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                >
+                  Annulla
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Video Modal */}
       {showVideoModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-lg rounded-xl shadow-xl max-w-lg w-full border border-white/30 dark:border-slate-700/30">
-            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-lg rounded-xl border border-white/30 dark:border-slate-700/30 max-w-lg w-full">
+            <div className="p-6 border-b border-gray-200/50 dark:border-slate-700/50 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">
                 {editingVideo ? 'Modifica Video' : 'Nuovo Video'}
               </h2>
               <button
@@ -722,11 +765,12 @@ export function VideoManager() {
                   setVideoForm({
                     title: '',
                     embed_url: '',
-                    category_id: videoForm.category_id,
+                    category_id: '',
                     publish_date: new Date().toISOString().split('T')[0]
                   });
                 }}
-                className="text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                aria-label="Chiudi"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -790,7 +834,22 @@ export function VideoManager() {
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-end">
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowVideoModal(false);
+                  setEditingVideo(null);
+                  setVideoForm({
+                    title: '',
+                    embed_url: '',
+                    category_id: '',
+                    publish_date: new Date().toISOString().split('T')[0]
+                  });
+                }}
+                className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-all transform hover:scale-105"
+              >
+                Annulla
+              </button>
               <button
                 onClick={handleSaveVideo}
                 disabled={loading}

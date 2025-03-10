@@ -131,7 +131,7 @@ export function SubscriptionManager() {
         <h2 className="text-2xl font-bold text-white dark:text-slate-100">Gestione Abbonamenti</h2>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
         <div className="p-6 border-b border-gray-200 dark:border-slate-800">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="relative flex-1">
