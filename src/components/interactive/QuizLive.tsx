@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Users, Trophy, Clock, AlertCircle, Plus, Square as Stop, RefreshCw, Trash2, Target, Edit, Eye, BarChart, ArrowLeft } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../services/supabase';
 import { LiveQuizSession, LiveQuizParticipant } from '../../types';
 import { QuizCreator } from '../instructor/QuizCreator';
@@ -12,6 +12,13 @@ import { Bar, Pie } from 'react-chartjs-2';
 
 interface QuizLiveProps {
   hostEmail: string;
+}
+
+// Funzione per verificare se un valore è un UUID v4 valido
+function isValidUUID(id: string): boolean {
+  if (!id) return false;
+  const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidV4Regex.test(id);
 }
 
 export function QuizLive({ hostEmail }: QuizLiveProps) {
@@ -175,6 +182,12 @@ export function QuizLive({ hostEmail }: QuizLiveProps) {
 
   const startQuiz = async (quizId: string) => {
     try {
+      if (!isValidUUID(quizId)) {
+        console.error("ID quiz non valido, non è un UUID:", quizId);
+        setError('ID quiz non valido. Impossibile avviare il quiz.');
+        return;
+      }
+      
       setIsStarting(true);
       setError(null);
       
@@ -315,6 +328,12 @@ export function QuizLive({ hostEmail }: QuizLiveProps) {
 
   const handleDeleteQuiz = async (quizId: string) => {
     try {
+      if (!isValidUUID(quizId)) {
+        console.error("ID quiz non valido, non è un UUID:", quizId);
+        setError('ID quiz non valido. Impossibile eliminare il quiz.');
+        return;
+      }
+      
       setLoading(true);
       setError(null);
       
@@ -372,6 +391,12 @@ export function QuizLive({ hostEmail }: QuizLiveProps) {
 
   const handlePreview = async (quizId: string) => {
     try {
+      if (!isValidUUID(quizId)) {
+        console.error("ID quiz non valido, non è un UUID:", quizId);
+        setError('ID quiz non valido. Impossibile visualizzare l\'anteprima.');
+        return;
+      }
+      
       setLoading(true);
       setError(null);
       

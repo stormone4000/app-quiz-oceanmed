@@ -4,6 +4,13 @@ import { supabase } from '../../services/supabase';
 import { Quiz } from '../../components/student/Quiz';
 import { ChevronLeft } from 'lucide-react';
 
+// Funzione per verificare se un valore è un UUID v4 valido
+function isValidUUID(id: string): boolean {
+  if (!id) return false;
+  const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidV4Regex.test(id);
+}
+
 export function TestQuizPage() {
   const { quizType, quizId } = useParams<{ quizType: string; quizId: string }>();
   const navigate = useNavigate();
@@ -15,6 +22,14 @@ export function TestQuizPage() {
     const checkQuiz = async () => {
       if (!quizId) {
         setError('ID Quiz mancante');
+        setLoading(false);
+        return;
+      }
+      
+      // Verifica che l'ID sia un UUID valido
+      if (!isValidUUID(quizId)) {
+        console.error("ID quiz non valido, non è un UUID:", quizId);
+        setError('ID quiz non valido. Si prega di utilizzare un quiz con un ID valido.');
         setLoading(false);
         return;
       }

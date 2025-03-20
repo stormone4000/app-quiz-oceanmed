@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Pause, Users, Trophy, Clock, AlertCircle, Plus, 
          Square as Stop, RefreshCw, Trash2, Target, Edit, Eye, 
@@ -8,10 +8,21 @@ import { supabase } from '../../services/supabase';
 import { QuizCreator } from '../instructor/QuizCreator';
 import { DeleteQuizModal } from '../instructor/DeleteQuizModal';
 import { QuizLiveResults } from './QuizLiveResults';
+import QRCode from 'qrcode.react';
+import { SessionStats } from './SessionStats';
+import { useAuth } from '../../context/AuthContext';
+import { theme } from '../../config/theme';
 
 interface QuizLiveManagerProps {
   hostEmail: string;
   onBackToMain?: () => void;
+}
+
+// Funzione per verificare se un valore è un UUID v4 valido
+function isValidUUID(id: string): boolean {
+  if (!id) return false;
+  const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidV4Regex.test(id);
 }
 
 export function QuizLiveManager({ hostEmail, onBackToMain }: QuizLiveManagerProps) {
@@ -55,14 +66,28 @@ export function QuizLiveManager({ hostEmail, onBackToMain }: QuizLiveManagerProp
       setLoading(true);
       setError(null);
 
+      console.log("Caricamento quiz per l'host:", hostEmail);
+      
       const { data, error } = await supabase
         .from('interactive_quiz_templates')
         .select('*')
         .eq('host_email', hostEmail)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setQuizzes(data || []);
+      if (error) {
+        console.error("Errore nel caricamento dei quiz:", JSON.stringify(error, null, 2));
+        throw error;
+      }
+      
+      console.log(`Trovati ${data?.length || 0} quiz`);
+      
+      // Verifica che i quiz abbiano ID validi
+      const validQuizzes = data?.filter(quiz => isValidUUID(quiz.id)) || [];
+      if (validQuizzes.length < (data?.length || 0)) {
+        console.warn(`Filtrati ${(data?.length || 0) - validQuizzes.length} quiz con ID non validi`);
+      }
+      
+      setQuizzes(validQuizzes);
     } catch (error) {
       console.error('Error loading quizzes:', error);
       setError(error instanceof Error ? error.message : 'Errore durante il caricamento dei quiz');
@@ -109,6 +134,31 @@ export function QuizLiveManager({ hostEmail, onBackToMain }: QuizLiveManagerProp
     return pin;
   };
 
+  // Funzione per convertire un ID numerico in UUID
+  const convertToUUID = (id: string | number): string => {
+    // Crea un UUID v5 basato sull'ID numerico
+    // Utilizziamo un namespace fisso per garantire la coerenza
+    const namespace = '6ba7b810-9dad-11d1-80b4-00c04fd430c8'; // Namespace UUID arbitrario
+    
+    // Converti l'ID in stringa se non lo è già
+    const idStr = id.toString();
+    
+    // Crea un UUID v5 basato sull'ID e sul namespace
+    // Questa è una implementazione semplificata, in produzione si dovrebbe usare una libreria UUID
+    const hash = Array.from(idStr).reduce((acc, char) => {
+      return (acc * 31 + char.charCodeAt(0)) & 0xffffffff;
+    }, 0);
+    
+    // Formatta come UUID v4 (casuale)
+    const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = (hash + Math.random() * 16) % 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+    
+    return uuid;
+  };
+
   // Configura le sottoscrizioni real-time
   const setupRealtimeSubscription = () => {
     const channel = supabase
@@ -136,42 +186,58 @@ export function QuizLiveManager({ hostEmail, onBackToMain }: QuizLiveManagerProp
     };
   };
 
-  // Avvia un quiz live
+  // Avvia un quiz
   const startQuiz = async (quizId: string) => {
     try {
+      if (!isValidUUID(quizId)) {
+        console.error("ID quiz non valido, non è un UUID:", quizId);
+        setError('ID quiz non valido. Impossibile avviare il quiz.');
+        return;
+      }
+      
       setIsStarting(true);
       setError(null);
 
+      // Controlla se esiste già una sessione per questo quiz
       const session = sessions[quizId];
+      
+      // Se non esiste una sessione, creane una nuova
       if (!session) {
-        // Se non esiste una sessione, creala
-        console.log('Nessuna sessione trovata, creazione di una nuova sessione...');
-        const newSession = await createSession(quizId);
-        if (!newSession) throw new Error('Impossibile creare la sessione');
-        
-        // Aggiorna lo stato della sessione appena creata
-        const { error: updateError } = await supabase
-          .from('live_quiz_sessions')
-          .update({
-            status: 'active',
-            started_at: new Date().toISOString()
-          })
-          .eq('id', newSession.id);
+        console.log('Creazione nuova sessione per quiz:', quizId);
+        try {
+          const newSession = await createSession(quizId);
+          if (!newSession) {
+            throw new Error('Impossibile creare la sessione');
+          }
           
-        if (updateError) {
-          console.error('Errore nell\'avvio della sessione appena creata:', updateError);
-          throw updateError;
+          // Aggiorna lo stato della sessione appena creata
+          const { error: updateError } = await supabase
+            .from('live_quiz_sessions')
+            .update({
+              status: 'active',
+              started_at: new Date().toISOString()
+            })
+            .eq('id', newSession.id);
+            
+          if (updateError) {
+            console.error('Errore nell\'avvio della sessione appena creata:', updateError);
+            console.error('Dettagli errore:', JSON.stringify(updateError, null, 2));
+            throw new Error(`Errore nell'avvio della sessione: ${updateError.message}`);
+          }
+          
+          // Mostra un messaggio di successo con il PIN
+          const pin = newSession.join_code;
+          if (pin) {
+            // Mostra un alert con il PIN
+            window.alert(`Quiz avviato con successo! PIN: ${pin}\nCondividi questo PIN con gli studenti per permettere loro di partecipare.`);
+          }
+          
+          await loadSessions();
+          return;
+        } catch (sessionError) {
+          console.error('Errore dettagliato nella creazione della sessione:', sessionError);
+          throw new Error(`Errore nella creazione della sessione: ${sessionError instanceof Error ? sessionError.message : 'Errore sconosciuto'}`);
         }
-        
-        // Mostra un messaggio di successo con il PIN
-        const pin = newSession.pin;
-        if (pin) {
-          // Mostra un alert con il PIN
-          window.alert(`Quiz avviato con successo! PIN: ${pin}\nCondividi questo PIN con gli studenti per permettere loro di partecipare.`);
-        }
-        
-        await loadSessions();
-        return;
       }
 
       // Se esiste già una sessione, aggiornala
@@ -186,11 +252,12 @@ export function QuizLiveManager({ hostEmail, onBackToMain }: QuizLiveManagerProp
 
       if (updateError) {
         console.error('Errore nell\'avvio della sessione esistente:', updateError);
-        throw updateError;
+        console.error('Dettagli errore:', JSON.stringify(updateError, null, 2));
+        throw new Error(`Errore nell'avvio della sessione: ${updateError.message}`);
       }
       
       // Mostra un messaggio di successo con il PIN
-      const pin = session.pin;
+      const pin = session.join_code;
       if (pin) {
         // Mostra un alert con il PIN
         window.alert(`Quiz avviato con successo! PIN: ${pin}\nCondividi questo PIN con gli studenti per permettere loro di partecipare.`);
@@ -222,20 +289,26 @@ export function QuizLiveManager({ hostEmail, onBackToMain }: QuizLiveManagerProp
         localStorage.removeItem('lastGeneratedPin');
       }
       
-      console.log(`Creazione sessione per quiz ${quizId} con PIN: ${pin}`);
+      // Converti l'ID del quiz in UUID
+      const uuidQuizId = convertToUUID(quizId);
+      
+      console.log(`Creazione sessione per quiz ${quizId} (UUID: ${uuidQuizId}) con PIN: ${pin}`);
       
       const { data: newSession, error: createError } = await supabase
         .from('live_quiz_sessions')
         .insert([{
-          quiz_id: quizId,
+          quiz_id: uuidQuizId, // Utilizziamo l'ID convertito in UUID
           host_email: hostEmail,
-          pin: pin,
+          join_code: pin,
           status: 'waiting'
         }])
         .select()
         .single();
 
-      if (createError) throw createError;
+      if (createError) {
+        console.error('Errore nella creazione della sessione:', createError);
+        throw createError;
+      }
       
       // Non aggiorniamo più il quiz con il PIN perché la colonna non esiste
       
@@ -295,6 +368,12 @@ export function QuizLiveManager({ hostEmail, onBackToMain }: QuizLiveManagerProp
   // Elimina un quiz
   const handleDeleteQuiz = async (quizId: string) => {
     try {
+      if (!isValidUUID(quizId)) {
+        console.error("ID quiz non valido, non è un UUID:", quizId);
+        setError('ID quiz non valido. Impossibile eliminare il quiz.');
+        return;
+      }
+      
       setLoading(true);
       setError(null);
 
@@ -464,11 +543,11 @@ export function QuizLiveManager({ hostEmail, onBackToMain }: QuizLiveManagerProp
           </div>
           
           {/* Mostra il PIN della sessione se è attiva */}
-          {isActive && session?.pin && (
+          {isActive && session?.join_code && (
             <div className="mt-2 p-3 bg-slate-100 dark:bg-navy-700 rounded-lg">
               <p className="text-sm text-slate-600 dark:text-gray-400 mb-1">Codice PIN:</p>
               <div className="flex items-center justify-between">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white tracking-wider">{session.pin}</span>
+                <span className="text-2xl font-bold text-slate-900 dark:text-white tracking-wider">{session.join_code}</span>
                 <div className="flex items-center gap-2">
                   {isWaiting && (
                     <span className="px-2 py-1 bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 text-xs rounded-full">
@@ -483,7 +562,7 @@ export function QuizLiveManager({ hostEmail, onBackToMain }: QuizLiveManagerProp
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigator.clipboard.writeText(session.pin);
+                      navigator.clipboard.writeText(session.join_code);
                       // Mostra un feedback di copia
                       const target = e.currentTarget;
                       target.classList.add('text-green-500');

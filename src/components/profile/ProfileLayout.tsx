@@ -59,5 +59,5 @@ export function ProfileLayout({ userEmail, isInstructor, isMasterAdmin, needsSub
     return <InstructorProfile userEmail={userEmail} needsSubscription={needsSubscription} />;
   }
 
-  return <StudentProfile userEmail={userEmail} />;
+  return <StudentProfile userEmail={userEmail} needsSubscription={needsSubscription} />;
 }

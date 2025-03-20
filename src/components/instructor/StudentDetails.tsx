@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   ArrowLeft, Calendar, Book, Star, Clock, CheckCircle2, XCircle, Edit, 
   Save, Trash2, Target, AlertCircle, ChevronDown, ChevronUp, UserPlus, 
@@ -68,6 +68,9 @@ interface QuizResult {
   question_times: number[];
   date: string;
   category: string;
+  questions?: any[] | string;
+  student_answers?: number[] | string;
+  selected_options?: number[];
   quiz_details?: {
     title: string;
     description: string;
@@ -106,6 +109,22 @@ interface StudentDetailsProps {
   onBack: () => void;
 }
 
+// Interfaccia per le informazioni sul creatore del codice
+interface CodeCreatorInfo {
+  code: string;
+  created_at: string;
+  creator_first_name: string;
+  creator_last_name: string;
+  creator_email: string;
+}
+
+// Funzione per verificare se un valore è un UUID v4 valido
+function isValidUUID(id: string): boolean {
+  if (!id) return false;
+  const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidV4Regex.test(id);
+}
+
 export function StudentDetails({ student, onBack }: StudentDetailsProps) {
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
   const [subscriptionHistory, setSubscriptionHistory] = useState<SubscriptionHistoryItem[]>([]);
@@ -113,7 +132,6 @@ export function StudentDetails({ student, onBack }: StudentDetailsProps) {
   const [newNote, setNewNote] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedQuiz, setExpandedQuiz] = useState<string | null>(null);
   const [categoryPerformance, setCategoryPerformance] = useState<CategoryPerformance[]>([]);
   const [classAverages, setClassAverages] = useState<{[date: string]: number}>({});
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -122,32 +140,50 @@ export function StudentDetails({ student, onBack }: StudentDetailsProps) {
   const [detailedQuizResult, setDetailedQuizResult] = useState<QuizDetailedResult | null>(null);
   const [loadingQuizDetails, setLoadingQuizDetails] = useState(false);
   const [showDeleteNoteModal, setShowDeleteNoteModal] = useState<{ id: string; comment: string } | null>(null);
-  const [showRawData, setShowRawData] = useState(false);
   const [rawResultData, setRawResultData] = useState<any>(null);
+  const [isLoadingQuizDetails, setIsLoadingQuizDetails] = useState(false);
+  const [quizDetailsError, setQuizDetailsError] = useState<string | null>(null);
+  const [codeCreatorInfo, setCodeCreatorInfo] = useState<CodeCreatorInfo | null>(null);
+  const [loadingCodeInfo, setLoadingCodeInfo] = useState(false);
 
   useEffect(() => {
     loadStudentData();
     loadRegistrationDate();
     loadClassAverages();
+    loadCodeCreatorInfo();
   }, [student.email]);
 
   const loadRegistrationDate = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('created_at')
-        .eq('email', student.email)
-        .single();
-
-      if (error) throw error;
-      
-      if (data && data.created_at) {
-        setRegistrationDate(data.created_at);
-      } else if (student.created_at) {
-        setRegistrationDate(student.created_at);
+      // Verifichiamo se la tabella profiles esiste
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('created_at')
+          .eq('email', student.email)
+          .single();
+        
+        if (error) {
+          console.error('Error loading registration date:', error);
+          // Se la tabella non esiste, usiamo la data di creazione dell'utente se disponibile
+          if (student.created_at) {
+            setRegistrationDate(student.created_at);
+          }
+          return;
+        }
+        
+        if (data && data.created_at) {
+          setRegistrationDate(data.created_at);
+        }
+      } catch (error) {
+        console.error('Exception loading registration date:', error);
+        // Se c'è un'eccezione, usiamo la data di creazione dell'utente se disponibile
+        if (student.created_at) {
+          setRegistrationDate(student.created_at);
+        }
       }
     } catch (error) {
-      console.error('Error loading registration date:', error);
+      console.error('Error in loadRegistrationDate:', error);
     }
   };
 
@@ -197,56 +233,233 @@ export function StudentDetails({ student, onBack }: StudentDetailsProps) {
     }
   };
 
+  const loadCodeCreatorInfo = async () => {
+    try {
+      setLoadingCodeInfo(true);
+      
+      // Prima proviamo a ottenere i dati tramite una query semplice
+      const { data: usageData, error: usageError } = await supabase
+        .from('access_code_usage')
+        .select('code_id, student_email')
+        .eq('student_email', student.email)
+        .order('used_at', { ascending: false })
+        .limit(1);
+      
+      if (usageError) {
+        console.error('Errore nel recupero dell\'utilizzo del codice:', usageError);
+        setLoadingCodeInfo(false);
+        return;
+      }
+      
+      if (!usageData || usageData.length === 0) {
+        console.log('Nessun utilizzo di codice trovato per lo studente');
+        setLoadingCodeInfo(false);
+        return;
+      }
+      
+      const codeId = usageData[0].code_id;
+      
+      // Ora otteniamo i dettagli del codice
+      const { data: codeData, error: codeError } = await supabase
+        .from('access_codes')
+        .select('code, created_at, created_by')
+        .eq('id', codeId)
+        .single();
+      
+      if (codeError) {
+        console.error('Errore nel recupero dei dettagli del codice:', codeError);
+        setLoadingCodeInfo(false);
+        return;
+      }
+      
+      // Infine otteniamo i dettagli del creatore
+      const { data: creatorData, error: creatorError } = await supabase
+        .from('auth_users')
+        .select('first_name, last_name, email')
+        .eq('id', codeData.created_by)
+        .single();
+      
+      if (creatorError) {
+        console.error('Errore nel recupero dei dettagli del creatore:', creatorError);
+        setLoadingCodeInfo(false);
+        return;
+      }
+      
+      // Ora abbiamo tutti i dati necessari
+      setCodeCreatorInfo({
+        code: codeData.code,
+        created_at: codeData.created_at,
+        creator_first_name: creatorData.first_name || '',
+        creator_last_name: creatorData.last_name || '',
+        creator_email: creatorData.email
+      });
+    } catch (err) {
+      console.error('Errore imprevisto nel caricamento delle informazioni sul creatore del codice:', err);
+    } finally {
+      setLoadingCodeInfo(false);
+    }
+  };
+
   const loadStudentData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // STEP 1: Carichiamo i risultati dei quiz
-      let quizResultsQuery = `
-        *,
-        quiz_id
-      `;
+      console.log('Caricamento dati studente:', student.email);
 
-      // Tentativo con 'quizzes' come suggerito dall'errore
+      // STEP 1: Carichiamo i risultati di base dei quiz
       try {
-      const { data: results, error: resultsError } = await supabase
-        .from('results')
-        .select(`
-          *,
-            quiz_details:quizzes(
-            title,
-            description,
-            quiz_type,
-            question_count,
-            duration_minutes
-          )
-        `)
-        .eq('student_email', student.email)
-        .order('date', { ascending: false });
+        const { data: basicResults, error: basicError } = await supabase
+          .from('results')
+          .select('*')
+          .eq('student_email', student.email)
+          .order('date', { ascending: false });
 
-        if (resultsError) {
-          // Se fallisce, proviamo senza la join
-          console.warn('Error with quiz_details join:', resultsError);
-          const { data: basicResults, error: basicError } = await supabase
-            .from('results')
-        .select('*')
-            .eq('student_email', student.email)
-        .order('date', { ascending: false });
-
-          if (basicError) throw basicError;
-          setQuizResults(basicResults || []);
+        if (basicError) {
+          console.error('Error loading quiz results:', basicError);
+          throw basicError;
+        }
+        
+        // Se abbiamo risultati, prepariamo l'array finale
+        if (basicResults && basicResults.length > 0) {
+          console.log(`Trovati ${basicResults.length} risultati per lo studente:`, student.email);
           
-          // Se abbiamo risultati, calcoliamo le performance
-          if (basicResults && basicResults.length > 0) {
-            calculateCategoryPerformance(basicResults);
+          // Creiamo una copia dei risultati che aggiorneremo con i dettagli dei quiz
+          const resultsWithDetails = [...basicResults];
+          
+          // Per ogni risultato, facciamo una query specifica per ottenere i dettagli del quiz
+          for (let i = 0; i < resultsWithDetails.length; i++) {
+            const result = resultsWithDetails[i];
+            const quizId = result.quiz_id;
+            
+            console.log(`Cercando dettagli per il quiz ${i+1}/${resultsWithDetails.length}, ID: ${quizId}`);
+            
+            // Primo tentativo: cerchiamo in quiz_templates
+            let { data: quizTemplate } = await supabase
+              .from('quiz_templates')
+              .select('id, title, description, quiz_type, category, question_count, duration_minutes')
+              .eq('id', quizId)
+              .maybeSingle();
+            
+            if (quizTemplate) {
+              console.log(`Trovato in quiz_templates: ${quizTemplate.title}`);
+              resultsWithDetails[i].quiz_details = quizTemplate;
+              continue; // Passiamo al prossimo risultato
+            }
+            
+            // Secondo tentativo: cerchiamo in interactive_quiz_templates
+            try {
+              // Verifica se l'ID è un UUID valido prima di fare la query
+              if (!isValidUUID(quizId.toString())) {
+                console.warn(`ID non valido per interactive_quiz_templates: ${quizId} non è un UUID valido`);
+                continue; // Passiamo al prossimo risultato
+              }
+              
+              let { data: interactiveTemplate } = await supabase
+                .from('interactive_quiz_templates')
+                .select('id, title, description, quiz_type, category, question_count, duration_minutes')
+                .eq('id', quizId.toString())
+                .maybeSingle();
+                
+              if (interactiveTemplate) {
+                console.log(`Trovato in interactive_quiz_templates: ${interactiveTemplate.title}`);
+                resultsWithDetails[i].quiz_details = interactiveTemplate;
+                continue; // Passiamo al prossimo risultato
+              }
+            } catch (err) {
+              console.warn(`Errore nel cercare in interactive_quiz_templates per ID ${quizId}:`, err);
+            }
+            
+            // NUOVO TENTATIVO: cerchiamo nella tabella quizzes e recuperiamo il titolo originale
+            try {
+              let { data: quizRecord } = await supabase
+                .from('quizzes')
+                .select('id, title, description, category, questions')
+                .eq('id', quizId)
+                .maybeSingle();
+                
+              if (quizRecord && quizRecord.questions && quizRecord.questions.length > 0) {
+                // Estraiamo il quiz_id originale dalla prima domanda
+                const originalQuizId = quizRecord.questions[0].quiz_id;
+                
+                if (originalQuizId) {
+                  console.log(`Trovato quiz_id originale: ${originalQuizId} dalla tabella quizzes`);
+                  
+                  // Recuperiamo il titolo originale dalla tabella quiz_templates
+                  let { data: originalTemplate } = await supabase
+                    .from('quiz_templates')
+                    .select('id, title, description, quiz_type, category, question_count, duration_minutes')
+                    .eq('id', originalQuizId)
+                    .maybeSingle();
+                    
+                  if (originalTemplate) {
+                    console.log(`Trovato titolo originale: ${originalTemplate.title}`);
+                    resultsWithDetails[i].quiz_details = originalTemplate;
+                    continue;
+                  }
+                }
+                
+                // Se non troviamo il titolo originale, usiamo i dati dalla tabella quizzes
+                console.log(`Usando dati dalla tabella quizzes: ${quizRecord.title}`);
+                resultsWithDetails[i].quiz_details = {
+                  id: quizRecord.id,
+                  title: quizRecord.title,
+                  description: quizRecord.description,
+                  quiz_type: result.quiz_type || 'exam',
+                  category: quizRecord.category || 'uncategorized',
+                  question_count: Array.isArray(quizRecord.questions) ? quizRecord.questions.length : 0,
+                  duration_minutes: 0
+                };
+                continue;
+              }
+            } catch (err) {
+              console.warn(`Errore nel cercare in quizzes per ID ${quizId}:`, err);
+            }
+            
+            // Terzo tentativo: utilizziamo la stored procedure
+            try {
+              const { data, error } = await supabase
+                .rpc('improve_quiz_result_details', { p_result_id: result.id });
+                
+              if (!error && data && data.quiz_details) {
+                console.log(`Trovato tramite stored procedure: ${data.quiz_details.title}`);
+                resultsWithDetails[i].quiz_details = data.quiz_details;
+                continue;
+              }
+              
+              console.warn(`La stored procedure non ha trovato dettagli per il risultato ID ${result.id}`);
+            } catch (err) {
+              console.warn(`Errore con la stored procedure per il risultato ID ${result.id}:`, err);
+            }
+            
+            // Fallback: creiamo un oggetto quiz_details minimo con un titolo predefinito
+            console.log(`Nessun dettaglio trovato per il quiz ID ${quizId}, impostando titolo predefinito`);
+            resultsWithDetails[i].quiz_details = {
+              id: quizId,
+              title: `Quiz ${i+1}`,
+              description: 'Dettagli non disponibili',
+              quiz_type: result.quiz_type || 'unknown',
+              category: result.category || 'unknown',
+              question_count: 0,
+              duration_minutes: 0
+            };
           }
+          
+          // Log dei risultati finali
+          console.log('Risultati arricchiti con dettagli:', 
+            resultsWithDetails.map(r => ({ 
+              id: r.id, 
+              quiz_id: r.quiz_id, 
+              has_details: !!r.quiz_details,
+              title: r.quiz_details?.title || 'Quiz non disponibile'
+            }))
+          );
+          
+          setQuizResults(resultsWithDetails);
+          calculateCategoryPerformance(resultsWithDetails);
         } else {
-          setQuizResults(results || []);
-          // Se abbiamo risultati, calcoliamo le performance
-          if (results && results.length > 0) {
-            calculateCategoryPerformance(results);
-          }
+          console.log('Nessun risultato trovato per lo studente:', student.email);
+          setQuizResults([]);
         }
       } catch (error) {
         console.error('Error loading quiz results:', error);
@@ -575,14 +788,14 @@ export function StudentDetails({ student, onBack }: StudentDetailsProps) {
 
   const handleViewQuizDetails = async (quizId: string, resultId: string) => {
     try {
-      setLoadingQuizDetails(true);
-      setError(null);
-      setShowRawData(false);
+      setIsLoadingQuizDetails(true);
+      setQuizDetailsError(null);
+      setDetailedQuizResult(null);
       setRawResultData(null);
       
-      console.log('Caricamento dettagli quiz - ID Quiz:', quizId, 'ID Risultato:', resultId);
+      console.log(`Caricamento dettagli per quiz ID: ${quizId}, risultato ID: ${resultId}`);
       
-      // 1. Otteniamo i dettagli del risultato specifico
+      // STEP 1: Recuperiamo i dettagli del risultato
       const { data: resultData, error: resultError } = await supabase
         .from('results')
         .select('*')
@@ -590,1270 +803,799 @@ export function StudentDetails({ student, onBack }: StudentDetailsProps) {
         .single();
         
       if (resultError) {
-        console.error('Errore nel caricamento del risultato:', resultError);
-        throw resultError;
+        console.error('Error loading quiz result:', resultError);
+        setQuizDetailsError('Errore durante il caricamento del risultato del quiz');
+        setIsLoadingQuizDetails(false);
+        return;
       }
       
-      // Salviamo i dati grezzi per il debug
+      console.log('Risultato caricato:', resultData);
       setRawResultData(resultData);
       
-      console.log('Risultato caricato con successo:', resultData);
+      // STEP 2: Proviamo a recuperare le domande e le risposte reali
       
-      // Verifica se le domande sono già presenti nel risultato
-      if (resultData && resultData.questions && Array.isArray(resultData.questions) && resultData.questions.length > 0) {
-        console.log('Domande trovate direttamente nel risultato:', resultData.questions.length);
+      // Prima verifichiamo se il quiz è nella tabella quizzes (quiz completati)
+      const { data: quizData, error: quizError } = await supabase
+        .from('quizzes')
+        .select('*')
+        .eq('id', quizId)
+        .single();
         
-        // Estrai le risposte dello studente dal risultato
-        let studentAnswers: number[] = [];
+      if (!quizError && quizData && quizData.questions && quizData.questions.length > 0) {
+        console.log('Quiz trovato nella tabella quizzes:', quizData);
         
-        if (resultData.student_answers && Array.isArray(resultData.student_answers)) {
-          studentAnswers = resultData.student_answers;
-        } else if (resultData.answers && Array.isArray(resultData.answers)) {
-          if (resultData.selected_options && Array.isArray(resultData.selected_options)) {
-            studentAnswers = resultData.selected_options;
+        // Estraiamo il quiz_id originale dalla prima domanda
+        const originalQuizId = quizData.questions[0].quiz_id;
+        
+        if (originalQuizId) {
+          console.log(`Trovato quiz_id originale: ${originalQuizId}, recuperando domande originali`);
+          
+          // Recuperiamo le domande originali dalla tabella quiz_questions
+          const { data: originalQuestions, error: questionsError } = await supabase
+            .from('quiz_questions')
+            .select('*')
+            .eq('quiz_id', originalQuizId)
+            .order('id');
+            
+          if (!questionsError && originalQuestions && originalQuestions.length > 0) {
+            console.log(`Trovate ${originalQuestions.length} domande originali`);
+            
+            // Ora dobbiamo abbinare le risposte dello studente alle domande originali
+            // Questo può essere complesso perché le risposte potrebbero essere in formati diversi
+            
+            // Prepariamo le risposte dello studente
+            let studentAnswers: number[] = [];
+            
+            // Controlliamo i vari formati possibili delle risposte
+            if (resultData.student_answers) {
+              if (typeof resultData.student_answers === 'string') {
+                try {
+                  studentAnswers = JSON.parse(resultData.student_answers);
+                } catch (e) {
+                  console.warn('Impossibile parsare student_answers come JSON:', e);
+                }
+              } else if (Array.isArray(resultData.student_answers)) {
+                studentAnswers = resultData.student_answers;
+              }
+            } else if (resultData.selected_options && Array.isArray(resultData.selected_options)) {
+              studentAnswers = resultData.selected_options;
+            } else if (resultData.answers && Array.isArray(resultData.answers)) {
+              // Se abbiamo solo array di boolean, dobbiamo convertirlo in indici
+              studentAnswers = resultData.answers.map((isCorrect: boolean, index: number) => {
+                // Se la risposta è corretta, restituiamo l'indice della risposta corretta
+                // altrimenti restituiamo un indice diverso (potrebbe non essere preciso)
+                if (index < originalQuestions.length) {
+                  return isCorrect ? originalQuestions[index].correct_answer : 
+                    (originalQuestions[index].correct_answer === 0 ? 1 : 0);
+                }
+                return -1; // Valore sentinella per risposte non disponibili
+              });
+            }
+            
+            console.log('Risposte dello studente elaborate:', studentAnswers);
+            
+            // Creiamo il risultato dettagliato
+            const detailedResult: QuizDetailedResult = {
+              id: resultData.id,
+              quiz_id: quizId,
+              questions: originalQuestions.map(q => ({
+                id: q.id,
+                question_text: q.question_text,
+                options: Array.isArray(q.options) ? q.options : [],
+                correct_answer: q.correct_answer,
+                explanation: q.explanation,
+                image_url: q.image_url
+              })),
+              studentAnswers: studentAnswers.length >= originalQuestions.length ? 
+                studentAnswers.slice(0, originalQuestions.length) : 
+                [...studentAnswers, ...Array(originalQuestions.length - studentAnswers.length).fill(-1)],
+              totalTime: resultData.total_time
+            };
+            
+            console.log('Risultato dettagliato creato con domande originali:', detailedResult);
+            setDetailedQuizResult(detailedResult);
+            setIsLoadingQuizDetails(false);
+            return;
           } else {
-            studentAnswers = resultData.answers.map(() => -1);
+            console.warn('Impossibile recuperare le domande originali:', questionsError);
           }
         }
         
-        // Convertiamo i dati nel formato necessario
+        // Se non riusciamo a recuperare le domande originali, usiamo quelle dalla tabella quizzes
+        console.log('Utilizzo delle domande dalla tabella quizzes');
+        const questions = quizData.questions.map((q: any) => ({
+          id: q.id,
+          question_text: q.question_text,
+          options: Array.isArray(q.options) ? q.options : [],
+          correct_answer: q.correct_answer,
+          explanation: q.explanation || '',
+          image_url: q.image_url
+        }));
+        
+        // Prepariamo le risposte dello studente
+        let studentAnswers: number[] = [];
+        
+        // Controlliamo i vari formati possibili delle risposte
+        if (resultData.student_answers) {
+          if (typeof resultData.student_answers === 'string') {
+            try {
+              studentAnswers = JSON.parse(resultData.student_answers);
+            } catch (e) {
+              console.warn('Impossibile parsare student_answers come JSON:', e);
+            }
+          } else if (Array.isArray(resultData.student_answers)) {
+            studentAnswers = resultData.student_answers;
+          }
+        } else if (resultData.selected_options && Array.isArray(resultData.selected_options)) {
+          studentAnswers = resultData.selected_options;
+        } else if (resultData.answers && Array.isArray(resultData.answers)) {
+          // Se abbiamo solo array di boolean, dobbiamo convertirlo in indici
+          studentAnswers = resultData.answers.map((isCorrect: boolean, index: number) => {
+            // Se la risposta è corretta, restituiamo l'indice della risposta corretta
+            // altrimenti restituiamo un indice diverso (potrebbe non essere preciso)
+            if (index < questions.length) {
+              return isCorrect ? questions[index].correct_answer : 
+                (questions[index].correct_answer === 0 ? 1 : 0);
+            }
+            return -1; // Valore sentinella per risposte non disponibili
+          });
+        }
+        
         const detailedResult: QuizDetailedResult = {
           id: resultData.id,
           quiz_id: quizId,
-          questions: resultData.questions,
-          studentAnswers: studentAnswers,
-          totalTime: resultData.total_time || 0
+          questions,
+          studentAnswers: studentAnswers.length >= questions.length ? 
+            studentAnswers.slice(0, questions.length) : 
+            [...studentAnswers, ...Array(questions.length - studentAnswers.length).fill(-1)],
+          totalTime: resultData.total_time
         };
         
-        // Impostiamo i dati del quiz dettagliato
+        console.log('Risultato dettagliato creato con domande dalla tabella quizzes:', detailedResult);
         setDetailedQuizResult(detailedResult);
-        setExpandedQuiz(resultId);
+        setIsLoadingQuizDetails(false);
         return;
       }
       
-      // Verifica se le domande sono presenti come stringa JSON
-      if (resultData && typeof resultData.questions === 'string' && resultData.questions.trim() !== '') {
-        try {
-          console.log('Tentativo di parsing delle domande da stringa JSON');
-          const parsedQuestions = JSON.parse(resultData.questions);
+      // STEP 3: Se non troviamo il quiz nella tabella quizzes, proviamo con la stored procedure
+      try {
+        console.log('Tentativo con stored procedure improve_quiz_result_details');
+        const { data, error } = await supabase
+          .rpc('improve_quiz_result_details', { p_result_id: resultId });
           
-          if (Array.isArray(parsedQuestions) && parsedQuestions.length > 0) {
-            console.log('Domande parsate con successo dalla stringa JSON:', parsedQuestions.length);
-            
-            // Estrai le risposte dello studente dal risultato
-            let studentAnswers: number[] = [];
-            
-            if (resultData.student_answers && Array.isArray(resultData.student_answers)) {
-              studentAnswers = resultData.student_answers;
-            } else if (typeof resultData.student_answers === 'string') {
-              try {
-                studentAnswers = JSON.parse(resultData.student_answers);
-              } catch (e) {
-                console.error('Errore nel parsing delle risposte dello studente:', e);
-                studentAnswers = [];
-              }
-            } else if (resultData.answers && Array.isArray(resultData.answers)) {
-              if (resultData.selected_options && Array.isArray(resultData.selected_options)) {
-                studentAnswers = resultData.selected_options;
-              } else {
-                studentAnswers = resultData.answers.map(() => -1);
-              }
-            }
-            
-            // Convertiamo i dati nel formato necessario
-            const detailedResult: QuizDetailedResult = {
-              id: resultData.id,
-              quiz_id: quizId,
-              questions: parsedQuestions,
-              studentAnswers: studentAnswers,
-              totalTime: resultData.total_time || 0
-            };
-            
-            // Impostiamo i dati del quiz dettagliato
-            setDetailedQuizResult(detailedResult);
-            setExpandedQuiz(resultId);
-            return;
-          }
-        } catch (e) {
-          console.error('Errore nel parsing delle domande da stringa JSON:', e);
-        }
-      }
-      
-      // Verifichiamo se il quiz_id è valido
-      if (!quizId || quizId === 'null' || quizId === 'undefined') {
-        console.error('Quiz ID non valido:', quizId);
-        setError('ID del quiz non valido. Impossibile caricare i dettagli.');
-        return;
-      }
-      
-      // Verifichiamo prima se il quiz esiste
-      console.log('Verifica esistenza del quiz:', quizId);
-      const { data: quizData, error: quizError } = await supabase
-        .from('quiz_templates')
-        .select('id, title, description')
-        .eq('id', quizId)
-        .maybeSingle();
-        
-      if (quizError) {
-        console.error('Errore nella verifica del quiz:', quizError);
-        console.log('Tentativo di recupero con quiz_id dal risultato...');
-        
-        // Proviamo a usare il quiz_id dal risultato
-        if (resultData && resultData.quiz_id) {
-          quizId = resultData.quiz_id;
-          console.log('Usando quiz_id dal risultato:', quizId);
-        } else {
-          setError(`Quiz non trovato. ID: ${quizId}`);
-          return;
-        }
-      } else if (!quizData) {
-        console.log('Quiz non trovato con ID:', quizId);
-        console.log('Tentativo di recupero con quiz_id dal risultato...');
-        
-        // Proviamo a usare il quiz_id dal risultato
-        if (resultData && resultData.quiz_id && resultData.quiz_id !== quizId) {
-          quizId = resultData.quiz_id;
-          console.log('Usando quiz_id dal risultato:', quizId);
-        } else {
-          // Continuiamo comunque, potremmo trovare le domande in altre tabelle
-          console.log('Continuiamo con il tentativo di recupero delle domande da altre fonti');
-        }
-      } else {
-        console.log('Quiz trovato:', quizData);
-      }
-      
-      // 2. Otteniamo le domande del quiz - senza usare position
-      console.log('Caricamento domande per quiz_id:', quizId);
-      const { data: questionsData, error: questionsError } = await supabase
-        .from('quiz_questions')
-        .select('*')
-        .eq('quiz_id', quizId);
-        
-      if (questionsError) {
-        console.error('Errore nel caricamento delle domande:', questionsError);
-        
-        // Tentativo alternativo: prova a caricare dal template del quiz
-        console.log('Tentativo alternativo: caricamento dal template del quiz');
-        const { data: templateData, error: templateError } = await supabase
-          .from('quiz_templates')
-          .select('questions')
-          .eq('id', quizId)
-          .maybeSingle();
-          
-        if (templateError) {
-          console.error('Errore anche nel caricamento dal template:', templateError);
-          
-          // Ultimo tentativo: prova a caricare dalla tabella results
-          console.log('Ultimo tentativo: recupero domande dal risultato stesso');
-          if (resultData && resultData.questions && Array.isArray(resultData.questions)) {
-            console.log('Domande trovate nel risultato:', resultData.questions.length);
-            
-            // Estrai le risposte dello studente dal risultato
-            let studentAnswers: number[] = [];
-            
-            if (resultData.student_answers && Array.isArray(resultData.student_answers)) {
-              studentAnswers = resultData.student_answers;
-            } else if (resultData.answers && Array.isArray(resultData.answers)) {
-              if (resultData.selected_options && Array.isArray(resultData.selected_options)) {
-                studentAnswers = resultData.selected_options;
-              } else {
-                studentAnswers = resultData.answers.map(() => -1);
-              }
-            }
-            
-            // Convertiamo i dati nel formato necessario
-            const detailedResult: QuizDetailedResult = {
-              id: resultData.id,
-              quiz_id: quizId,
-              questions: resultData.questions,
-              studentAnswers: studentAnswers,
-              totalTime: resultData.total_time || 0
-            };
-            
-            // Impostiamo i dati del quiz dettagliato
-            setDetailedQuizResult(detailedResult);
-            setExpandedQuiz(resultId);
-            return;
-          }
-          
-          setError(`Errore nel caricamento delle domande: ${questionsError.message}`);
-          return;
+        if (error) {
+          console.error('Error with stored procedure:', error);
+          throw error;
         }
         
-        if (templateData && templateData.questions && Array.isArray(templateData.questions) && templateData.questions.length > 0) {
-          console.log('Domande caricate con successo dal template:', templateData.questions.length);
+        if (data && data.questions && data.questions.length > 0) {
+          console.log('Dati recuperati dalla stored procedure:', data);
           
-          // Estrai le risposte dello studente dal risultato
-          let studentAnswers: number[] = [];
-          
-          if (resultData.student_answers && Array.isArray(resultData.student_answers)) {
-            studentAnswers = resultData.student_answers;
-          } else if (resultData.answers && Array.isArray(resultData.answers)) {
-            if (resultData.selected_options && Array.isArray(resultData.selected_options)) {
-              studentAnswers = resultData.selected_options;
-            } else {
-              studentAnswers = resultData.answers.map(() => -1);
-            }
-          }
-          
-          // Convertiamo i dati nel formato necessario
           const detailedResult: QuizDetailedResult = {
-            id: resultData.id,
+            id: resultId,
             quiz_id: quizId,
-            questions: templateData.questions,
-            studentAnswers: studentAnswers,
-            totalTime: resultData.total_time || 0
+            questions: data.questions.map((q: any) => ({
+              id: q.id || `q-${Math.random().toString(36).substring(2, 9)}`,
+              question_text: q.question_text,
+              options: Array.isArray(q.options) ? q.options : [],
+              correct_answer: q.correct_answer,
+              explanation: q.explanation || '',
+              image_url: q.image_url
+            })),
+            studentAnswers: data.questions.map((q: any) => 
+              typeof q.student_answer === 'number' ? q.student_answer : -1
+            ),
+            totalTime: resultData.total_time
           };
           
-          // Impostiamo i dati del quiz dettagliato
+          console.log('Risultato dettagliato creato dalla stored procedure:', detailedResult);
           setDetailedQuizResult(detailedResult);
-          setExpandedQuiz(resultId);
+          setIsLoadingQuizDetails(false);
           return;
         } else {
-          console.log('Nessuna domanda trovata nel template');
-          
-          // Ultimo tentativo: prova a caricare dalla tabella questions
-          console.log('Ultimo tentativo: caricamento dalla tabella questions');
-          const { data: questionsTableData, error: questionsTableError } = await supabase
-            .from('questions')
-            .select('*')
-            .eq('quiz_id', quizId);
-            
-          if (questionsTableError) {
-            console.error('Errore anche nel caricamento dalla tabella questions:', questionsTableError);
-            setError(`Errore nel caricamento delle domande: ${questionsError.message}`);
-            return;
-          }
-          
-          if (questionsTableData && questionsTableData.length > 0) {
-            console.log('Domande caricate con successo dalla tabella questions:', questionsTableData.length);
-            
-            // Estrai le risposte dello studente dal risultato
-            let studentAnswers: number[] = [];
-            
-            if (resultData.student_answers && Array.isArray(resultData.student_answers)) {
-              studentAnswers = resultData.student_answers;
-            } else if (resultData.answers && Array.isArray(resultData.answers)) {
-              if (resultData.selected_options && Array.isArray(resultData.selected_options)) {
-                studentAnswers = resultData.selected_options;
-              } else {
-                studentAnswers = resultData.answers.map(() => -1);
-              }
-            }
-            
-            // Convertiamo i dati nel formato necessario
-            const detailedResult: QuizDetailedResult = {
-              id: resultData.id,
-              quiz_id: quizId,
-              questions: questionsTableData,
-              studentAnswers: studentAnswers,
-              totalTime: resultData.total_time || 0
-            };
-            
-            // Impostiamo i dati del quiz dettagliato
-            setDetailedQuizResult(detailedResult);
-            setExpandedQuiz(resultId);
-            return;
-          } else {
-            console.log('Nessuna domanda trovata in nessuna tabella');
-            
-            // Ultimo tentativo: verifichiamo se ci sono domande nel campo questions del risultato
-            if (resultData && resultData.questions) {
-              console.log('Tentativo di recupero domande dal campo questions del risultato');
-              
-              let questions = resultData.questions;
-              
-              // Se è una stringa, proviamo a parsarla come JSON
-              if (typeof questions === 'string') {
-                try {
-                  questions = JSON.parse(questions);
-                  console.log('Domande parsate con successo dal campo questions del risultato');
-                } catch (e) {
-                  console.error('Errore nel parsing delle domande dal campo questions:', e);
-                }
-              }
-              
-              if (Array.isArray(questions) && questions.length > 0) {
-                console.log('Domande trovate nel campo questions del risultato:', questions.length);
-                
-                // Estrai le risposte dello studente dal risultato
-                let studentAnswers: number[] = [];
-                
-                if (resultData.student_answers && Array.isArray(resultData.student_answers)) {
-                  studentAnswers = resultData.student_answers;
-                } else if (typeof resultData.student_answers === 'string') {
-                  try {
-                    studentAnswers = JSON.parse(resultData.student_answers);
-                  } catch (e) {
-                    console.error('Errore nel parsing delle risposte dello studente:', e);
-                    studentAnswers = [];
-                  }
-                } else if (resultData.answers && Array.isArray(resultData.answers)) {
-                  if (resultData.selected_options && Array.isArray(resultData.selected_options)) {
-                    studentAnswers = resultData.selected_options;
-                  } else {
-                    studentAnswers = resultData.answers.map(() => -1);
-                  }
-                }
-                
-                // Convertiamo i dati nel formato necessario
-                const detailedResult: QuizDetailedResult = {
-                  id: resultData.id,
-                  quiz_id: quizId,
-                  questions: questions,
-                  studentAnswers: studentAnswers,
-                  totalTime: resultData.total_time || 0
-                };
-                
-                // Impostiamo i dati del quiz dettagliato
-                setDetailedQuizResult(detailedResult);
-                setExpandedQuiz(resultId);
-                return;
-              }
-            }
-            
-            setError('Nessuna domanda trovata per questo quiz');
-            return;
-          }
+          console.warn('La stored procedure non ha restituito domande');
         }
+      } catch (err) {
+        console.error('Errore con la stored procedure:', err);
       }
       
-      if (!questionsData || questionsData.length === 0) {
-        console.log('Nessuna domanda trovata per il quiz:', quizId);
-        setError('Nessuna domanda trovata per questo quiz');
-        return;
-      }
-      
-      console.log('Domande caricate con successo:', questionsData.length);
-      
-      // Estrai le risposte dello studente dal risultato
-      let studentAnswers: number[] = [];
-      
-      if (resultData.student_answers && Array.isArray(resultData.student_answers)) {
-        studentAnswers = resultData.student_answers;
-      } else if (resultData.answers && Array.isArray(resultData.answers)) {
-        if (resultData.selected_options && Array.isArray(resultData.selected_options)) {
-          studentAnswers = resultData.selected_options;
-        } else {
-          studentAnswers = resultData.answers.map(() => -1);
+      // STEP 4: Fallback - Proviamo a recuperare le domande direttamente dalle tabelle
+      try {
+        console.log('Tentativo di recupero domande dalle tabelle quiz_questions o interactive_quiz_questions');
+        
+        // Proviamo prima con quiz_questions
+        const { data: quizQuestions, error: questionsError } = await supabase
+          .from('quiz_questions')
+          .select('*')
+          .eq('quiz_id', quizId);
+          
+        if (!questionsError && quizQuestions && quizQuestions.length > 0) {
+          console.log(`Trovate ${quizQuestions.length} domande in quiz_questions`);
+          
+          const detailedResult: QuizDetailedResult = {
+            id: resultId,
+            quiz_id: quizId,
+            questions: quizQuestions.map(q => ({
+              id: q.id,
+              question_text: q.question_text,
+              options: Array.isArray(q.options) ? q.options : [],
+              correct_answer: q.correct_answer,
+              explanation: q.explanation || '',
+              image_url: q.image_url
+            })),
+            studentAnswers: Array(quizQuestions.length).fill(-1), // Non abbiamo le risposte specifiche
+            totalTime: resultData.total_time
+          };
+          
+          console.log('Risultato dettagliato creato da quiz_questions:', detailedResult);
+          setDetailedQuizResult(detailedResult);
+          setIsLoadingQuizDetails(false);
+          return;
         }
+        
+        // Se non troviamo in quiz_questions, proviamo con interactive_quiz_questions
+        const { data: interactiveQuestions, error: interactiveError } = await supabase
+          .from('interactive_quiz_questions')
+          .select('*')
+          .eq('quiz_id', quizId);
+          
+        if (!interactiveError && interactiveQuestions && interactiveQuestions.length > 0) {
+          console.log(`Trovate ${interactiveQuestions.length} domande in interactive_quiz_questions`);
+          
+          const detailedResult: QuizDetailedResult = {
+            id: resultId,
+            quiz_id: quizId,
+            questions: interactiveQuestions.map(q => ({
+              id: q.id,
+              question_text: q.question_text,
+              options: Array.isArray(q.options) ? q.options : [],
+              correct_answer: q.correct_answer,
+              explanation: q.explanation || '',
+              image_url: q.image_url
+            })),
+            studentAnswers: Array(interactiveQuestions.length).fill(-1), // Non abbiamo le risposte specifiche
+            totalTime: resultData.total_time
+          };
+          
+          console.log('Risultato dettagliato creato da interactive_quiz_questions:', detailedResult);
+          setDetailedQuizResult(detailedResult);
+          setIsLoadingQuizDetails(false);
+          return;
+        }
+      } catch (err) {
+        console.error('Errore nel recupero delle domande dalle tabelle:', err);
       }
       
-      // Convertiamo i dati nel formato necessario
-      const detailedResult: QuizDetailedResult = {
-        id: resultData.id,
-        quiz_id: quizId,
-        questions: questionsData,
-        studentAnswers: studentAnswers,
-        totalTime: resultData.total_time || 0
-      };
-      
-      // Impostiamo i dati del quiz dettagliato
-      setDetailedQuizResult(detailedResult);
-      setExpandedQuiz(resultId);
-      
+      // Se arriviamo qui, non siamo riusciti a trovare le domande
+      console.error('Impossibile trovare le domande per questo quiz');
+      setQuizDetailsError('Domande non trovate o non caricate correttamente. Il quiz potrebbe essere stato modificato o eliminato.');
+      setIsLoadingQuizDetails(false);
     } catch (error) {
-      console.error('Error loading quiz details:', error);
-      let errorMessage = 'Errore durante il caricamento dei dettagli del quiz';
-      
-      if (error && typeof error === 'object' && 'message' in error) {
-        errorMessage += `: ${error.message}`;
-      }
-      
-      setError(errorMessage);
-    } finally {
-      setLoadingQuizDetails(false);
+      console.error('Error in handleViewQuizDetails:', error);
+      setQuizDetailsError('Si è verificato un errore durante il caricamento dei dettagli del quiz');
+      setIsLoadingQuizDetails(false);
     }
   };
   
   const closeQuizDetails = () => {
     setDetailedQuizResult(null);
-    setExpandedQuiz(null);
   };
 
   return (
     <div className="space-y-6">
-      <button
-        onClick={onBack}
-        className="text-white hover:text-blue-100 flex items-center gap-2"
-      >
-        <ArrowLeft className="w-5 h-5" />
-        Torna alla lista
-      </button>
-
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-              {student.first_name} {student.last_name}
-            </h2>
-            <p className="text-gray-600 dark:text-slate-400">{student.email}</p>
-            {registrationDate && (
-              <p className="text-gray-500 dark:text-slate-500 text-sm mt-1 flex items-center">
-                <UserPlus className="w-4 h-4 mr-1" />
-                Registrato il {formatShortDate(registrationDate)}
-              </p>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={handleSendEmail}
-              className="p-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full hover:bg-blue-100 dark:hover:bg-blue-800/30 transition-colors"
-              aria-label="Invia email allo studente"
-            >
-              <Mail className="w-5 h-5" />
-            </button>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-            student.account_status === 'active'
-                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-          }`}>
-            {student.account_status === 'active' ? 'Attivo' : 'Sospeso'}
-          </span>
-        </div>
-          </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg border border-gray-100 dark:border-slate-700">
-            <div className="flex items-center gap-2 mb-2">
-              <Target className="w-5 h-5 text-blue-500" />
-              <h3 className="font-semibold text-slate-900 dark:text-white">Quiz Completati</h3>
-            </div>
-            <p className="text-lg font-medium text-slate-900 dark:text-slate-200">{totalQuizzes}</p>
-          </div>
-
-          <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg border border-gray-100 dark:border-slate-700">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
-              <h3 className="font-semibold text-slate-900 dark:text-white">Quiz Superati</h3>
-            </div>
-            <p className="text-lg font-medium text-slate-900 dark:text-slate-200">{passedQuizzes}</p>
-          </div>
-
-          <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg border border-gray-100 dark:border-slate-700">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="w-5 h-5 text-purple-500" />
-              <h3 className="font-semibold text-slate-900 dark:text-white">Ultimo Accesso</h3>
-            </div>
-            <p className="text-lg font-medium text-slate-900 dark:text-slate-200">
-              {student.last_login ? formatDate(student.last_login) : 'Mai acceduto'}
-            </p>
-          </div>
-        </div>
+      <div className="flex items-center mb-6">
+        <button 
+          onClick={onBack}
+          className="mr-4 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-slate-400" />
+        </button>
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+          Dettagli Studente: {student.first_name} {student.last_name}
+        </h2>
       </div>
 
-      {/* Quiz History */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
-        {detailedQuizResult ? (
-          <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-slate-950 dark:text-white">
-                Dettaglio Quiz
-              </h3>
-              <button
-                onClick={closeQuizDetails}
-                className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 flex items-center gap-2"
-              >
-                <ArrowLeft className="w-5 h-5" />
-                Torna ai risultati
-              </button>
-            </div>
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative dark:bg-red-900/30 dark:border-red-800 dark:text-red-400" role="alert">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 mr-2" />
+            <span>{error}</span>
+          </div>
+        </div>
+      )}
 
-            {/* Statistiche del quiz */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800/30">
-                <div className="flex items-center gap-2 mb-1">
-                  <Target className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  <h4 className="font-medium text-slate-900 dark:text-white">Punteggio</h4>
-                </div>
-                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {detailedQuizResult.questions.length > 0 
-                    ? `${Math.round((detailedQuizResult.questions.filter((_, i) => 
-                        typeof detailedQuizResult.studentAnswers[i] === 'number' && 
-                        detailedQuizResult.studentAnswers[i] === detailedQuizResult.questions[i].correct_answer
-                      ).length / detailedQuizResult.questions.length) * 100)}%`
-                    : '0%'
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Informazioni generali */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
+          <div className="p-6">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Informazioni Generali</h3>
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-slate-400">Email</p>
+                <p className="text-slate-900 dark:text-white">{student.email}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500 dark:text-slate-400">Nome Completo</p>
+                <p className="text-slate-900 dark:text-white">
+                  {student.first_name || student.last_name ? 
+                    `${student.first_name} ${student.last_name}` : 
+                    <span className="text-gray-400 dark:text-gray-500 italic">Nome non disponibile</span>
                   }
                 </p>
               </div>
-
-              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-100 dark:border-green-800/30">
-                <div className="flex items-center gap-2 mb-1">
-                  <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-                  <h4 className="font-medium text-slate-900 dark:text-white">Risposte Corrette</h4>
-                </div>
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {detailedQuizResult.questions.filter((_, i) => 
-                    typeof detailedQuizResult.studentAnswers[i] === 'number' && 
-                    detailedQuizResult.studentAnswers[i] === detailedQuizResult.questions[i].correct_answer
-                  ).length} / {detailedQuizResult.questions.length}
+              <div>
+                <p className="text-sm text-gray-500 dark:text-slate-400">Stato Account</p>
+                <p className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  student.account_status === 'active'
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                    : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                }`}>
+                  {student.account_status === 'active' ? 'Attivo' : 'Sospeso'}
                 </p>
               </div>
-
-              <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-100 dark:border-red-800/30">
-                <div className="flex items-center gap-2 mb-1">
-                  <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
-                  <h4 className="font-medium text-slate-900 dark:text-white">Risposte Errate</h4>
-                </div>
-                <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                  {detailedQuizResult.questions.filter((_, i) => 
-                    typeof detailedQuizResult.studentAnswers[i] === 'number' && 
-                    detailedQuizResult.studentAnswers[i] !== detailedQuizResult.questions[i].correct_answer
-                  ).length} / {detailedQuizResult.questions.length}
-                </p>
+              <div>
+                <p className="text-sm text-gray-500 dark:text-slate-400">Ultimo Accesso</p>
+                <p className="text-slate-900 dark:text-white">{formatDate(student.last_login)}</p>
               </div>
-
-              <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800/30">
-                <div className="flex items-center gap-2 mb-1">
-                  <Clock className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                  <h4 className="font-medium text-slate-900 dark:text-white">Tempo Totale</h4>
-                </div>
-                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                  {formatTime(detailedQuizResult.totalTime || 0)}
-                </p>
-              </div>
-            </div>
-            
-            <ScrollArea className="h-[calc(100vh-400px)] pr-4">
-              {detailedQuizResult.questions.map((question, questionIndex) => {
-                const studentAnswerIndex = detailedQuizResult.studentAnswers[questionIndex];
-                // Se studentAnswerIndex è -1, significa che non abbiamo l'informazione sulla risposta specifica
-                // ma solo se era corretta o meno
-                const isCorrect = 
-                  typeof studentAnswerIndex === 'number' && studentAnswerIndex === question.correct_answer || 
-                  (studentAnswerIndex === -1 && Array.isArray(detailedQuizResult.studentAnswers) && 
-                   typeof detailedQuizResult.studentAnswers[questionIndex] === 'boolean' && 
-                   detailedQuizResult.studentAnswers[questionIndex] === true);
-                
-                return (
-                  <div 
-                    key={question.id} 
-                    className={`mb-6 p-4 rounded-lg border ${
-                      isCorrect 
-                        ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900/30' 
-                        : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900/30'
-                    }`}
-                  >
-                    <div className="flex justify-between mb-2">
-                      <h4 className="text-lg font-medium text-slate-900 dark:text-white">
-                        Domanda {questionIndex + 1}
-                      </h4>
-                      <span className={`px-2 py-1 rounded text-sm font-medium ${
-                        isCorrect 
-                          ? 'bg-green-100 dark:bg-green-800/40 text-green-800 dark:text-green-300' 
-                          : 'bg-red-100 dark:bg-red-800/40 text-red-800 dark:text-red-300'
-                      }`}>
-                        {isCorrect ? 'Corretta' : 'Errata'}
-                      </span>
-                    </div>
-                    
-                    <div className="mb-4 text-slate-800 dark:text-slate-200">{question.question_text}</div>
-                    
-                    {question.image_url && (
-                      <div className="mb-4">
-                        <img 
-                          src={question.image_url} 
-                          alt="Immagine della domanda" 
-                          className="max-h-48 rounded-lg" 
-                        />
-                      </div>
-                    )}
-                    
-                    <div className="space-y-2 mb-4">
-                      {question.options.map((option, optionIndex) => {
-                        // Determina lo stato di questa opzione
-                        let isSelectedByStudent = false;
-                        let isCorrectOption = optionIndex === question.correct_answer;
-                        
-                        if (studentAnswerIndex !== -1) {
-                          // Se abbiamo l'indice della risposta scelta dallo studente
-                          isSelectedByStudent = optionIndex === studentAnswerIndex;
-                        } else if (Array.isArray(detailedQuizResult.studentAnswers)) {
-                          // Se abbiamo solo un array di booleani per risposte corrette/errate
-                          // Non possiamo sapere quale opzione ha selezionato lo studente,
-                          // ma possiamo evidenziare comunque la risposta corretta
-                          isSelectedByStudent = false;
-                        }
-                        
-                        return (
-                          <div 
-                            key={optionIndex}
-                            className={`p-3 rounded-lg border ${
-                              isCorrectOption
-                                ? 'bg-green-100 dark:bg-green-900/30 border-green-200 dark:border-green-900/40 text-green-800 dark:text-green-300'
-                                : isSelectedByStudent
-                                  ? 'bg-red-100 dark:bg-red-900/30 border-red-200 dark:border-red-900/40 text-red-800 dark:text-red-300'
-                                  : 'bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
-                            }`}
-                          >
-                            <div className="flex gap-2 items-start">
-                              <div className="mt-0.5">
-                                {isCorrectOption ? (
-                                  <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-                                ) : isSelectedByStudent ? (
-                                  <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
-                                ) : (
-                                  <div className="w-5 h-5 border-2 border-gray-300 dark:border-slate-600 rounded-full" />
-                                )}
-                              </div>
-                              <div>{option}</div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    
-                    {question.explanation && (
-                      <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 text-blue-800 dark:text-blue-300 rounded-lg">
-                        <div className="font-medium mb-1">Spiegazione:</div>
-                        <div>{question.explanation}</div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </ScrollArea>
-          </div>
-        ) : loadingQuizDetails ? (
-          <div className="p-6 flex flex-col items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
-            <p className="text-slate-600 dark:text-slate-400">Caricamento dettagli del quiz...</p>
-          </div>
-        ) : error ? (
-          <div className="p-6">
-            <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg mb-6">
-              <div className="flex items-center">
-                <AlertCircle className="w-5 h-5 mr-2" />
-                <span>{error}</span>
-              </div>
-              <div className="mt-4 flex space-x-2">
-                <button 
-                  onClick={() => {
-                    setError(null);
-                    if (expandedQuiz) {
-                      const parts = expandedQuiz.split('-');
-                      if (parts.length === 2) {
-                        handleViewQuizDetails(parts[0], parts[1]);
-                      }
-                    }
-                  }}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  Riprova
-                </button>
-                {rawResultData && (
-                  <button 
-                    onClick={() => setShowRawData(!showRawData)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    {showRawData ? 'Nascondi dati grezzi' : 'Mostra dati grezzi'}
-                  </button>
-                )}
-                <button 
-                  onClick={() => {
-                    setError(null);
-                    closeQuizDetails();
-                  }}
-                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                >
-                  Chiudi
-                </button>
-              </div>
-              
-              {showRawData && rawResultData && (
-                <div className="mt-4 p-4 bg-gray-100 dark:bg-slate-800 rounded-lg overflow-auto max-h-96">
-                  <h4 className="font-bold mb-2">Dati grezzi del risultato:</h4>
-                  <pre className="text-xs whitespace-pre-wrap">
-                    {JSON.stringify(rawResultData, null, 2)}
-                  </pre>
+              {registrationDate && (
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">Data Registrazione</p>
+                  <p className="text-slate-900 dark:text-white">{formatDate(registrationDate)}</p>
                 </div>
               )}
             </div>
           </div>
-        ) : (
-          <div className="p-6 border-b border-gray-200 dark:border-slate-800">
-            <h3 className="text-xl font-bold text-slate-950 dark:text-white mb-4">Cronologia Quiz</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800/30">
-              <div className="flex items-center gap-2 mb-1">
-                  <Target className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  <h4 className="font-medium text-slate-900 dark:text-white">Media Punteggi</h4>
-              </div>
-                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {(averageScore * 100).toFixed(1)}%
-              </p>
-            </div>
-
-              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-100 dark:border-green-800/30">
-              <div className="flex items-center gap-2 mb-1">
-                  <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-                  <h4 className="font-medium text-slate-900 dark:text-white">Tasso di Successo</h4>
-              </div>
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                {totalQuizzes > 0 ? ((passedQuizzes / totalQuizzes) * 100).toFixed(1) : 0}%
-              </p>
-            </div>
-
-              <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800/30">
-              <div className="flex items-center gap-2 mb-1">
-                  <Clock className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                  <h4 className="font-medium text-slate-900 dark:text-white">Tempo Medio</h4>
-              </div>
-                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                {formatTime(Math.round(averageTime))}
-              </p>
-            </div>
-          </div>
-
-          <div className="h-64 mb-6">
-            <Line
-              data={chartData}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                        callback: value => `${value}%`,
-                        color: document.documentElement.classList.contains('dark') ? '#94a3b8' : '#64748b'
-                      },
-                      grid: {
-                        color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-                      }
-                    },
-                    x: {
-                      ticks: {
-                        color: document.documentElement.classList.contains('dark') ? '#94a3b8' : '#64748b'
-                      },
-                      grid: {
-                        color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-                      }
-                    }
-                  },
-                  plugins: {
-                    tooltip: {
-                      callbacks: {
-                        label: function(context) {
-                          return `${context.dataset.label}: ${context.parsed.y.toFixed(1)}%`;
-                        }
-                      }
-                    },
-                    legend: {
-                      position: 'top',
-                      labels: {
-                        color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#334155'
-                    }
-                  }
-                }
-              }}
-            />
-          </div>
-
-            <h4 className="text-lg font-semibold text-slate-950 dark:text-white mb-3">Tabella Risultati Quiz</h4>
-            
-            <div className="overflow-x-auto mb-6">
-              <table className="w-full border-collapse">
-                <thead className="bg-gray-50 dark:bg-slate-800">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-600 dark:text-slate-300">Data</th>
-                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-600 dark:text-slate-300">Quiz</th>
-                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-600 dark:text-slate-300">Categoria</th>
-                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-600 dark:text-slate-300">Punteggio</th>
-                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-600 dark:text-slate-300">Tempo</th>
-                    <th className="px-4 py-2 text-left text-sm font-semibold text-gray-600 dark:text-slate-300">Risultato</th>
-                    <th className="px-4 py-2 text-center text-sm font-semibold text-gray-600 dark:text-slate-300">Azioni</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {quizResults.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-3 text-center text-gray-500 dark:text-slate-400">
-                        Nessun quiz completato
-                      </td>
-                    </tr>
-                  ) : (
-                    quizResults.map((result) => (
-                      <tr key={result.id} className="border-t border-gray-100 dark:border-slate-700">
-                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">{formatShortDate(result.date)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
-                          {result.quiz_details?.title || 'Quiz non disponibile'}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">{result.category || 'N/D'}</td>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-slate-200">
-                          {(result.score * 100).toFixed(1)}%
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">{formatTime(result.total_time)}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            result.score >= 0.75 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                          }`}>
-                            {result.score >= 0.75 ? 'Superato' : 'Non superato'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => handleViewQuizDetails(result.quiz_id, result.id)}
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mr-2"
-                            aria-label="Visualizza dettagli"
-                          >
-                            <Eye className="w-5 h-5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-                      </div>
-
-            <h4 className="text-lg font-semibold text-slate-950 dark:text-white mb-3">Performance per Categoria</h4>
-            
-            <div className="h-64 mb-6">
-              <Bar
-                data={categoryChartData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      max: 100,
-                      ticks: {
-                        callback: value => `${value}%`,
-                        color: document.documentElement.classList.contains('dark') ? '#94a3b8' : '#64748b'
-                      },
-                      grid: {
-                        color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-                      }
-                    },
-                    x: {
-                      ticks: {
-                        color: document.documentElement.classList.contains('dark') ? '#94a3b8' : '#64748b'
-                      },
-                      grid: {
-                        color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
-                      }
-                    }
-                  },
-                  plugins: {
-                    tooltip: {
-                      callbacks: {
-                        label: function(context) {
-                          const categoryData = categoryPerformance[context.dataIndex];
-                          return [
-                            `Tasso di Successo: ${context.parsed.y.toFixed(1)}%`,
-                            `Risposte Corrette: ${categoryData.correctAnswers}/${categoryData.totalQuestions}`
-                          ];
-                        }
-                      }
-                    },
-                    legend: {
-                      display: false
-                    }
-                  }
-                }}
-              />
-                    </div>
-                  </div>
-        )}
-                </div>
-
-      {/* Note dell'istruttore */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
-        <div className="p-6">
-          <h3 className="text-xl font-bold text-slate-950 dark:text-white mb-4">Note dell'Istruttore</h3>
-          
-          <div className="mb-4">
-            <textarea
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              placeholder="Aggiungi una nota su questo studente..."
-              className="w-full p-3 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-              rows={3}
-            />
-            <button
-              onClick={handleAddNote}
-              className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Aggiungi Nota
-            </button>
-              </div>
-          
-          <div className="space-y-4">
-            {/* Log per debug */}
-            {notes.length === 0 ? (
-              <p className="text-gray-500 dark:text-slate-400 italic">Nessuna nota presente per questo studente</p>
-            ) : (
-              notes.map((note) => {
-                console.log('Rendering note:', note);
-                return (
-                  <div key={note.id} className="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg border border-gray-200 dark:border-slate-700">
-                    {editingNoteId === note.id ? (
-                      <div>
-                        <textarea
-                          value={editNoteContent}
-                          onChange={(e) => setEditNoteContent(e.target.value)}
-                          className="w-full p-3 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                          rows={3}
-                        />
-                        <div className="flex gap-2 mt-2">
-                          <button
-                            onClick={handleSaveEditedNote}
-                            className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
-                          >
-                            <Save className="w-4 h-4" />
-                            Salva
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="px-3 py-1 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                          >
-                            Annulla
-                          </button>
-          </div>
         </div>
-                    ) : (
-                      <div>
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="text-sm text-gray-500 dark:text-slate-400">{formatDate(note.created_at)}</span>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleEditNote(note)}
-                              className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                              aria-label="Modifica nota"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => setShowDeleteNoteModal({ id: note.id, comment: note.comment })}
-                              className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
-                              aria-label="Elimina nota"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-      </div>
-                        </div>
-                        {note.comment ? (
-                          <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{note.comment}</p>
-                        ) : (
-                          <p className="text-gray-500 dark:text-slate-400 italic">Nessun contenuto</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+
+        {/* Informazioni sul creatore del codice */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
+          <div className="p-6">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Informazioni Codice di Accesso</h3>
+            {loadingCodeInfo ? (
+              <div className="flex justify-center items-center p-6">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+              </div>
+            ) : codeCreatorInfo ? (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">Codice Utilizzato</p>
+                  <p className="text-slate-900 dark:text-white font-mono">{codeCreatorInfo.code}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">Creato da</p>
+                  <p className="text-slate-900 dark:text-white">
+                    {codeCreatorInfo.creator_first_name || codeCreatorInfo.creator_last_name ? 
+                      `${codeCreatorInfo.creator_first_name} ${codeCreatorInfo.creator_last_name}` : 
+                      <span className="text-gray-400 dark:text-gray-500 italic">Nome non disponibile</span>
+                    }
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">Email Creatore</p>
+                  <p className="text-slate-900 dark:text-white">{codeCreatorInfo.creator_email}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-slate-400">Data Creazione</p>
+                  <p className="text-slate-900 dark:text-white">{formatDate(codeCreatorInfo.created_at)}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-gray-500 dark:text-slate-400 italic">Nessuna informazione disponibile sul codice di accesso</p>
             )}
           </div>
         </div>
-      </div>
 
-      {/* Modale di conferma eliminazione nota */}
-      {showDeleteNoteModal && (
-        <ConfirmModal
-          type="delete"
-          title="Elimina nota"
-          message="Sei sicuro di voler eliminare questa nota? Questa azione non può essere annullata."
-          details={showDeleteNoteModal.comment}
-          onConfirm={() => {
-            handleDeleteNote(showDeleteNoteModal.id);
-            setShowDeleteNoteModal(null);
-          }}
-          onCancel={() => setShowDeleteNoteModal(null)}
-        />
-      )}
+        {/* Quiz History */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
+          {detailedQuizResult ? (
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-slate-950 dark:text-white">
+                  Dettaglio Quiz
+                </h3>
+                <button
+                  onClick={closeQuizDetails}
+                  className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 flex items-center gap-2"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                  Torna ai risultati
+                </button>
+              </div>
 
-      {/* Visualizzazione dettagli quiz */}
-      {expandedQuiz && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-slate-900 dark:text-white">Dettagli Quiz</h3>
-              <button
-                onClick={closeQuizDetails}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-6">
-              {loadingQuizDetails ? (
-                <div className="flex flex-col items-center justify-center h-64">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
-                  <p className="text-gray-500 dark:text-gray-400">Caricamento dettagli quiz...</p>
+              {/* Statistiche del quiz */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Target className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <h4 className="font-medium text-slate-900 dark:text-white">Punteggio</h4>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    {detailedQuizResult.questions.length > 0 
+                      ? `${Math.round((detailedQuizResult.questions.filter((_, i) => 
+                          typeof detailedQuizResult.studentAnswers[i] === 'number' && 
+                          detailedQuizResult.studentAnswers[i] === detailedQuizResult.questions[i].correct_answer
+                        ).length / detailedQuizResult.questions.length) * 100)}%`
+                      : '0%'
+                  }
+                  </p>
                 </div>
-              ) : error ? (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
-                  <div className="flex items-start">
-                    <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 mr-3" />
-                    <div>
-                      <h4 className="text-sm font-medium text-red-800 dark:text-red-400">Errore</h4>
-                      <p className="text-sm text-red-700 dark:text-red-300 mt-1">{error}</p>
+
+                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-100 dark:border-green-800/30">
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    <h4 className="font-medium text-slate-900 dark:text-white">Risposte Corrette</h4>
+                  </div>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                    {detailedQuizResult.questions.filter((_, i) => 
+                      typeof detailedQuizResult.studentAnswers[i] === 'number' && 
+                      detailedQuizResult.studentAnswers[i] === detailedQuizResult.questions[i].correct_answer
+                    ).length} / {detailedQuizResult.questions.length}
+                  </p>
+                </div>
+
+                <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-100 dark:border-red-800/30">
+                  <div className="flex items-center gap-2 mb-1">
+                    <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                    <h4 className="font-medium text-slate-900 dark:text-white">Risposte Errate</h4>
+                  </div>
+                  <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                    {detailedQuizResult.questions.filter((_, i) => 
+                      typeof detailedQuizResult.studentAnswers[i] === 'number' && 
+                      detailedQuizResult.studentAnswers[i] !== detailedQuizResult.questions[i].correct_answer
+                    ).length} / {detailedQuizResult.questions.length}
+                  </p>
+                </div>
+
+                <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800/30">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Clock className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    <h4 className="font-medium text-slate-900 dark:text-white">Tempo Totale</h4>
+                  </div>
+                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                    {formatTime(detailedQuizResult.totalTime || 0)}
+                  </p>
+                </div>
+              </div>
+              
+              <ScrollArea className="h-[calc(100vh-400px)] pr-4">
+                {detailedQuizResult.questions.map((question, questionIndex) => {
+                  const studentAnswerIndex = detailedQuizResult.studentAnswers[questionIndex];
+                  // Se studentAnswerIndex è -1, significa che non abbiamo l'informazione sulla risposta specifica
+                  // ma solo se era corretta o meno
+                  const isCorrect = 
+                    typeof studentAnswerIndex === 'number' && studentAnswerIndex === question.correct_answer || 
+                    (studentAnswerIndex === -1 && Array.isArray(detailedQuizResult.studentAnswers) && 
+                     typeof detailedQuizResult.studentAnswers[questionIndex] === 'boolean' && 
+                     detailedQuizResult.studentAnswers[questionIndex] === true);
+                  
+                  return (
+                    <div 
+                      key={question.id} 
+                      className={`mb-6 p-4 rounded-lg border ${
+                        isCorrect 
+                          ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900/30' 
+                          : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900/30'
+                      }`}
+                    >
+                      <div className="flex justify-between mb-2">
+                        <h4 className="text-lg font-medium text-slate-900 dark:text-white">
+                          Domanda {questionIndex + 1}
+                        </h4>
+                        <span className={`px-2 py-1 rounded text-sm font-medium ${
+                          isCorrect 
+                            ? 'bg-green-100 dark:bg-green-800/40 text-green-800 dark:text-green-300' 
+                            : 'bg-red-100 dark:bg-red-800/40 text-red-800 dark:text-red-300'
+                        }`}>
+                          {isCorrect ? 'Corretta' : 'Errata'}
+                        </span>
+                      </div>
                       
-                      {rawResultData && (
-                        <div className="mt-4">
-                          <button
-                            onClick={() => setShowRawData(!showRawData)}
-                            className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center"
-                          >
-                            {showRawData ? (
-                              <>
-                                <EyeOff className="w-4 h-4 mr-1" />
-                                Nascondi dati grezzi
-                              </>
-                            ) : (
-                              <>
-                                <Eye className="w-4 h-4 mr-1" />
-                                Mostra dati grezzi
-                              </>
-                            )}
-                          </button>
-                          
-                          {showRawData && (
-                            <div className="mt-3 bg-gray-100 dark:bg-slate-800 rounded-md p-3 overflow-x-auto">
-                              <pre className="text-xs text-gray-800 dark:text-gray-300 whitespace-pre-wrap">
-                                {JSON.stringify(rawResultData, null, 2)}
-                              </pre>
-                            </div>
-                          )}
+                      <div className="mb-4 text-slate-800 dark:text-slate-200">{question.question_text}</div>
+                      
+                      {question.image_url && (
+                        <div className="mb-4">
+                          <img 
+                            src={question.image_url} 
+                            alt="Immagine della domanda" 
+                            className="max-h-48 rounded-lg" 
+                          />
                         </div>
                       )}
                       
-                      <div className="mt-4">
-                        <button
-                          onClick={() => handleViewQuizDetails(detailedQuizResult?.quiz_id || '', expandedQuiz || '')}
-                          className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 transition-colors flex items-center"
-                        >
-                          <RefreshCw className="w-4 h-4 mr-1" />
-                          Riprova
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : detailedQuizResult ? (
-                <>
-                  {/* Statistiche del quiz */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                    <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg border border-gray-100 dark:border-slate-700 flex items-center">
-                      <Target className="w-6 h-6 text-blue-500 mr-3" />
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Punteggio</h4>
-                        <p className="text-lg font-semibold text-slate-900 dark:text-white">
-                          {Math.round((detailedQuizResult.studentAnswers.filter(a => a !== -1 && detailedQuizResult.questions[a]?.correct_answer === a).length / detailedQuizResult.questions.length) * 100)}%
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg border border-gray-100 dark:border-slate-700 flex items-center">
-                      <CheckCircle2 className="w-6 h-6 text-green-500 mr-3" />
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Risposte Corrette</h4>
-                        <p className="text-lg font-semibold text-slate-900 dark:text-white">
-                          {detailedQuizResult.studentAnswers.filter(a => a !== -1 && detailedQuizResult.questions[a]?.correct_answer === a).length} / {detailedQuizResult.questions.length}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg border border-gray-100 dark:border-slate-700 flex items-center">
-                      <XCircle className="w-6 h-6 text-red-500 mr-3" />
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Risposte Errate</h4>
-                        <p className="text-lg font-semibold text-slate-900 dark:text-white">
-                          {detailedQuizResult.studentAnswers.filter(a => a !== -1 && detailedQuizResult.questions[a]?.correct_answer !== a).length} / {detailedQuizResult.questions.length}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg border border-gray-100 dark:border-slate-700 flex items-center">
-                      <Clock className="w-6 h-6 text-orange-500 mr-3" />
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400">Tempo Totale</h4>
-                        <p className="text-lg font-semibold text-slate-900 dark:text-white">
-                          {formatTime(detailedQuizResult.totalTime || 0)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Domande e risposte */}
-                  <div className="space-y-6">
-                    {detailedQuizResult.questions.map((question, index) => {
-                      const studentAnswerIndex = detailedQuizResult.studentAnswers[index];
-                      // Correggiamo il controllo del tipo per evitare confronti tra number e boolean
-                      const isCorrect = typeof studentAnswerIndex === 'number' && studentAnswerIndex !== -1 
-                        ? studentAnswerIndex === question.correct_answer 
-                        : Array.isArray(detailedQuizResult.studentAnswers) && 
-                          typeof detailedQuizResult.studentAnswers[index] === 'boolean' &&
-                          detailedQuizResult.studentAnswers[index] === true;
-                      
-                      return (
-                        <div 
-                          key={index} 
-                          className={`p-4 rounded-lg border ${
-                            isCorrect 
-                              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
-                              : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                          }`}
-                        >
-                          <div className="flex items-start">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center mr-3 mt-0.5 ${
-                              isCorrect 
-                                ? 'bg-green-100 dark:bg-green-800' 
-                                : 'bg-red-100 dark:bg-red-800'
-                            }`}>
-                              {isCorrect ? (
-                                <Check className="w-3 h-3 text-white" />
-                              ) : (
-                                <X className="w-3 h-3 text-white" />
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <h4 className="font-medium text-slate-900 dark:text-white mb-2">
-                                {index + 1}. {question.question_text}
-                              </h4>
-                              
-                              {question.image_url && (
-                                <img 
-                                  src={question.image_url} 
-                                  alt={`Immagine per la domanda ${index + 1}`}
-                                  className="mb-3 rounded-md max-h-48 object-contain"
-                                />
-                              )}
-                              
-                              <div className="space-y-2 mt-3">
-                                {question.options.map((option, optionIndex) => {
-                                  const isSelected = typeof studentAnswerIndex === 'number' && studentAnswerIndex !== -1 
-                                    ? studentAnswerIndex === optionIndex 
-                                    : false;
-                                  const isCorrectOption = optionIndex === question.correct_answer;
-                                  
-                                  return (
-                                    <div 
-                                      key={optionIndex}
-                                      className={`p-2 rounded ${
-                                        isSelected && isCorrectOption
-                                          ? 'bg-green-100 dark:bg-green-800/40 border border-green-200 dark:border-green-700'
-                                          : isSelected && !isCorrectOption
-                                            ? 'bg-red-100 dark:bg-red-800/40 border border-red-200 dark:border-red-700'
-                                            : !isSelected && isCorrectOption
-                                              ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
-                                              : 'bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700'
-                                      }`}
-                                    >
-                                      <div className="flex items-center">
-                                        <div className={`w-5 h-5 rounded-full flex items-center justify-center mr-2 ${
-                                          isSelected
-                                            ? isCorrectOption
-                                              ? 'bg-green-500 dark:bg-green-600'
-                                              : 'bg-red-500 dark:bg-red-600'
-                                            : isCorrectOption
-                                              ? 'bg-blue-500 dark:bg-blue-600'
-                                              : 'bg-gray-300 dark:bg-gray-600'
-                                        }`}>
-                                          {isSelected ? (
-                                            isCorrectOption ? (
-                                              <Check className="w-3 h-3 text-white" />
-                                            ) : (
-                                              <X className="w-3 h-3 text-white" />
-                                            )
-                                          ) : (
-                                            isCorrectOption ? (
-                                              <Check className="w-3 h-3 text-white" />
-                                            ) : (
-                                              <span className="text-xs text-white font-medium">{String.fromCharCode(65 + optionIndex)}</span>
-                                            )
-                                          )}
-                                        </div>
-                                        <span className={`text-sm ${
-                                          isSelected || isCorrectOption
-                                            ? 'font-medium'
-                                            : ''
-                                        }`}>
-                                          {option}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                                
-                                {studentAnswerIndex === -1 && (
-                                  <div className="p-2 rounded bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700">
-                                    <div className="flex items-center">
-                                      <Info className="w-5 h-5 text-gray-500 dark:text-gray-400 mr-2" />
-                                      <span className="text-sm text-gray-600 dark:text-gray-300">
-                                        Risposta non disponibile
-                                      </span>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                              
-                              {question.explanation && (
-                                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-100 dark:border-blue-800">
-                                  <div className="flex">
-                                    <HelpCircle className="w-5 h-5 text-blue-500 mr-2 mt-0.5" />
-                                    <div>
-                                      <h5 className="text-sm font-medium text-blue-700 dark:text-blue-400 mb-1">Spiegazione</h5>
-                                      <p className="text-sm text-blue-600 dark:text-blue-300">{question.explanation}</p>
-                                    </div>
-                                  </div>
+                      <div className="space-y-2 mb-4">
+                        {question.options.map((option, optionIndex) => {
+                          // Determina lo stato di questa opzione
+                          let isSelectedByStudent = false;
+                          let isCorrectOption = optionIndex === question.correct_answer;
+                          
+                          if (studentAnswerIndex !== -1) {
+                            // Se abbiamo l'indice della risposta scelta dallo studente
+                            isSelectedByStudent = optionIndex === studentAnswerIndex;
+                          } else if (Array.isArray(detailedQuizResult.studentAnswers)) {
+                            // Se abbiamo solo un array di booleani per risposte corrette/errate
+                            // Non possiamo sapere quale opzione ha selezionato lo studente,
+                            // ma possiamo evidenziare comunque la risposta corretta
+                            isSelectedByStudent = false;
+                          }
+                          
+                          return (
+                            <div 
+                              key={optionIndex}
+                              className={`p-3 rounded-lg border ${
+                                isCorrectOption
+                                  ? 'bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-900/40 text-green-800 dark:text-green-300'
+                                  : isSelectedByStudent
+                                    ? 'bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-900/40 text-red-800 dark:text-red-300'
+                                    : 'bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                              }`}
+                            >
+                              <div className="flex gap-2 items-start">
+                                <div className="mt-0.5">
+                                  {isCorrectOption ? (
+                                    <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                                  ) : isSelectedByStudent ? (
+                                    <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                                  ) : (
+                                    <div className="w-5 h-5 border-2 border-gray-300 dark:border-slate-600 rounded-full" />
+                                  )}
                                 </div>
-                              )}
+                                <div>{option}</div>
+                              </div>
                             </div>
+                          );
+                        })}
+                      </div>
+                      
+                      {question.explanation && (
+                        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 text-blue-800 dark:text-blue-300 rounded-lg">
+                          <div className="font-medium mb-1">Spiegazione:</div>
+                          <div>{question.explanation}</div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </ScrollArea>
+            </div>
+          ) : isLoadingQuizDetails ? (
+            <div className="p-6 flex flex-col items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+              <p className="text-slate-600 dark:text-slate-400">Caricamento dettagli del quiz...</p>
+            </div>
+          ) : quizDetailsError ? (
+            <div className="p-6">
+              <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg mb-6">
+                <div className="flex items-center">
+                  <AlertCircle className="w-5 h-5 mr-2" />
+                  <span>{quizDetailsError}</span>
+                </div>
+                <div className="mt-4 flex space-x-2">
+                  <button 
+                    onClick={() => {
+                      setQuizDetailsError(null);
+                      handleViewQuizDetails(quizResults[0].quiz_id, quizResults[0].id);
+                    }}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    Riprova
+                  </button>
+                  {rawResultData && (
+                    <button 
+                      onClick={() => setIsLoadingQuizDetails(!isLoadingQuizDetails)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      {isLoadingQuizDetails ? 'Nascondi dati grezzi' : 'Mostra dati grezzi'}
+                    </button>
+                  )}
+                  <button 
+                    onClick={closeQuizDetails}
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                  >
+                    Chiudi
+                  </button>
+                </div>
+                
+                {isLoadingQuizDetails && rawResultData && (
+                  <div className="mt-4 p-4 bg-gray-100 dark:bg-slate-800 rounded-lg overflow-auto max-h-96">
+                    <h4 className="font-bold mb-2">Dati grezzi del risultato:</h4>
+                    <pre className="text-xs whitespace-pre-wrap">
+                      {JSON.stringify(rawResultData, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="p-6 border-b border-gray-200 dark:border-slate-800">
+              <h3 className="text-xl font-bold text-slate-950 dark:text-white mb-4">Cronologia Quiz</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800/30">
+                <div className="flex items-center gap-2 mb-1">
+                    <Target className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <h4 className="font-medium text-slate-900 dark:text-white">Media Punteggi</h4>
+                </div>
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {(averageScore * 100).toFixed(1)}%
+                </p>
+              </div>
+
+                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-100 dark:border-green-800/30">
+                <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    <h4 className="font-medium text-slate-900 dark:text-white">Tasso di Successo</h4>
+                </div>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {totalQuizzes > 0 ? ((passedQuizzes / totalQuizzes) * 100).toFixed(1) : 0}%
+                </p>
+              </div>
+
+                <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg border border-purple-100 dark:border-purple-800/30">
+                <div className="flex items-center gap-2 mb-1">
+                    <Clock className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    <h4 className="font-medium text-slate-900 dark:text-white">Tempo Medio</h4>
+                </div>
+                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                  {formatTime(Math.round(averageTime))}
+                </p>
+              </div>
+            </div>
+
+              <div className="h-64 mb-6">
+                <Line
+                  data={chartData}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: value => `${value}%`,
+                            color: document.documentElement.classList.contains('dark') ? '#94a3b8' : '#64748b'
+                          },
+                          grid: {
+                            color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                          }
+                        },
+                        x: {
+                          ticks: {
+                            color: document.documentElement.classList.contains('dark') ? '#94a3b8' : '#64748b'
+                          },
+                          grid: {
+                            color: document.documentElement.classList.contains('dark') ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'
+                          }
+                        }
+                      },
+                      plugins: {
+                        tooltip: {
+                          callbacks: {
+                            label: function(context) {
+                              return `${context.dataset.label}: ${context.parsed.y.toFixed(1)}%`;
+                            }
+                          }
+                        },
+                        legend: {
+                          position: 'top',
+                          labels: {
+                            color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#334155'
+                        }
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          </div>
+
+        {/* Note dell'istruttore */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden">
+          <div className="p-6">
+            <h3 className="text-xl font-bold text-slate-950 dark:text-white mb-4">Note dell'Istruttore</h3>
+            
+            <div className="mb-4">
+              <textarea
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                placeholder="Aggiungi una nota su questo studente..."
+                className="w-full p-3 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                rows={3}
+              />
+              <button
+                onClick={handleAddNote}
+                className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Aggiungi Nota
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Log per debug */}
+              {notes.length === 0 ? (
+                <p className="text-gray-500 dark:text-slate-400 italic">Nessuna nota presente per questo studente</p>
+              ) : (
+                notes.map((note) => {
+                  console.log('Rendering note:', note);
+                  return (
+                    <div key={note.id} className="bg-gray-50 dark:bg-slate-800 p-4 rounded-lg border border-gray-200 dark:border-slate-700">
+                      {editingNoteId === note.id ? (
+                        <div>
+                          <textarea
+                            value={editNoteContent}
+                            onChange={(e) => setEditNoteContent(e.target.value)}
+                            className="w-full p-3 border border-gray-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                            rows={3}
+                          />
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={handleSaveEditedNote}
+                              className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
+                            >
+                              <Save className="w-4 h-4" />
+                              Salva
+                            </button>
+                            <button
+                              onClick={handleCancelEdit}
+                              className="px-3 py-1 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                            >
+                              Annulla
+                            </button>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-64">
-                  <FileQuestion className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
-                  <p className="text-gray-500 dark:text-gray-400">Nessun dettaglio disponibile</p>
-                </div>
-              )}
-              
-              {/* Visualizzazione dati grezzi per debug */}
-              {rawResultData && !error && (
-                <div className="mt-8 border-t border-gray-200 dark:border-slate-700 pt-4">
-                  <button
-                    onClick={() => setShowRawData(!showRawData)}
-                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center"
-                  >
-                    {showRawData ? (
-                      <>
-                        <EyeOff className="w-4 h-4 mr-1" />
-                        Nascondi dati grezzi
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="w-4 h-4 mr-1" />
-                        Mostra dati grezzi per debug
-                      </>
-                    )}
-                  </button>
-                  
-                  {showRawData && (
-                    <div className="mt-3 bg-gray-100 dark:bg-slate-800 rounded-md p-3 overflow-x-auto">
-                      <pre className="text-xs text-gray-800 dark:text-gray-300 whitespace-pre-wrap">
-                        {JSON.stringify(rawResultData, null, 2)}
-                      </pre>
+                      ) : (
+                        <div>
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="text-sm text-gray-500 dark:text-slate-400">{formatDate(note.created_at)}</span>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEditNote(note)}
+                                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                                aria-label="Modifica nota"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setShowDeleteNoteModal({ id: note.id, comment: note.comment })}
+                                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
+                                aria-label="Elimina nota"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                          {note.comment ? (
+                            <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{note.comment}</p>
+                          ) : (
+                            <p className="text-gray-500 dark:text-slate-400 italic">Nessun contenuto</p>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  );
+                })
               )}
             </div>
           </div>
         </div>
-      )}
+
+        {/* Modale di conferma eliminazione nota */}
+        {showDeleteNoteModal && (
+          <ConfirmModal
+            type="delete"
+            title="Elimina nota"
+            message="Sei sicuro di voler eliminare questa nota? Questa azione non può essere annullata."
+            details={showDeleteNoteModal.comment}
+            onConfirm={() => {
+              handleDeleteNote(showDeleteNoteModal.id);
+              setShowDeleteNoteModal(null);
+            }}
+            onCancel={() => setShowDeleteNoteModal(null)}
+          />
+        )}
+
+      </div>
     </div>
   );
 }

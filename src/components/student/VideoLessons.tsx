@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Video, Calendar, Search, ArrowLeft } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 import { COLORS } from '../instructor/QuizCreator';
+import { convertYouTubeUrl } from '../../utils/videoUtils';
 
 interface VideoCategory {
   id: string;
@@ -331,10 +332,11 @@ export function VideoLessons() {
 
           <div className="aspect-video">
             <iframe
-              src={selectedVideo.embed_url}
+              src={convertYouTubeUrl(selectedVideo.embed_url)}
               className="w-full h-full"
               frameBorder="0"
               allowFullScreen
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             />
           </div>
         </div>

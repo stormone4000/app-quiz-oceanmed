@@ -6,6 +6,13 @@ import { motion } from 'framer-motion';
 import { QuizDetailReport } from './QuizDetailReport';
 import { v4 as uuidv4 } from 'uuid';
 
+// Funzione per verificare se un valore è un UUID v4 valido
+function isValidUUID(id: string): boolean {
+  if (!id) return false;
+  const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidV4Regex.test(id);
+}
+
 interface QuizProps {
   quizId: string;
   onBack: () => void;
@@ -90,8 +97,16 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
   const loadQuiz = async () => {
     try {
       setError(null);
-      console.log("Caricamento quiz con ID:", quizId);
+      console.log("[DEBUG] Inizio caricamento quiz con ID:", quizId);
       
+      // Verifica che l'ID sia un UUID valido
+      if (!isValidUUID(quizId)) {
+        console.error("[DEBUG] ID quiz non valido, non è un UUID:", quizId);
+        setError('ID quiz non valido. Si prega di utilizzare un quiz con un ID valido.');
+        return;
+      }
+      
+      console.log("[DEBUG] Verifico esistenza del quiz template");
       // Prima verifichiamo se il quiz esiste
       const { data: quizTemplate, error: templateError } = await supabase
         .from('quiz_templates')
@@ -100,47 +115,63 @@ export function Quiz({ quizId, onBack, studentEmail, isTestMode = false }: QuizP
         .single();
         
       if (templateError) {
-        console.error("Errore nel caricamento del template del quiz:", templateError);
+        console.error("[DEBUG] Errore nel caricamento del template del quiz:", templateError);
         throw templateError;
       }
       
       if (!quizTemplate) {
-        console.error("Quiz non trovato con ID:", quizId);
+        console.error("[DEBUG] Quiz non trovato con ID:", quizId);
         throw new Error('Quiz non trovato');
       }
       
-      console.log("Template del quiz trovato:", quizTemplate.title);
+      console.log("[DEBUG] Template del quiz trovato:", quizTemplate.title, "Tipo:", quizTemplate.quiz_type);
+      
+      // Determina la tabella corretta per le domande in base al tipo di quiz
+      const questionsTable = quizTemplate.quiz_type === 'interactive' ? 'interactive_quiz_questions' : 'quiz_questions';
+      console.log("[DEBUG] Utilizzo tabella domande:", questionsTable);
       
       // Ora carichiamo le domande associate
+      console.log("[DEBUG] Caricamento domande da", questionsTable, "per quiz_id:", quizId);
       const { data: questions, error: questionsError } = await supabase
-        .from('quiz_questions')
+        .from(questionsTable)
         .select('*')
         .eq('quiz_id', quizId);
         
       if (questionsError) {
-        console.error("Errore nel caricamento delle domande:", questionsError);
+        console.error("[DEBUG] Errore nel caricamento delle domande:", questionsError);
         throw questionsError;
       }
       
-      console.log("Numero di domande trovate:", questions?.length || 0);
+      console.log("[DEBUG] Numero di domande trovate:", questions?.length || 0);
       
       if (!questions?.length) {
-        console.error("Nessuna domanda trovata per il quiz:", quizId);
+        console.error("[DEBUG] Nessuna domanda trovata per il quiz:", quizId);
         throw new Error('Nessuna domanda disponibile per questo quiz');
       }
       
+      // Log dettagliato delle domande trovate
+      console.log("[DEBUG] Prime 2 domande (esempio):", questions.slice(0, 2).map(q => ({
+        id: q.id,
+        question_text: q.question_text,
+        options_type: typeof q.options,
+        options_length: Array.isArray(q.options) ? q.options.length : 'non è un array'
+      })));
+      
       // Combiniamo i dati
+      console.log("[DEBUG] Combinazione dati quiz e domande");
       const quizData = {
         ...quizTemplate,
         questions: questions
       };
       
+      console.log("[DEBUG] Quiz caricato con successo, impostazione stati");
       setQuiz(quizData);
       setStartTime(new Date());
       setRemainingTime(quizData.duration_minutes * 60);
+      console.log("[DEBUG] Disattivazione stato di inizializzazione");
       setIsInitializing(false);
     } catch (error) {
-      console.error('Error loading quiz:', error);
+      console.error('[DEBUG] Errore durante il caricamento del quiz:', error);
       setError('Errore durante il caricamento del quiz');
     }
   };

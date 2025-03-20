@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Trophy, TrendingUp, TrendingDown, Minus, Star, Award, Target, Clock, ArrowRight } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 import confetti from 'canvas-confetti';
+import { DashboardLayout } from '../layout/DashboardLayout';
+import { useNavigate } from 'react-router-dom';
+import { useAppSelector, useAppDispatch } from '../../redux/hooks';
+import { selectAuth, logout } from '../../redux/slices/authSlice';
+import { DashboardTab } from '../../types-dashboard';
+import { useNavigation } from '../../hooks/useNavigation';
 
 interface LeaderboardEntry {
   id: string;
@@ -14,12 +20,31 @@ interface LeaderboardEntry {
   level: number;
 }
 
-interface StudentProfileProps {
-  studentEmail: string;
+interface StudentDashboardProfileProps {
+  studentEmail?: string;
+  userEmail: string;
+  needsSubscription?: boolean;
 }
 
-export function StudentProfile({ studentEmail }: StudentProfileProps) {
+export function StudentDashboardProfile({ userEmail, needsSubscription }: StudentDashboardProfileProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [activeTab, setActiveTab] = useState<DashboardTab>('profile');
+  const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+  const auth = useAppSelector(selectAuth);
+  const { navigateToTab } = useNavigation();
+  
+  // Assicuriamoci che l'email dell'utente sia disponibile
+  const effectiveUserEmail = userEmail || auth.userEmail || localStorage.getItem('userEmail') || '';
+  
+  // Se abbiamo l'email dell'utente, salviamola nel localStorage per sicurezza
+  useEffect(() => {
+    if (effectiveUserEmail) {
+      localStorage.setItem('userEmail', effectiveUserEmail);
+      console.log("Email utente salvata in localStorage:", effectiveUserEmail);
+    }
+  }, [effectiveUserEmail]);
+  
   const [userStats, setUserStats] = useState<{
     rank: number;
     totalParticipants: number;
@@ -38,13 +63,15 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
     previousRank: 0
   });
 
+  // Aggiorniamo il trigger dell'useEffect per usare effectiveUserEmail
   useEffect(() => {
+    console.log("Avvio loadLeaderboardData con email:", effectiveUserEmail);
     loadLeaderboardData();
-  }, [studentEmail]);
+  }, [effectiveUserEmail]);
 
   const loadLeaderboardData = async () => {
     try {
-      console.log("Caricamento dati leaderboard per email:", studentEmail);
+      console.log("Caricamento dati leaderboard per email:", effectiveUserEmail);
       
       // Otteniamo i dati dell'utente dal localStorage
       const firstName = localStorage.getItem('firstName') || '';
@@ -58,14 +85,14 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
         const { data: dbUserData, error: userError } = await supabase
           .from('auth_users')
           .select('first_name, last_name')
-          .eq('email', studentEmail)
+          .eq('email', effectiveUserEmail)
           .maybeSingle();
 
         if (userError) {
           console.warn('Errore nel recupero dei dettagli utente:', userError);
           // Continuiamo senza dettagli utente
         } else if (!dbUserData) {
-          console.log('Nessun dettaglio utente trovato per email:', studentEmail);
+          console.log('Nessun dettaglio utente trovato per email:', effectiveUserEmail);
           // Continuiamo senza dettagli utente
         } else {
           console.log('Dettagli utente trovati:', dbUserData);
@@ -79,7 +106,7 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
         console.log('Dettagli utente trovati nel localStorage:', { firstName, lastName });
       }
 
-      // Get total XP for each student
+      // Get total XP for each student - Non filtriamo per l'email dell'utente per avere tutti i risultati
       const { data: xpData, error: xpError } = await supabase
         .from('results')
         .select(`
@@ -178,8 +205,11 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
         entry.previousRank = entry.rank;
       });
 
-      // Get user's stats
-      const userRanking = rankings.find(r => r.id === studentEmail);
+      // Get user's stats - Qui sta il problema principale: cerchiamo l'utente attuale nella lista
+      console.log('Cerco profilo utente con email:', effectiveUserEmail);
+      console.log('Ranking completo:', rankings);
+      
+      const userRanking = rankings.find(r => r.id === effectiveUserEmail);
       if (userRanking) {
         const newRank = userRanking.rank;
         const oldRank = userStats.rank;
@@ -207,7 +237,7 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
         });
       } else {
         // L'utente non ha ancora risultati
-        console.log('Utente non trovato nella leaderboard:', studentEmail);
+        console.log('Utente non trovato nella leaderboard:', effectiveUserEmail);
         setUserStats({
           rank: 0,
           totalParticipants: rankings.length,
@@ -220,7 +250,7 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
         });
       }
 
-      // Anche se l'utente non ha risultati, mostriamo comunque la leaderboard
+      // Anche se l'utente non ha risultati, mostriamo comunque la leaderboard completa
       setLeaderboard(rankings.slice(0, 10));
     } catch (error) {
       console.error('Error loading leaderboard:', error);
@@ -257,8 +287,39 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
     return `${n}°`;
   };
 
-  return (
-    <div className="max-w-4xl mx-auto p-6">
+  const handleTabChange = (tab: DashboardTab) => {
+    // Utilizza il nuovo hook per la navigazione
+    navigateToTab(tab);
+  };
+
+  const handleLogout = () => {
+    // Prima di fare il dispatch dell'azione di logout, assicuriamoci che tutti i dati
+    // nel localStorage relativi all'autenticazione siano rimossi
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('isProfessor');
+    localStorage.removeItem('isStudent');
+    localStorage.removeItem('isMasterAdmin');
+    localStorage.removeItem('hasActiveAccess');
+    localStorage.removeItem('hasInstructorAccess');
+    localStorage.removeItem('firstName');
+    localStorage.removeItem('lastName');
+    localStorage.removeItem('needsSubscription');
+    localStorage.removeItem('masterCode');
+    localStorage.removeItem('email');
+    
+    // Notifichiamo altri componenti
+    window.dispatchEvent(new Event('localStorageUpdated'));
+    
+    // Fare il dispatch dell'azione di logout che pulirà anche lo stato di Redux
+    dispatch(logout());
+    
+    // Navighiamo alla pagina di login
+    navigate('/login');
+  };
+
+  const profileContent = (
+    <div className="max-w-4xl mx-auto">
       {/* User Stats Card */}
       <div className="bg-blue-100 dark:bg-violet-800/20 backdrop-blur-lg border border-blue-200 dark:border-violet-100/30 rounded-xl p-6 mb-8 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -335,7 +396,7 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
             <div
               key={entry.id}
               className={`flex items-center justify-between p-4 rounded-lg transition-colors border ${
-                entry.id === studentEmail
+                entry.id === effectiveUserEmail
                   ? 'bg-blue-200/50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700'
                   : 'hover:bg-blue-50 dark:hover:bg-slate-700/30 border-blue-100 dark:border-transparent'
               }`}
@@ -346,7 +407,7 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
                 </span>
                 <div>
                   <p className="font-medium text-slate-800 dark:text-slate-100">
-                    {entry.id === studentEmail 
+                    {entry.id === effectiveUserEmail 
                       ? `${userStats.firstName} ${userStats.lastName}`
                       : entry.pseudonym}
                   </p>
@@ -410,5 +471,15 @@ export function StudentProfile({ studentEmail }: StudentProfileProps) {
         )}
       </div>
     </div>
+  );
+
+  return (
+    <DashboardLayout 
+      onLogout={handleLogout}
+      studentEmail={effectiveUserEmail}
+      supabaseStatus="connected"
+    >
+      {profileContent}
+    </DashboardLayout>
   );
 }

@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Usa le variabili d'ambiente per la configurazione
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://uqutbomzymeklyowfewp.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxdXRib216eW1la2x5b3dmZXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzkyODQ2NTksImV4cCI6MjA1NDg2MDY1OX0.Wy-_3xBqJPPm87LMsMNJ_tQj_r3aLaXdQm_LN-dGYPM';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxdXRib216eW1la2x5b3dmZXdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzkyODQ2NTksImV4cCI6MjA1NDg2MDY1OX0.HtnIuP5YJRkzfHuHYqYyKbyIFoSHW67m2wqdVxdL8Wc';
 const supabaseServiceRole = import.meta.env.VITE_SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxdXRib216eW1la2x5b3dmZXdwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczOTI4NDY1OSwiZXhwIjoyMDU0ODYwNjU5fQ.ReeAgOge64_oVk3PxqdxV5OaWRa4q4QTLwQ2bYh2ZIc';
 
 // Verifica che le variabili d'ambiente siano configurate correttamente
@@ -45,21 +45,27 @@ const supabaseOptions = {
   }
 };
 
-// Client per operazioni pubbliche
+// Client per operazioni pubbliche (attenzione: non utilizzare nelle query come count(*))
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, supabaseOptions);
 
 // Client con service role per operazioni amministrative
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRole, supabaseOptions);
 
-// Funzione per testare la connessione
+// Funzione per testare la connessione (NON usare count(*) direttamente nella query)
 export const testConnection = async () => {
   try {
-    const { data, error } = await supabase.from('quiz_templates').select('*', { count: 'exact', head: true });
+    // Usiamo una query più semplice che sappiamo funziona
+    const { data, error } = await supabaseAdmin
+      .from('quiz_templates')
+      .select('id')
+      .limit(1);
+      
     if (error) {
       console.error('Errore nella connessione a Supabase:', error);
       return { success: false, error };
     }
-    console.log('Connessione a Supabase riuscita, conteggio quiz:', data);
+    
+    console.log('Connessione a Supabase riuscita');
     return { success: true, data };
   } catch (err) {
     console.error('Eccezione nella connessione a Supabase:', err);

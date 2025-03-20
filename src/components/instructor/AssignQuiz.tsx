@@ -211,12 +211,12 @@ export function AssignQuiz({ quiz, onClose, onAssignSuccess }: AssignQuizProps) 
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full h-[80vh] flex flex-col">
-        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-xl font-bold">Assegna Quiz</h2>
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl max-w-4xl w-full h-[80vh] flex flex-col">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Assegna Quiz</h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
           >
             <X className="w-6 h-6" />
           </button>
@@ -224,19 +224,19 @@ export function AssignQuiz({ quiz, onClose, onAssignSuccess }: AssignQuizProps) 
 
         <div className="p-6 flex-grow overflow-auto">
           <div className="mb-6">
-            <h3 className="font-medium mb-2">{quiz.title}</h3>
-            <p className="text-sm text-gray-600">{quiz.description}</p>
+            <h3 className="font-medium mb-2 text-slate-900 dark:text-white">{quiz.title}</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">{quiz.description}</p>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg flex items-center gap-2">
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg flex items-center gap-2">
               <AlertCircle className="w-5 h-5 flex-shrink-0" />
               <span>{error}</span>
             </div>
           )}
           
           {success && (
-            <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-lg flex items-center gap-2">
+            <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg flex items-center gap-2">
               <CheckCircle className="w-5 h-5 flex-shrink-0" />
               <span>Quiz assegnato con successo!</span>
             </div>
@@ -244,7 +244,7 @@ export function AssignQuiz({ quiz, onClose, onAssignSuccess }: AssignQuizProps) 
 
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-medium mb-2">Seleziona Studenti</h3>
+              <h3 className="text-lg font-medium mb-2 text-slate-900 dark:text-white">Seleziona Studenti</h3>
               <div className="flex items-center gap-2 mb-4">
                 <div className="relative flex-grow">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -252,92 +252,80 @@ export function AssignQuiz({ quiz, onClose, onAssignSuccess }: AssignQuizProps) 
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Cerca studenti per nome o email"
+                    placeholder="Cerca per nome o email"
+                    className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
                   />
                 </div>
                 <button
                   onClick={selectAll}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                  className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
                 >
-                  {selectedStudents.length === filteredStudents.length && filteredStudents.length > 0 
-                    ? 'Deseleziona Tutti' 
-                    : 'Seleziona Tutti'}
+                  {selectedStudents.length === filteredStudents.length ? 'Deseleziona tutti' : 'Seleziona tutti'}
                 </button>
               </div>
               
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden max-h-[300px] overflow-y-auto">
                 {loadingStudents ? (
-                  <div className="text-center py-8">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-600" />
-                    <p className="text-gray-500">Caricamento studenti...</p>
+                  <div className="flex items-center justify-center p-4">
+                    <RefreshCw className="w-5 h-5 animate-spin text-blue-500 mr-2" />
+                    <span className="text-gray-600 dark:text-gray-400">Caricamento studenti...</span>
                   </div>
                 ) : filteredStudents.length === 0 ? (
-                  <div className="text-center py-8">
-                    <UserPlus className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                    <p className="text-gray-500 mb-2">Nessuno studente trovato</p>
-                    <p className="text-sm text-gray-500">
-                      Gli studenti verranno associati al tuo account quando utilizzeranno 
-                      un codice di accesso da te creato.
-                    </p>
+                  <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+                    {students.length === 0 ? 'Nessuno studente trovato' : 'Nessun risultato per la ricerca'}
                   </div>
                 ) : (
-                  <div className="max-h-[300px] overflow-y-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50 sticky top-0">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Seleziona
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Nome
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Email
-                          </th>
+                  <table className="w-full">
+                    <thead className="bg-gray-50 dark:bg-slate-800">
+                      <tr>
+                        <th className="px-4 py-2"></th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Nome</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Email</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ultimo accesso</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {filteredStudents.map((student) => (
+                        <tr 
+                          key={student.email}
+                          onClick={() => toggleStudent(student.email)}
+                          className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 ${
+                            selectedStudents.includes(student.email) ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                          }`}
+                        >
+                          <td className="px-4 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedStudents.includes(student.email)}
+                              onChange={() => toggleStudent(student.email)}
+                              className="h-4 w-4 text-blue-600 rounded border-gray-300 dark:border-gray-700 focus:ring-blue-500"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                            {student.first_name && student.last_name 
+                              ? `${student.first_name} ${student.last_name}`
+                              : 'Nome non disponibile'}
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {student.email}
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {student.last_access 
+                              ? new Date(student.last_access).toLocaleDateString('it-IT')
+                              : 'Mai'}
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredStudents.map((student) => (
-                          <tr 
-                            key={student.email}
-                            className="hover:bg-gray-50 cursor-pointer"
-                            onClick={() => toggleStudent(student.email)}
-                          >
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <input
-                                type="checkbox"
-                                checked={selectedStudents.includes(student.email)}
-                                onChange={() => {}}
-                                className="h-5 w-5 text-blue-600 rounded"
-                              />
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {student.first_name || student.last_name 
-                                ? `${student.first_name || ''} ${student.last_name || ''}`
-                                : '-'}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                              {student.email}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
-              </div>
-              
-              <div className="mt-2 text-sm text-gray-500">
-                {selectedStudents.length > 0 
-                  ? `${selectedStudents.length} studenti selezionati` 
-                  : 'Nessuno studente selezionato'}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Data Inizio *
                 </label>
                 <div className="relative">
@@ -346,12 +334,14 @@ export function AssignQuiz({ quiz, onClose, onAssignSuccess }: AssignQuizProps) 
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                    required
                   />
                 </div>
               </div>
+              
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Scadenza *
                 </label>
                 <div className="relative">
@@ -360,7 +350,8 @@ export function AssignQuiz({ quiz, onClose, onAssignSuccess }: AssignQuizProps) 
                     type="date"
                     value={deadline}
                     onChange={(e) => setDeadline(e.target.value)}
-                    className="w-full pl-12 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                    required
                   />
                 </div>
               </div>
@@ -368,18 +359,33 @@ export function AssignQuiz({ quiz, onClose, onAssignSuccess }: AssignQuizProps) 
           </div>
         </div>
 
-        <div className="p-6 border-t border-gray-200 flex justify-end">
+        <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800"
+          >
+            Annulla
+          </button>
           <button
             onClick={handleAssign}
             disabled={loading || selectedStudents.length === 0}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center gap-2 ${
+              loading || selectedStudents.length === 0 
+                ? 'opacity-50 cursor-not-allowed' 
+                : 'hover:bg-blue-700'
+            }`}
           >
             {loading ? (
-              <RefreshCw className="w-5 h-5 animate-spin" />
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Assegnazione...
+              </>
             ) : (
-              <Send className="w-5 h-5" />
+              <>
+                <Send className="w-4 h-4" />
+                Assegna Quiz
+              </>
             )}
-            Assegna Quiz
           </button>
         </div>
       </div>

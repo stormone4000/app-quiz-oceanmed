@@ -18,7 +18,7 @@ import { QuizLiveMain } from './interactive/QuizLiveMain';
 import type { QuizResult } from '../types';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
-import { Users, Target, CheckCircle2, Trophy, Star, Book, ArrowRight, Key } from 'lucide-react';
+import { Users, Target, CheckCircle2, Trophy, Star, Book, ArrowRight, Key, Plus } from 'lucide-react';
 import type { QuizType } from '../types';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
@@ -31,6 +31,9 @@ import {
 } from '../redux/slices/authSlice';
 import { supabase } from '../services/supabase';
 import { DashboardTab } from '../types-dashboard';
+import { InstructorProfile } from './profile/InstructorProfile';
+import { useLocation } from 'react-router-dom';
+import { setActiveTab as setReduxActiveTab } from '../redux/slices/uiSlice';
 
 // Importiamo il tipo DashboardTab dal file DashboardLayout
 
@@ -49,13 +52,15 @@ interface ProfessorDashboardProps {
   onLogout: () => void;
   hostEmail?: string;
   needsSubscription?: boolean;
+  isMaster?: boolean;
 }
 
 const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
   results,
   onLogout,
   hostEmail,
-  needsSubscription: propNeedsSubscription
+  needsSubscription: propNeedsSubscription,
+  isMaster: propIsMaster
 }) => {
   /**
    * Gestione dello stato:
@@ -68,13 +73,15 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
    * - Sincronizziamo hasInstructorAccess con hasActiveAccess tramite Redux quando necessario
    */
   const [activeTab, setActiveTab] = useState<DashboardTab>('dashboard');
-  const [quizType, setQuizType] = useState<QuizType | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [quizType, setQuizType] = useState<'exam' | 'learning' | 'interactive' | null>('exam');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>('');
   const [isCodeDeactivated, setIsCodeDeactivated] = useState(false);
   const [needsSubscription, setNeedsSubscription] = useState(propNeedsSubscription || false);
   const [totalInstructors, setTotalInstructors] = useState(0);
   const [dbTotalStudents, setDbTotalStudents] = useState(0);
   const [dbTotalAttempts, setDbTotalAttempts] = useState(0);
+  const [quizCodeToActivate, setQuizCodeToActivate] = useState('');
+  const [supabaseStatus, setSupabaseStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   
   // Utilizziamo Redux per ottenere lo stato dell'utente
   const isMaster = useSelector(selectIsMasterAdmin);
@@ -84,8 +91,56 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
   const userEmailFromRedux = useSelector(selectUserEmail);
   const dispatch = useDispatch();
   
+  // Utilizziamo la prop isMaster con priorità rispetto a Redux
+  const effectiveIsMaster = propIsMaster !== undefined ? propIsMaster : isMaster;
+
+  console.log("ProfessorDashboard - propIsMaster:", propIsMaster, "isMaster (Redux):", isMaster, "effectiveIsMaster:", effectiveIsMaster);
+  
   // Stato locale per userEmail, con priorità al prop hostEmail
   const [userEmail, setUserEmail] = useState(hostEmail || userEmailFromRedux || '');
+  
+  // Otteniamo la posizione corrente dall'URL
+  const location = useLocation();
+  
+  // Effetto per sincronizzare il tab attivo con l'URL corrente
+  useEffect(() => {
+    // Mappa dei percorsi URL ai tab del dashboard
+    const pathToTabMap: Record<string, DashboardTab> = {
+      '/dashboard': 'dashboard',
+      '/quizzes': 'quizzes',
+      '/gestione-quiz': 'gestione-quiz',
+      '/gestione-alunni': 'gestione-alunni',
+      '/instructor-access-codes': 'instructor-access-codes',
+      '/videos': 'videos',
+      '/quiz-studenti': 'quiz-studenti',
+      '/quiz-live': 'quiz-live',
+      '/students': 'students',
+      '/subscriptions': 'subscriptions',
+      '/notifications': 'notifications',
+      '/profile/instructor': 'profile'
+    };
+    
+    const path = location.pathname;
+    
+    if (pathToTabMap[path]) {
+      console.log(`[ProfessorDashboard] URL corrente ${path} corrisponde al tab ${pathToTabMap[path]}`);
+      
+      // Aggiorniamo sia lo stato Redux che lo stato locale
+      dispatch(setReduxActiveTab(pathToTabMap[path]));
+      setActiveTab(pathToTabMap[path]);
+      
+      console.log(`[ProfessorDashboard] Tab impostato a ${pathToTabMap[path]} in base all'URL`);
+    } else {
+      console.log(`[ProfessorDashboard] URL ${path} non corrisponde a nessun tab conosciuto`);
+    }
+    
+    // Se abbiamo uno stato nella navigazione, usalo (compatibilità)
+    if (location.state && location.state.activeTab) {
+      console.log(`[ProfessorDashboard] Trovato activeTab=${location.state.activeTab} nello stato location`);
+      dispatch(setReduxActiveTab(location.state.activeTab));
+      setActiveTab(location.state.activeTab);
+    }
+  }, [location.pathname, dispatch]);
   
   useEffect(() => {
     // Sincronizziamo lo stato locale con Redux e props
@@ -162,12 +217,38 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
   }, [hostEmail, propNeedsSubscription, userEmailFromRedux]);
 
   useEffect(() => {
-    if (isMaster && activeTab === 'dashboard') {
-      loadTotalInstructors();
-      loadTotalStudents();
-      loadTotalAttempts();
-    }
-  }, [isMaster, activeTab]);
+    loadTotalInstructors();
+    loadTotalStudents();
+    loadTotalAttempts();
+    
+    // Imposta il tipo di quiz e la categoria di default
+    setQuizType('exam');
+    setSelectedCategory('');
+    
+    // Verifica lo stato della connessione a Supabase
+    const checkSupabaseConnection = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('quiz_templates')
+          .select('id')
+          .limit(1);
+          
+        if (error) {
+          console.error('Errore di connessione a Supabase:', error);
+          setSupabaseStatus('error');
+          return;
+        }
+        
+        console.log('Connessione a Supabase stabilita con successo');
+        setSupabaseStatus('connected');
+      } catch (err) {
+        console.error('Eccezione durante la verifica della connessione a Supabase:', err);
+        setSupabaseStatus('error');
+      }
+    };
+    
+    checkSupabaseConnection();
+  }, []);
 
   const loadTotalInstructors = async () => {
     try {
@@ -235,10 +316,55 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
     }
   };
   
+  // Funzione per attivare un quiz tramite codice
+  const handleActivateQuizCode = async () => {
+    if (!quizCodeToActivate?.trim()) return;
+    
+    try {
+      // Ottieni l'email dell'utente corrente
+      const userEmail = localStorage.getItem('userEmail') || '';
+      
+      // Verifica se il codice esiste
+      const { data: codeExists, error: codeError } = await supabase
+        .from('quiz_templates')
+        .select('id, title')
+        .eq('quiz_code', quizCodeToActivate.trim())
+        .single();
+      
+      if (codeError || !codeExists) {
+        alert('Codice quiz non valido o inesistente');
+        return;
+      }
+      
+      // Chiama la stored procedure per clonare il quiz
+      const { data: quizData, error: cloneError } = await supabase
+        .rpc('clone_quiz_by_code', {
+          p_quiz_code: quizCodeToActivate.trim(),
+          p_user_email: userEmail
+        });
+      
+      if (cloneError) {
+        console.error('Errore durante la duplicazione del quiz:', cloneError);
+        alert('Si è verificato un errore durante la duplicazione del quiz');
+        return;
+      }
+      
+      // Resetta il campo input
+      setQuizCodeToActivate('');
+      
+      // Mostra un messaggio di successo
+      alert(`Il quiz "${codeExists.title}" è stato duplicato con successo nella tua collezione personale.`);
+      
+    } catch (err) {
+      console.error("Errore durante l'attivazione del quiz:", err);
+      alert("Si è verificato un errore durante l'attivazione del quiz");
+    }
+  };
+  
   const renderContent = () => {
     // Se l'utente è un istruttore e non ha accesso attivo, mostriamo solo la tab del profilo
     // Questo controllo è ora allineato con la logica della Sidebar
-    if (isProfessor && !hasActiveAccess && activeTab !== 'profile' && !isMaster) {
+    if (isProfessor && !hasActiveAccess && activeTab !== 'profile' && !effectiveIsMaster) {
       return (
         <div className="flex flex-col items-center justify-center p-8">
           <h2 className="text-2xl font-bold mb-4">Accesso non autorizzato</h2>
@@ -267,7 +393,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
         />;
       case 'pro-codes':
         // Solo gli admin possono accedere a questa tab
-        if (!isMaster) {
+        if (!effectiveIsMaster) {
           return (
             <div className="flex flex-col items-center justify-center p-8">
               <h2 className="text-2xl font-bold mb-4">Accesso non autorizzato</h2>
@@ -282,62 +408,43 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
         return (
           <div className="p-4">
             <div className="mb-6">
-              <h3 className="text-2xl font-bold mb-4 text-slate-900 dark:text-white">Seleziona Quiz</h3>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={() => setQuizType('exam')}
-                  className={`px-5 py-2.5 rounded-lg font-medium transition-colors ${
-                    quizType === 'exam' 
-                      ? 'bg-indigo-600 text-white shadow-md' 
-                      : 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600'
-                  }`}
-                >
-                  Quiz Esame
-                </button>
-                <button
-                  onClick={() => setQuizType('learning')}
-                  className={`px-5 py-2.5 rounded-lg font-medium transition-colors ${
-                    quizType === 'learning' 
-                      ? 'bg-blue-600 text-white shadow-md' 
-                      : 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600'
-                  }`}
-                >
-                  Quiz Apprendimento
-                </button>
-                <button
-                  onClick={() => setQuizType('interactive')}
-                  className={`px-5 py-2.5 rounded-lg font-medium transition-colors ${
-                    quizType === 'interactive' 
-                      ? 'bg-purple-600 text-white shadow-md' 
-                      : 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600'
-                  }`}
-                >
-                  Quiz Interattivo
-                </button>
+              <h3 className="text-2xl font-bold mb-4 text-slate-900 dark:text-white">Quiz Disponibili</h3>
+              
+              {/* Titolo Esplora Quiz */}
+              <div className="mb-4">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Esplora Quiz</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400">Esplora e prova i quiz disponibili</p>
               </div>
             </div>
             
-            {quizType && (
-              <div className="mb-6">
-                <h3 className="text-2xl font-bold mb-4 text-slate-900 dark:text-white">Seleziona Categoria</h3>
+            {/* Selezione categoria */}
+            <div className="mb-6">
+              <h3 className="text-lg font-medium mb-2 text-slate-900 dark:text-white">Seleziona Categoria</h3>
+              
+              {/* Aggiungeremo un'indicazione di caricamento */}
+              <div className="relative">
                 <select
                   value={selectedCategory || ''}
                   onChange={(e) => setSelectedCategory(e.target.value || null)}
-                  className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-30 outline-none"
+                  className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-30 outline-none text-ellipsis"
+                  style={{ textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}
                 >
                   <option value="">Tutte le categorie</option>
-                  <option value="base">Base</option>
-                  <option value="avanzato">Avanzato</option>
-                  <option value="esperto">Esperto</option>
+                  {/* Le categorie verranno caricate dinamicamente dal QuizManager */}
+                  {/* Non abbiamo bisogno di opzioni statiche qui */}
                 </select>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Le categorie vengono caricate in base ai quiz disponibili
+                </p>
               </div>
-            )}
+            </div>
             
-            {quizType && (
-              <QuizManager
-                mode="all"
-              />
-            )}
+            {/* QuizManager con i tab */}
+            <QuizManager
+              mode="all"
+              selectedCategory={selectedCategory}
+              userEmail={userEmail}
+            />
           </div>
         );
       case 'stats':
@@ -346,20 +453,20 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
         return (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-white mb-6">Profilo Utente</h2>
-            <UserProfile 
+            <InstructorProfile 
               userEmail={userEmail}
               needsSubscription={needsSubscription}
             />
           </div>
         );
       case 'videos':
-        return <VideoManager />;
+        return <VideoManager userEmail={userEmail} />;
       case 'subscriptions':
         return <SubscriptionManager />;
       case 'gestione-alunni':
         return <StudentManagement />;
       case 'gestione-quiz':
-        return <QuizManager mode="manage" />;
+        return <QuizManager mode="manage" userEmail={userEmail} />;
       case 'access-codes':
       case 'instructor-access-codes':
         return <AccessCodeManager />;
@@ -403,12 +510,12 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
 
   const renderDashboard = () => {
     // Utilizziamo i dati dal database se siamo admin, altrimenti calcoliamo dai risultati
-    const totalAttempts = isMaster ? dbTotalAttempts : results.length;
+    const totalAttempts = effectiveIsMaster ? dbTotalAttempts : results.length;
     const averageScore = results.length > 0 ? results.reduce((acc, curr) => acc + curr.score, 0) / results.length : 0;
     const passedAttempts = results.filter(r => r.score >= 0.75).length;
     const failedAttempts = results.length - passedAttempts;
     // Utilizziamo i dati dal database se siamo admin, altrimenti calcoliamo dai risultati
-    const totalStudents = isMaster ? dbTotalStudents : new Set(results.map(r => r.email)).size;
+    const totalStudents = effectiveIsMaster ? dbTotalStudents : new Set(results.map(r => r.email)).size;
 
     // Get top 5 students
     const studentScores = results.reduce((acc: { [key: string]: { score: number, attempts: number, name: string } }, curr) => {
@@ -474,11 +581,11 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
     return (
       <div className="space-y-8 px-4 sm:px-6 md:px-8 py-6 max-w-7xl mx-auto">
         <h2 className="text-3xl font-bold text-slate-800 dark:text-white">
-          {isMaster ? 'Dashboard Admin Master' : 'Dashboard Istruttore'}
+          {effectiveIsMaster ? 'Dashboard Admin Master' : 'Dashboard Istruttore'}
         </h2>
 
         {/* Mostra le statistiche aggregate solo per gli admin master */}
-        {isMaster && (
+        {effectiveIsMaster && (
           <DashboardStats />
         )}
 
@@ -493,7 +600,7 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
             <p className="text-3xl font-bold text-slate-800 dark:text-white">{totalStudents}</p>
           </div>
 
-          {isMaster && (
+          {effectiveIsMaster && (
             <div className="group relative rounded-xl bg-gradient-to-br from-white to-slate-100 dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700 p-6 hover:scale-[1.02] transition-all">
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-3 bg-purple-100 dark:bg-purple-900/40 rounded-xl">
@@ -691,11 +798,10 @@ const ProfessorDashboard: React.FC<ProfessorDashboardProps> = ({
 
   return (
     <DashboardLayout
-      activeTab={activeTab}
-      onTabChange={setActiveTab}
       onLogout={onLogout}
       studentEmail={userEmail}
-      isMaster={isMaster}
+      isMaster={effectiveIsMaster}
+      supabaseStatus={supabaseStatus}
     >
       {renderContent()}
     </DashboardLayout>

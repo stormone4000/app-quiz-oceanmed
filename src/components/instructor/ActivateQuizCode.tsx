@@ -3,6 +3,22 @@ import { supabase, supabaseAdmin } from '../../services/supabase';
 import { useModal } from '../../hooks/useModal';
 import { Modal } from '../ui/Modal';
 
+// Funzione per generare un UUID v4
+const generateUUID = () => {
+  // Implementazione più robusta di UUID v4
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
+// Funzione per verificare se una stringa è un UUID v4 valido
+const isValidUUID = (uuid: string): boolean => {
+  const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidV4Regex.test(uuid);
+};
+
 interface ActivateQuizCodeProps {
   onQuizActivated?: () => void;
 }
@@ -107,9 +123,13 @@ const ActivateQuizCode: React.FC<ActivateQuizCodeProps> = ({ onQuizActivated }) 
       
       console.log("Quiz inserito con successo:", insertedQuiz);
       
+      // Determina la tabella corretta per le domande in base al tipo di quiz
+      const questionsTableName = quizData.quiz_type === 'interactive' ? 'interactive_quiz_questions' : 'quiz_questions';
+      console.log(`Utilizzo tabella ${questionsTableName} per le domande del quiz di tipo ${quizData.quiz_type}`);
+      
       // Copia le domande dal quiz originale al nuovo quiz usando supabaseAdmin
       const { data: questions, error: questionsError } = await supabaseAdmin
-        .from('quiz_questions')
+        .from(questionsTableName)
         .select('*')
         .eq('quiz_id', quizData.id);
       
@@ -120,29 +140,110 @@ const ActivateQuizCode: React.FC<ActivateQuizCodeProps> = ({ onQuizActivated }) 
         return;
       }
       
+      console.log(`Trovate ${questions?.length || 0} domande da copiare`);
+      
       if (questions && questions.length > 0) {
         // Crea nuove domande per il nuovo quiz
-        const newQuestions = questions.map(q => ({
-          ...q,
-          id: undefined, // Supabase genererà un nuovo ID
-          quiz_id: insertedQuiz.id
-        }));
+        const newQuestions = questions.map(q => {
+          // Assicuriamoci che le opzioni siano nel formato corretto
+          let options = q.options;
+          if (typeof options === 'string') {
+            try {
+              options = JSON.parse(options);
+              console.log(`Opzioni parsate da stringa JSON per la domanda: ${q.id}`);
+            } catch (e) {
+              console.error(`Errore nel parsing delle opzioni per la domanda ${q.id}:`, e);
+              options = [];
+            }
+          } else if (!Array.isArray(options)) {
+            console.log(`Opzioni non in formato array per la domanda ${q.id}, tipo: ${typeof options}`);
+            // Se options è un oggetto, prova a convertirlo in array
+            if (options && typeof options === 'object') {
+              try {
+                options = Object.values(options);
+                console.log(`Opzioni convertite da oggetto ad array: ${JSON.stringify(options)}`);
+              } catch (e) {
+                console.error(`Errore nella conversione delle opzioni in array:`, e);
+                options = [];
+              }
+            } else {
+              options = [];
+            }
+          }
+          
+          // Assicuriamoci che correct_answer sia un numero
+          let correctAnswer = q.correct_answer;
+          if (typeof correctAnswer === 'string') {
+            correctAnswer = parseInt(correctAnswer, 10);
+            if (isNaN(correctAnswer)) {
+              correctAnswer = 0; // Valore predefinito
+            }
+          }
+          
+          return {
+            ...q,
+            id: generateUUID(), // Generiamo un nuovo UUID
+            quiz_id: insertedQuiz.id,
+            options: Array.isArray(options) ? options : [],
+            correct_answer: correctAnswer
+          };
+        });
         
-        console.log("Tentativo inserimento domande:", newQuestions.length);
+        console.log(`Preparate ${newQuestions.length} domande da inserire`);
+        console.log(`Prima domanda esempio: ${JSON.stringify(newQuestions[0])}`);
         
         // Inserisci le nuove domande una alla volta per evitare problemi di policy
+        let successCount = 0;
+        let errorCount = 0;
+        
         for (const question of newQuestions) {
-          const { error: insertQuestionError } = await supabaseAdmin
-            .from('quiz_questions')
-            .insert([question]);
-            
-          if (insertQuestionError) {
-            console.error('Errore nell\'inserimento domanda:', insertQuestionError);
+          try {
+            const { error: insertQuestionError } = await supabaseAdmin
+              .from(questionsTableName)
+              .insert([question]);
+              
+            if (insertQuestionError) {
+              console.error('Errore nell\'inserimento domanda:', insertQuestionError);
+              errorCount++;
+              
+              // Tentativo alternativo con un approccio diverso
+              try {
+                // Rimuovi l'ID per lasciare che il database lo generi
+                const { id, ...questionWithoutId } = question;
+                const { error: altInsertError } = await supabaseAdmin
+                  .from(questionsTableName)
+                  .insert([{
+                    ...questionWithoutId,
+                    quiz_id: insertedQuiz.id,
+                    // Assicuriamoci che options sia una stringa JSON se non lo è già
+                    options: Array.isArray(questionWithoutId.options) 
+                      ? questionWithoutId.options 
+                      : (typeof questionWithoutId.options === 'string' 
+                          ? JSON.parse(questionWithoutId.options) 
+                          : [])
+                  }]);
+                  
+                if (altInsertError) {
+                  console.error('Anche il tentativo alternativo è fallito:', altInsertError);
+                } else {
+                  console.log('Domanda inserita con metodo alternativo');
+                  successCount++;
+                }
+              } catch (e) {
+                console.error('Errore nel tentativo alternativo:', e);
+              }
+            } else {
+              successCount++;
+            }
+          } catch (e) {
+            console.error('Errore imprevisto nell\'inserimento della domanda:', e);
+            errorCount++;
           }
         }
         
-        // Non c'è bisogno di copiare le risposte poiché non esiste una tabella separata
-        // Le risposte sono probabilmente già incluse nelle domande
+        console.log(`Inserimento domande completato: ${successCount} successi, ${errorCount} errori`);
+      } else {
+        console.log('Nessuna domanda trovata da copiare');
       }
       
       // Resetta l'input e notifica il completamento
@@ -151,10 +252,23 @@ const ActivateQuizCode: React.FC<ActivateQuizCodeProps> = ({ onQuizActivated }) 
         onQuizActivated();
       }
       
+      // Verifica finale che le domande siano state copiate correttamente
+      const { data: verifyQuestions, error: verifyError } = await supabaseAdmin
+        .from(questionsTableName)
+        .select('*')
+        .eq('quiz_id', insertedQuiz.id);
+        
+      const questionsCopied = verifyQuestions?.length || 0;
+      console.log(`Verifica finale: ${questionsCopied} domande copiate su ${questions?.length || 0} originali`);
+      
       // Mostra un messaggio di successo con la modale
       showSuccess(
         'Quiz Duplicato', 
-        `Il quiz "${quizData.title}" è stato duplicato con successo nella tua collezione personale. Ora puoi modificarlo o assegnarlo ai tuoi studenti.`,
+        `Il quiz "${quizData.title}" è stato duplicato con successo nella tua collezione personale con ${questionsCopied} domande. ${
+          questionsCopied === 0 ? 'ATTENZIONE: Nessuna domanda è stata copiata. Dovrai aggiungerle manualmente.' : 
+          questionsCopied < (questions?.length || 0) ? `ATTENZIONE: Solo ${questionsCopied} domande su ${questions?.length} sono state copiate.` : 
+          'Tutte le domande sono state copiate correttamente.'
+        } Ora puoi modificarlo o assegnarlo ai tuoi studenti.`,
         'Fantastico!'
       );
       

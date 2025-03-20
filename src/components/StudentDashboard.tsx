@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { DashboardLayout } from './layout/DashboardLayout';
 import { QuizSelection } from './QuizSelection';
 import { QuizCategories } from './QuizCategories';
@@ -9,13 +9,18 @@ import { AccessCodeHistory } from './student/AccessCodeHistory';
 import { VideoLessons } from './student/VideoLessons';
 import { UserProfile } from './profile/UserProfile';
 import { StudentStats } from './student/StudentStats';
-import { StudentProfile } from './student/StudentProfile';
+import { QuizHistory } from './student/QuizHistory';
+import { StudentDashboardProfile } from './student/StudentProfile';
 import { NotificationList } from './notifications/NotificationList';
 import { StudentSubscription } from './student/StudentSubscription';
 import { QuizLiveMain } from './interactive/QuizLiveMain';
 import { QuizSelector } from './student/QuizSelector';
+import { useAppSelector, useAppDispatch } from '../redux/hooks';
+import { selectUi, setActiveTab } from '../redux/slices/uiSlice';
+import { useNavigation } from '../hooks/useNavigation';
 import type { QuizType, QuizResult } from '../types';
 import type { DashboardTab } from '../types-dashboard';
+import { StudentProfile } from './profile/StudentProfile';
 
 // Definisco il tipo per i tab
 // type DashboardTab = 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live' | 'dashboard' | 'gestione-quiz' | 'gestione-alunni' | 'quiz-history' | 'student-access-codes' | 'instructor-access-codes';
@@ -27,29 +32,84 @@ interface Props {
 }
 
 export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
-  const [activeTab, setActiveTab] = useState<DashboardTab>('stats');
+  const { activeTab } = useAppSelector(selectUi);
+  const dispatch = useAppDispatch();
+  const { navigateToTab } = useNavigation();
   const [quizType, setQuizType] = useState<QuizType | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const location = useLocation();
-  const navigate = useNavigate();
 
   useEffect(() => {
     // Gestione dei parametri URL per la navigazione diretta
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
-    if (tab) {
-      setActiveTab(tab as DashboardTab);
+    
+    // Mappa dei percorsi URL ai tab del dashboard
+    const pathToTabMap: Record<string, DashboardTab> = {
+      '/dashboard': 'dashboard',
+      '/quizzes': 'quizzes',
+      '/student-quiz': 'student-quiz',
+      '/quiz-history': 'quiz-history',
+      '/my-videos': 'my-videos',
+      '/student-access-codes': 'student-access-codes',
+      '/quiz-live': 'quiz-live',
+      '/notifications': 'notifications',
+      '/profile/student': 'profile'
+    };
+    
+    const path = location.pathname;
+    
+    // Prima controlliamo se il percorso corrente è nella mappa
+    if (pathToTabMap[path]) {
+      console.log(`[StudentDashboard] URL corrente ${path} corrisponde al tab ${pathToTabMap[path]}`);
+      dispatch(setActiveTab(pathToTabMap[path]));
+      console.log(`[StudentDashboard] Tab impostato a ${pathToTabMap[path]} in base all'URL`);
+    } 
+    // Poi controlliamo i parametri di query
+    else if (tab) {
+      console.log(`[StudentDashboard] Parametro tab=${tab} trovato nell'URL`);
+      dispatch(setActiveTab(tab as DashboardTab));
     }
-  }, [location]);
+    
+    // Infine controlliamo lo stato della location (compatibilità)
+    if (location.state && location.state.activeTab) {
+      console.log(`[StudentDashboard] Trovato activeTab=${location.state.activeTab} nello stato location`);
+      dispatch(setActiveTab(location.state.activeTab));
+    }
+  }, [location, dispatch]);
+
+  // Monitoriamo i cambiamenti del tab attivo
+  useEffect(() => {
+    console.log("StudentDashboard - Active tab changed to:", activeTab);
+    
+    // Reset degli stati correlati quando cambia il tab
+    if (activeTab !== 'quizzes' && activeTab !== 'quiz-studenti') {
+      setQuizType(null);
+      setSelectedCategory(null);
+    }
+  }, [activeTab]);
 
   // Funzione per tornare alla dashboard
   const handleBackToDashboard = () => {
-    setActiveTab('stats');
+    dispatch(setActiveTab('dashboard'));
     setQuizType(null);
     setSelectedCategory(null);
   };
 
   const renderContent = () => {
+    if (activeTab === 'quiz-history') {
+      console.log("Rendering quiz history...");
+      return (
+        <div className="space-y-6 px-4 sm:px-6 md:px-8 py-6 max-w-7xl mx-auto">
+          <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-6">Cronologia Quiz</h2>
+          <QuizHistory 
+            results={results} 
+            onBack={() => dispatch(setActiveTab('dashboard'))}
+          />
+        </div>
+      );
+    }
+
     if (activeTab === 'quiz-live') {
       return <QuizLiveMain 
         userEmail={studentEmail} 
@@ -72,16 +132,21 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
       );
     }
 
-    if (activeTab === 'videos') {
-      return <VideoLessons />;
+    if (activeTab === 'videos' || activeTab === 'my-videos') {
+      console.log("Rendering video lessons...");
+      return (
+        <div className="space-y-6 px-4 sm:px-6 md:px-8 py-6 max-w-7xl mx-auto">
+          <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-6">I Miei Video</h2>
+          <VideoLessons />
+        </div>
+      );
     }
 
     if (activeTab === 'profile') {
       return (
         <div className="space-y-6">
           <h2 className="text-3xl font-light text-white mb-6">Profilo Utente</h2>
-          <StudentProfile studentEmail={studentEmail} />
-          <UserProfile 
+          <StudentProfile 
             userEmail={studentEmail}
           />
         </div>
@@ -93,21 +158,6 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
         <div className="space-y-6">
           <h2 className="text-3xl font-light text-white mb-6">Cronologia Codici di Accesso</h2>
           <AccessCodeHistory studentEmail={studentEmail} />
-        </div>
-      );
-    }
-
-    if (activeTab === 'quiz-history') {
-      return (
-        <div className="space-y-6">
-          <h2 className="text-3xl font-semibold text-white mb-6">Cronologia Quiz</h2>
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md p-6">
-            <StudentStats 
-              results={results} 
-              onBack={() => setActiveTab('dashboard')}
-              showFilters={true}
-            />
-          </div>
         </div>
       );
     }
@@ -159,10 +209,9 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
       return (
         <div className="space-y-6 px-4 sm:px-6 md:px-8 py-6 max-w-7xl mx-auto">
           <h2 className="text-3xl font-bold text-slate-800 dark:text-white mb-6">Le Tue Statistiche</h2>
-          <StudentProfile studentEmail={studentEmail} />
           <StudentStats 
             results={results} 
-            onBack={() => setActiveTab('quizzes')} 
+            onBack={() => dispatch(setActiveTab('quizzes'))} 
           />
         </div>
       );
@@ -193,7 +242,7 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
         <div className="space-y-6">
           <QuizSelection
             onSelectQuizType={(type) => setQuizType(type)}
-            onShowDashboard={() => setActiveTab('stats')}
+            onShowDashboard={() => dispatch(setActiveTab('stats'))}
           />
           <div className="px-4 sm:px-6 md:px-8 py-6 max-w-7xl mx-auto">
             <QuizSelector onQuizSelect={(quizId) => {
@@ -210,12 +259,6 @@ export function StudentDashboard({ results, studentEmail, onLogout }: Props) {
 
   return (
     <DashboardLayout
-      activeTab={activeTab}
-      onTabChange={(tab: DashboardTab) => {
-        setActiveTab(tab);
-        setQuizType(null);
-        setSelectedCategory(null);
-      }}
       onLogout={onLogout}
       studentEmail={studentEmail}
     >

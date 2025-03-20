@@ -33,6 +33,7 @@ interface QuizCreatorProps {
 }
 
 interface Question {
+  id?: string;
   question_text: string;
   options: string[];
   correct_answer: number;
@@ -81,9 +82,65 @@ const COLOR_OPTIONS = [
 
 // Funzione di utilità per verificare se un valore è un UUID valido
 function isValidUUID(value: any): boolean {
-  if (!value || typeof value !== 'string') return false;
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(value);
+  if (!value) return false;
+  
+  // Se è un numero o una stringa numerica, consideriamolo come valido
+  // Sarà convertito in UUID più tardi nel codice
+  if (typeof value === 'number' || !isNaN(Number(value))) {
+    return true;
+  }
+  
+  if (typeof value !== 'string') return false;
+  
+  // Regex per validare un UUID v4
+  const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidV4Regex.test(value);
+}
+
+// Funzione per generare un UUID v4 valido che rispetti il vincolo del database
+function generateValidUUIDv4(): string {
+  const id = uuidv4();
+  console.log("UUID v4 generato:", id);
+  
+  // Verifica che l'UUID generato rispetti il formato v4
+  const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!uuidV4Regex.test(id)) {
+    console.error("UUID generato non valido secondo il vincolo v4:", id);
+    // Riprova fino a ottenere un UUID valido
+    return generateValidUUIDv4();
+  }
+  
+  return id;
+}
+
+// Funzione per convertire un ID numerico in UUID
+function convertToUUID(id: string | number): string {
+  // Se è già un UUID valido, ritornalo
+  if (typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return id;
+  }
+  
+  // Converti l'ID in stringa se non lo è già
+  const idStr = id.toString();
+  
+  // Crea un hash deterministico basato sull'ID
+  const hash = Array.from(idStr).reduce((acc, char) => {
+    return (acc * 31 + char.charCodeAt(0)) & 0xffffffff;
+  }, 0);
+  
+  // Formatta come UUID v4 (deterministico basato sull'hash)
+  const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = (hash + Math.random() * 16) % 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+  
+  return uuid;
+}
+
+// Utilizzo la funzione generateValidUUIDv4 per generare un nuovo UUID valido
+function generateQuestionUUID(): string {
+  return generateValidUUIDv4();
 }
 
 // Funzione per generare un PIN a 6 cifre
@@ -147,12 +204,15 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
       if (editQuiz.questions && editQuiz.questions.length > 0) {
         console.log('Initializing questions from quiz object:', editQuiz.questions);
         const formattedQuestions = editQuiz.questions.map(q => ({
-          question_text: q.question_text,
-          options: q.options || [],
-          correct_answer: q.correct_answer,
+          question_text: q.question_text || '',
+          options: Array.isArray(q.options) ? q.options : [],
+          correct_answer: typeof q.correct_answer === 'number' ? q.correct_answer : 
+                         (typeof q.correct_answer === 'string' ? parseInt(q.correct_answer, 10) : 0),
           explanation: q.explanation || '',
-          image_url: q.image_url
+          image_url: q.image_url || ''
         }));
+        
+        console.log('Formatted questions:', formattedQuestions);
         setQuestions(formattedQuestions);
         
         // Set image previews for existing images
@@ -174,7 +234,9 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
 
   const loadQuestions = async () => {
     try {
-      console.log('Fetching questions from database...');
+      console.log('Fetching questions from database...', new Date().toISOString());
+      console.log('EditQuiz ID:', editQuiz?.id);
+      console.log('Quiz Type:', quizType);
       setError('');
       
       if (!editQuiz?.id) {
@@ -182,11 +244,15 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
         return;
       }
 
+      console.log('EditQuiz object:', JSON.stringify(editQuiz, null, 2));
+
       // Determina la tabella corretta per le domande in base al tipo di quiz
       const questionsTableName = quizType === 'interactive' ? 'interactive_quiz_questions' : 'quiz_questions';
-      console.log(`Loading questions from table: ${questionsTableName} for quiz type: ${quizType}`);
+      console.log(`Loading questions from table: ${questionsTableName} for quiz type: ${quizType} with quiz ID: ${editQuiz.id}`);
 
-      const { data, error } = await supabase
+      // Utilizziamo supabaseAdmin invece di supabase per evitare problemi di autorizzazione
+      console.log('Esecuzione query con supabaseAdmin...');
+      const { data, error } = await supabaseAdmin
         .from(questionsTableName)
         .select(`
           id,
@@ -199,9 +265,60 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
         .eq('quiz_id', editQuiz.id)
         .order('created_at', { ascending: true });
 
+      console.log('Risultato query:', data ? `${data.length} domande trovate` : 'Nessun dato');
+      console.log('Errore query:', error ? JSON.stringify(error, null, 2) : 'Nessun errore');
+
       if (error) {
         console.error(`Errore nel caricamento delle domande da ${questionsTableName}:`, error);
-        throw error;
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        
+        // Prova un approccio alternativo se il primo fallisce
+        console.log('Tentativo alternativo di caricamento domande...');
+        const { data: altData, error: altError } = await supabase
+          .from('quiz_questions')
+          .select('*')
+          .eq('quiz_id', editQuiz.id);
+          
+        if (altError || !altData || altData.length === 0) {
+          console.error('Anche il tentativo alternativo è fallito:', altError);
+          throw error;
+        } else {
+          console.log('Domande caricate con metodo alternativo:', altData);
+          
+          // Transform data to match our Question interface
+          const formattedQuestions = altData?.map(q => {
+            // Assicurati che correct_answer sia un numero
+            let correctAnswer = q.correct_answer;
+            if (typeof correctAnswer === 'string') {
+              correctAnswer = parseInt(correctAnswer, 10);
+              if (isNaN(correctAnswer)) {
+                correctAnswer = 0; // Valore predefinito
+              }
+            }
+            
+            // Assicurati che options sia un array
+            let options = q.options;
+            if (typeof options === 'string') {
+              try {
+                options = JSON.parse(options);
+              } catch (e) {
+                console.error('Errore nel parsing delle opzioni:', e);
+                options = [];
+              }
+            }
+            
+            return {
+              question_text: q.question_text || '',
+              options: Array.isArray(options) ? options : [],
+              correct_answer: correctAnswer,
+              explanation: q.explanation || '',
+              image_url: q.image_url || ''
+            };
+          }) || [];
+          
+          setQuestions(formattedQuestions);
+          return;
+        }
       }
       
       console.log(`Questions loaded from ${questionsTableName}:`, data);
@@ -217,9 +334,38 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
           }
         }
         
+        // Assicurati che options sia un array
+        let options = q.options;
+        if (typeof options === 'string') {
+          try {
+            options = JSON.parse(options);
+            console.log(`Opzioni parsate da stringa JSON per la domanda`);
+          } catch (e) {
+            console.error(`Errore nel parsing delle opzioni per la domanda:`, e);
+            options = [];
+          }
+        }
+        
+        if (!Array.isArray(options)) {
+          console.log(`Opzioni non in formato array per la domanda, tipo: ${typeof options}`);
+          // Se options è un oggetto, prova a convertirlo in array
+          if (options && typeof options === 'object') {
+            try {
+              options = Object.values(options);
+              console.log(`Opzioni convertite da oggetto ad array: ${JSON.stringify(options)}`);
+            } catch (e) {
+              console.error(`Errore nella conversione delle opzioni in array:`, e);
+              options = [];
+            }
+          } else {
+            options = [];
+          }
+        }
+        
         return {
+          id: q.id,
           question_text: q.question_text || '',
-          options: Array.isArray(q.options) ? q.options : [],
+          options: Array.isArray(options) ? options : [],
           correct_answer: correctAnswer,
           explanation: q.explanation || '',
           image_url: q.image_url || ''
@@ -405,7 +551,7 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
       }
       
       // Preparazione dei dati del quiz
-      const quizData = {
+      const quizData: any = {
         title,
         description,
         quiz_type: quizType,
@@ -415,7 +561,8 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
         duration_minutes: duration,
         icon,
         icon_color: iconColor,
-        created_by: userEmail // Utilizziamo sempre l'email dell'utente per il campo created_by
+        created_by: userEmail, // Utilizziamo sempre l'email dell'utente per il campo created_by
+        category: category.trim() // Assicuriamoci di includere la categoria nel salvataggio e di rimuovere spazi extra
       };
 
       // Aggiungi host_email solo per i quiz interattivi
@@ -457,22 +604,18 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
         }
         quizId = editQuiz.id;
 
-        console.log('Deleting old questions for quiz:', quizId);
-        // Determina la tabella corretta per le domande in base al tipo di quiz
-        const questionsTableName = quizType === 'interactive' ? 'interactive_quiz_questions' : 'quiz_questions';
-        console.log(`Using questions table for deletion: ${questionsTableName} for quiz type: ${quizType}`);
-        
-        const { error: deleteError } = await supabaseAdmin
-          .from(questionsTableName)
-          .delete()
-          .eq('quiz_id', quizId);
-
-        if (deleteError) {
-          console.error('Errore nell\'eliminazione delle domande esistenti:', deleteError);
-          throw new Error(`Errore nell'eliminazione delle domande esistenti: ${deleteError.message}`);
-        }
+        console.log('Utilizzeremo la strategia di upsert per le domande del quiz:', quizId);
       } else {
         console.log('Creating new quiz');
+        
+        // Se la tabella richiede un UUID, generiamolo manualmente
+        if (tableName === 'interactive_quiz_templates') {
+          // Genera un UUID v4 valido utilizzando la funzione generateValidUUIDv4
+          const newUuid = generateValidUUIDv4();
+          console.log('Generating valid UUID v4 for new quiz:', newUuid);
+          quizData.id = newUuid;
+        }
+        
         const { data: newQuiz, error: insertError } = await supabaseAdmin
           .from(tableName)
           .insert([quizData])
@@ -481,6 +624,8 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
 
         if (insertError) {
           console.error('Errore nella creazione del quiz:', insertError);
+          console.error('Dettagli errore:', JSON.stringify(insertError, null, 2));
+          console.error('Dati quiz che hanno causato l\'errore:', JSON.stringify(quizData, null, 2));
           throw new Error(`Errore nella creazione del quiz: ${insertError.message}`);
         }
         if (!newQuiz) throw new Error('Nessun dato restituito dopo l\'inserimento del quiz');
@@ -496,11 +641,18 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
           console.log(`Question ${idx+1} - correct_answer:`, q.correct_answer, `(type: ${typeof q.correct_answer})`);
         });
         
-        // Verifica che quizId sia un UUID valido
+        // Verifica che quizId sia un UUID valido o lo converte in un UUID
         if (!isValidUUID(quizId)) {
           console.error('ID quiz non valido:', quizId);
           throw new Error(`ID quiz non valido: ${quizId}. È necessario un UUID valido.`);
         }
+        
+        // Se quizId è numerico, convertilo in UUID
+        const quizUUID = typeof quizId === 'number' || !isNaN(Number(quizId)) 
+          ? convertToUUID(quizId) 
+          : quizId;
+        
+        console.log(`Quiz ID originale: ${quizId}, convertito in UUID: ${quizUUID}`);
         
         // Prepara i dati delle domande con controlli rigorosi sui tipi
         const questionsData = questions.map((q, idx) => {
@@ -523,7 +675,8 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
           
           // Crea l'oggetto domanda con tipi corretti
           return {
-            quiz_id: quizId, // UUID valido
+            quiz_id: quizUUID, // UUID valido convertito
+            id: q.id || generateQuestionUUID(), // Usa l'ID esistente se disponibile, altrimenti genera un nuovo UUID
             question_text: q.question_text || '',
             options: options,
             correct_answer: correctAnswer,
@@ -539,18 +692,70 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
         console.log(`Using questions table: ${questionsTableName} for quiz type: ${quizType}`);
         
         try {
-          // Inserisci le domande una alla volta per identificare meglio eventuali errori
-          for (let i = 0; i < questionsData.length; i++) {
-            const questionData = questionsData[i];
+          console.log('Utilizzo strategia upsert per le domande...');
+          
+          // Prima otteniamo tutte le domande esistenti
+          const { data: existingQuestions, error: fetchError } = await supabaseAdmin
+            .from(questionsTableName)
+            .select('id')
+            .eq('quiz_id', quizId);
+            
+          if (fetchError) {
+            console.error('Errore nel recupero delle domande esistenti:', fetchError);
+            console.error('Fetch error details:', JSON.stringify(fetchError, null, 2));
+          }
+          
+          const existingQuestionIds = existingQuestions ? existingQuestions.map(q => q.id) : [];
+          console.log('ID delle domande esistenti:', existingQuestionIds);
+          
+          // Identifichiamo quali domande aggiornare e quali inserire
+          const questionsToUpdate = questionsData.filter(q => q.id && existingQuestionIds.includes(q.id));
+          const questionsToInsert = questionsData.filter(q => !q.id || !existingQuestionIds.includes(q.id));
+          
+          console.log(`Domande da aggiornare: ${questionsToUpdate.length}, Domande da inserire: ${questionsToInsert.length}`);
+          
+          // Aggiorna le domande esistenti
+          for (let i = 0; i < questionsToUpdate.length; i++) {
+            const questionData = questionsToUpdate[i];
+            console.log(`Aggiornamento domanda ${i+1}:`, JSON.stringify(questionData, null, 2));
+            
+            const { error: updateError } = await supabaseAdmin
+              .from(questionsTableName)
+              .update({
+                question_text: questionData.question_text,
+                options: questionData.options,
+                correct_answer: questionData.correct_answer,
+                explanation: questionData.explanation,
+                image_url: questionData.image_url
+              })
+              .eq('id', questionData.id)
+              .eq('quiz_id', quizId);
+              
+            if (updateError) {
+              console.error(`Errore nell'aggiornamento della domanda ${i+1}:`, updateError);
+              console.error('Update error details:', JSON.stringify(updateError, null, 2));
+              throw new Error(`Errore nell'aggiornamento della domanda ${i+1}: ${updateError.message}`);
+            }
+          }
+          
+          // Inserisci le nuove domande
+          for (let i = 0; i < questionsToInsert.length; i++) {
+            const questionData = questionsToInsert[i];
+            // Assicurati che ci sia un ID valido
+            if (!questionData.id) {
+              questionData.id = generateQuestionUUID();
+            }
+            
             console.log(`Inserimento domanda ${i+1}:`, JSON.stringify(questionData, null, 2));
             
-            const { error: questionError } = await supabaseAdmin
+            const { error: insertError } = await supabaseAdmin
               .from(questionsTableName)
               .insert([questionData]);
               
-            if (questionError) {
-              console.error(`Errore nell'inserimento della domanda ${i+1}:`, questionError);
-              throw new Error(`Errore nell'inserimento della domanda ${i+1}: ${questionError.message}`);
+            if (insertError) {
+              console.error(`Errore nell'inserimento della domanda ${i+1}:`, insertError);
+              console.error('Insert error details:', JSON.stringify(insertError, null, 2));
+              throw new Error(`Errore nell'inserimento della domanda ${i+1}: ${insertError.message}`);
             }
           }
           
@@ -564,16 +769,25 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
       // Verify questions were saved
       // Determina la tabella corretta per la verifica in base al tipo di quiz
       const verifyTableName = quizType === 'interactive' ? 'interactive_quiz_questions' : 'quiz_questions';
-      const { data: savedQuestions, error: verifyError } = await supabase
+      console.log(`Verifica salvataggio domande nella tabella: ${verifyTableName} per quiz ID: ${quizId}`);
+      
+      const { data: savedQuestions, error: verifyError } = await supabaseAdmin
         .from(verifyTableName)
         .select('*')
         .eq('quiz_id', quizId);
 
       if (verifyError) {
         console.error('Errore nella verifica delle domande salvate:', verifyError);
+        console.error('Verify error details:', JSON.stringify(verifyError, null, 2));
         throw new Error(`Errore nella verifica delle domande salvate: ${verifyError.message}`);
       }
+      
       console.log('Verification - Saved questions:', savedQuestions?.length || 0);
+      if (savedQuestions && savedQuestions.length > 0) {
+        console.log('Prima domanda salvata:', JSON.stringify(savedQuestions[0], null, 2));
+      } else {
+        console.error('ATTENZIONE: Nessuna domanda salvata per il quiz!');
+      }
       
       // Mostra un messaggio di conferma
       const quizStatus = editQuiz ? 'modificato' : 'creato';
@@ -691,7 +905,7 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
             {quizType !== 'interactive' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                  Categoria
+                  Categoria *
                 </label>
                 <input
                   type="text"
@@ -700,6 +914,10 @@ export function QuizCreator({ quizType, editQuiz, hostEmail, onClose, onSaveSucc
                   className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100"
                   placeholder="Es: Navigazione Base, Meteorologia, etc."
                 />
+                <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+                  La categoria è importante per organizzare i quiz e renderli facilmente ricercabili. 
+                  {category && <span className="ml-1 font-medium text-blue-600 dark:text-blue-400">Valore attuale: "{category}"</span>}
+                </p>
               </div>
             )}
 

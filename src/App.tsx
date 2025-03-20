@@ -25,22 +25,137 @@ import { purgeStore } from './redux/store';
 import { QuizLiveMain } from './components/interactive/QuizLiveMain';
 import { setupAllStorage } from './utils/setupStorage';
 import { Toaster } from 'react-hot-toast';
+import { MyVideosPage } from './pages/Student/MyVideos';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { RouteListener } from './components/system/RouteListener';
 
 // Creazione componenti wrapper per InstructorProfile e StudentProfile
 function ProfileWrapper({component}: {component: React.ElementType}) {
   const auth = useAppSelector(selectAuth);
+  const dispatch = useAppDispatch();
   const Component = component;
-  return <Component userEmail={auth.userEmail || ''} needsSubscription={auth.needsSubscription} />;
+  
+  console.log("Rendering ProfileWrapper con:", {
+    userEmail: auth.userEmail,
+    needsSubscription: auth.needsSubscription,
+    isAuthenticated: auth.isAuthenticated
+  });
+  
+  // Assicuriamoci che i dati dell'utente siano disponibili
+  if (!auth.userEmail && localStorage.getItem('userEmail')) {
+    console.log("Dati auth mancanti, utilizzando localStorage");
+  }
+  
+  const email = auth.userEmail || localStorage.getItem('userEmail') || '';
+  const needsSub = auth.needsSubscription || localStorage.getItem('needsSubscription') === 'true';
+  
+  const handleLogout = () => {
+    // Prima eseguiamo il dispatch dell'azione logout
+    dispatch(logout());
+    
+    // Puliamo lo stato persistente
+    purgeStore().then(() => {
+      // Reindirizzamento alla home page
+      window.location.href = '/';
+    });
+  };
+  
+  // Se il componente è InstructorProfile, dovrebbe essere renderizzato all'interno di ProfessorDashboard
+  if (component === InstructorProfile) {
+    return (
+      <ProfessorDashboard 
+        results={[]} 
+        onLogout={handleLogout} 
+        needsSubscription={needsSub}
+        hostEmail={email}
+        isMaster={auth.isMasterAdmin || localStorage.getItem('isMasterAdmin') === 'true'}
+      />
+    );
+  }
+  
+  // Se il componente è StudentProfile, dovrebbe essere renderizzato all'interno di StudentDashboard
+  if (component === StudentProfile) {
+    return (
+      <StudentDashboard 
+        results={[]}
+        studentEmail={email}
+        onLogout={handleLogout}
+      />
+    );
+  }
+  
+  // Se arriviamo qui, renderizziamo il componente direttamente
+  return <Component 
+    userEmail={email} 
+    needsSubscription={needsSub} 
+  />;
 }
 
 function App() {
   // Utilizziamo Redux per lo stato dell'autenticazione
   const auth = useAppSelector(selectAuth);
   const dispatch = useAppDispatch();
-  
-  // Rimuoviamo lo stato locale userRole e usiamo direttamente auth da Redux
+  const [loading, setLoading] = useState(true);
   const [results, setResults] = useState<QuizResult[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [sessionExpirationChecked, setSessionExpirationChecked] = useState(false);
+  const [isQuizLiveMode, setIsQuizLiveMode] = useState(false);
+  
+  // Funzione per sincronizzare Redux con localStorage
+  const syncAuthState = () => {
+    if (typeof window !== 'undefined') {
+      const isProfessorLS = localStorage.getItem('isProfessor') === 'true';
+      const isStudentLS = localStorage.getItem('isStudent') === 'true';
+      const isMasterAdminLS = localStorage.getItem('isMasterAdmin') === 'true';
+      const isAuthenticatedLS = localStorage.getItem('isAuthenticated') === 'true';
+      
+      // Se localStorage ha dati di autenticazione ma Redux no, sincronizziamo
+      if (isAuthenticatedLS && !auth.isAuthenticated) {
+        console.log('Sincronizzazione da localStorage a Redux');
+        dispatch(syncFromStorage());
+      }
+      
+      // Se Redux ha dati di autenticazione ma localStorage no, sincronizziamo
+      if (auth.isAuthenticated && !isAuthenticatedLS) {
+        console.log('Sincronizzazione da Redux a localStorage');
+        localStorage.setItem('isAuthenticated', 'true');
+        localStorage.setItem('isProfessor', String(auth.isProfessor));
+        localStorage.setItem('isStudent', String(auth.isStudent));
+        localStorage.setItem('isMasterAdmin', String(auth.isMasterAdmin));
+        localStorage.setItem('hasActiveAccess', String(auth.hasActiveAccess));
+        localStorage.setItem('hasInstructorAccess', String(auth.hasInstructorAccess));
+        localStorage.setItem('needsSubscription', String(auth.needsSubscription));
+        if (auth.userEmail) localStorage.setItem('userEmail', auth.userEmail);
+      }
+      
+      // Log per debug
+      console.log('Stato auth corrente:', {
+        reduxAuth: {
+          isAuthenticated: auth.isAuthenticated,
+          isProfessor: auth.isProfessor,
+          isStudent: auth.isStudent,
+          isMasterAdmin: auth.isMasterAdmin
+        },
+        localStorageAuth: {
+          isAuthenticated: isAuthenticatedLS,
+          isProfessor: isProfessorLS,
+          isStudent: isStudentLS,
+          isMasterAdmin: isMasterAdminLS
+        }
+      });
+    }
+  };
+  
+  // Eseguiamo la sincronizzazione iniziale
+  useEffect(() => {
+    syncAuthState();
+    
+    // Impostiamo un timer per controllare periodicamente la sincronizzazione
+    const intervalId = setInterval(syncAuthState, 5000);
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [auth.isAuthenticated]);
 
   // Funzione per ottenere il codice di accesso per un utente specifico
   const getAccessCodeForUser = async (userEmail: string): Promise<string | null> => {
@@ -248,6 +363,7 @@ function App() {
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <Router>
+        <RouteListener />
         <div className="App">
           {/* Toaster per le notifiche */}
           <Toaster 
@@ -335,26 +451,27 @@ function App() {
               <Route 
                 path="/dashboard" 
                 element={
-                  auth.isAuthenticated ? (
-                    auth.isProfessor ? (
-                      <ProfessorDashboard 
-                        results={results} 
-                        onLogout={handleLogout} 
-                        needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess && !auth.isMasterAdmin}
-                        hostEmail={auth.userEmail || ''}
-                      />
-                    ) : auth.userEmail ? (
-                      <StudentDashboard 
-                        results={results.filter(r => r.email === auth.userEmail)}
-                        studentEmail={auth.userEmail || ''}
-                        onLogout={handleLogout}
-                      />
-                    ) : (
-                      <Navigate to="/login" />
-                    )
-                  ) : (
-                    <Navigate to="/login" />
-                  )
+                  <ProtectedRoute 
+                    element={
+                      auth.isProfessor ? (
+                        <ProfessorDashboard 
+                          results={results} 
+                          onLogout={handleLogout} 
+                          needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess && !auth.isMasterAdmin}
+                          hostEmail={auth.userEmail || localStorage.getItem('userEmail') || ''}
+                          isMaster={auth.isMasterAdmin || localStorage.getItem('isMasterAdmin') === 'true'}
+                        />
+                      ) : auth.userEmail || localStorage.getItem('userEmail') ? (
+                        <StudentDashboard 
+                          results={results.filter(r => r.email === (auth.userEmail || localStorage.getItem('userEmail')))}
+                          studentEmail={auth.userEmail || localStorage.getItem('userEmail') || ''}
+                          onLogout={handleLogout}
+                        />
+                      ) : (
+                        <Navigate to="/login" />
+                      )
+                    }
+                  />
                 }
               />
               
@@ -364,17 +481,61 @@ function App() {
               
               {/* Rotte protette - Studente */}
               <Route
-                path="/student/*"
+                path="/student-quiz"
                 element={
-                  auth.isStudent ? (
-                    <StudentDashboard 
-                      studentEmail={auth.userEmail || ''} 
-                      results={[]} 
-                      onLogout={handleLogout} 
-                    />
-                  ) : (
-                    <Navigate to="/login" />
-                  )
+                  <ProtectedRoute
+                    element={
+                      <StudentDashboard 
+                        studentEmail={auth.userEmail || localStorage.getItem('userEmail') || ''} 
+                        results={results.filter(r => r.email === (auth.userEmail || localStorage.getItem('userEmail')))} 
+                        onLogout={handleLogout} 
+                      />
+                    }
+                    requiredRole="student"
+                  />
+                }
+              />
+              
+              <Route
+                path="/quiz-history"
+                element={
+                  <ProtectedRoute
+                    element={
+                      <StudentDashboard 
+                        studentEmail={auth.userEmail || localStorage.getItem('userEmail') || ''} 
+                        results={results.filter(r => r.email === (auth.userEmail || localStorage.getItem('userEmail')))} 
+                        onLogout={handleLogout} 
+                      />
+                    }
+                    requiredRole="student"
+                  />
+                }
+              />
+              
+              <Route
+                path="/student-access-codes"
+                element={
+                  <ProtectedRoute
+                    element={
+                      <StudentDashboard 
+                        studentEmail={auth.userEmail || localStorage.getItem('userEmail') || ''} 
+                        results={results.filter(r => r.email === (auth.userEmail || localStorage.getItem('userEmail')))} 
+                        onLogout={handleLogout} 
+                      />
+                    }
+                    requiredRole="student"
+                  />
+                }
+              />
+              
+              {/* Rotta protetta - Video per studenti */}
+              <Route
+                path="/my-videos"
+                element={
+                  <ProtectedRoute
+                    element={<MyVideosPage />}
+                    requiredRole="student"
+                  />
                 }
               />
               
@@ -388,10 +549,215 @@ function App() {
                       onLogout={handleLogout} 
                       needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess}
                       hostEmail={auth.userEmail || ''}
+                      isMaster={auth.isMasterAdmin || localStorage.getItem('isMasterAdmin') === 'true'}
                     />
                   ) : (
                     <Navigate to="/login" />
                   )
+                }
+              />
+              
+              {/* Rotta specifica per gestione quiz */}
+              <Route
+                path="/gestione-quiz"
+                element={
+                  <ProtectedRoute
+                    element={
+                      <ProfessorDashboard 
+                        results={results} 
+                        onLogout={handleLogout} 
+                        needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess && !auth.isMasterAdmin}
+                        hostEmail={auth.userEmail || localStorage.getItem('userEmail') || ''}
+                        isMaster={auth.isMasterAdmin || localStorage.getItem('isMasterAdmin') === 'true'}
+                      />
+                    }
+                    requiredRole="professor"
+                  />
+                }
+              />
+              
+              {/* Rotta specifica per gestione alunni */}
+              <Route
+                path="/gestione-alunni"
+                element={
+                  <ProtectedRoute
+                    element={
+                      <ProfessorDashboard 
+                        results={results} 
+                        onLogout={handleLogout} 
+                        needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess && !auth.isMasterAdmin}
+                        hostEmail={auth.userEmail || localStorage.getItem('userEmail') || ''}
+                        isMaster={auth.isMasterAdmin || localStorage.getItem('isMasterAdmin') === 'true'}
+                      />
+                    }
+                    requiredRole="professor"
+                  />
+                }
+              />
+              
+              {/* Rotta specifica per codici di accesso istruttore */}
+              <Route
+                path="/instructor-access-codes"
+                element={
+                  <ProtectedRoute
+                    element={
+                      <ProfessorDashboard 
+                        results={results} 
+                        onLogout={handleLogout} 
+                        needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess && !auth.isMasterAdmin}
+                        hostEmail={auth.userEmail || localStorage.getItem('userEmail') || ''}
+                        isMaster={auth.isMasterAdmin || localStorage.getItem('isMasterAdmin') === 'true'}
+                      />
+                    }
+                    requiredRole="professor"
+                  />
+                }
+              />
+              
+              {/* Rotta specifica per codici PRO */}
+              <Route
+                path="/pro-codes"
+                element={
+                  <ProtectedRoute
+                    element={
+                      <ProfessorDashboard 
+                        results={results} 
+                        onLogout={handleLogout} 
+                        needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess && !auth.isMasterAdmin}
+                        hostEmail={auth.userEmail || localStorage.getItem('userEmail') || ''}
+                        isMaster={auth.isMasterAdmin || localStorage.getItem('isMasterAdmin') === 'true'}
+                      />
+                    }
+                    requiredRole="professor"
+                  />
+                }
+              />
+              
+              {/* Rotta specifica per quiz studenti */}
+              <Route
+                path="/quiz-studenti"
+                element={
+                  <ProtectedRoute
+                    element={
+                      <ProfessorDashboard 
+                        results={results} 
+                        onLogout={handleLogout} 
+                        needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess && !auth.isMasterAdmin}
+                        hostEmail={auth.userEmail || localStorage.getItem('userEmail') || ''}
+                        isMaster={auth.isMasterAdmin || localStorage.getItem('isMasterAdmin') === 'true'}
+                      />
+                    }
+                    requiredRole="professor"
+                  />
+                }
+              />
+              
+              {/* Rotta per i quiz (gestisce sia studenti che istruttori) */}
+              <Route
+                path="/quizzes"
+                element={
+                  <ProtectedRoute
+                    element={
+                      auth.isProfessor ? (
+                        <ProfessorDashboard 
+                          results={results} 
+                          onLogout={handleLogout} 
+                          needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess && !auth.isMasterAdmin}
+                          hostEmail={auth.userEmail || localStorage.getItem('userEmail') || ''}
+                          isMaster={auth.isMasterAdmin || localStorage.getItem('isMasterAdmin') === 'true'}
+                        />
+                      ) : (
+                        <StudentDashboard 
+                          results={results.filter(r => r.email === (auth.userEmail || localStorage.getItem('userEmail')))}
+                          studentEmail={auth.userEmail || localStorage.getItem('userEmail') || ''}
+                          onLogout={handleLogout}
+                        />
+                      )
+                    }
+                  />
+                }
+              />
+              
+              {/* Rotta specifica per video didattici */}
+              <Route
+                path="/videos"
+                element={
+                  <ProtectedRoute
+                    element={
+                      <ProfessorDashboard 
+                        results={results} 
+                        onLogout={handleLogout} 
+                        needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess && !auth.isMasterAdmin}
+                        hostEmail={auth.userEmail || localStorage.getItem('userEmail') || ''}
+                        isMaster={auth.isMasterAdmin || localStorage.getItem('isMasterAdmin') === 'true'}
+                      />
+                    }
+                    requiredRole="professor"
+                  />
+                }
+              />
+              
+              {/* Rotta per gestire le notifiche */}
+              <Route
+                path="/notifications"
+                element={
+                  <ProtectedRoute
+                    element={
+                      auth.isProfessor ? (
+                        <ProfessorDashboard 
+                          results={results} 
+                          onLogout={handleLogout} 
+                          needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess && !auth.isMasterAdmin}
+                          hostEmail={auth.userEmail || localStorage.getItem('userEmail') || ''}
+                          isMaster={auth.isMasterAdmin || localStorage.getItem('isMasterAdmin') === 'true'}
+                        />
+                      ) : (
+                        <StudentDashboard 
+                          results={results.filter(r => r.email === (auth.userEmail || localStorage.getItem('userEmail')))}
+                          studentEmail={auth.userEmail || localStorage.getItem('userEmail') || ''}
+                          onLogout={handleLogout}
+                        />
+                      )
+                    }
+                  />
+                }
+              />
+              
+              {/* Rotta per gestione utenti (solo admin) */}
+              <Route
+                path="/students"
+                element={
+                  <ProtectedRoute
+                    element={
+                      <ProfessorDashboard 
+                        results={results} 
+                        onLogout={handleLogout} 
+                        needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess && !auth.isMasterAdmin}
+                        hostEmail={auth.userEmail || localStorage.getItem('userEmail') || ''}
+                        isMaster={auth.isMasterAdmin || localStorage.getItem('isMasterAdmin') === 'true'}
+                      />
+                    }
+                    requiredRole="professor"
+                  />
+                }
+              />
+              
+              {/* Rotta per gestione abbonamenti (solo admin) */}
+              <Route
+                path="/subscriptions"
+                element={
+                  <ProtectedRoute
+                    element={
+                      <ProfessorDashboard 
+                        results={results} 
+                        onLogout={handleLogout} 
+                        needsSubscription={!auth.hasActiveAccess && !auth.hasInstructorAccess && !auth.isMasterAdmin}
+                        hostEmail={auth.userEmail || localStorage.getItem('userEmail') || ''}
+                        isMaster={auth.isMasterAdmin || localStorage.getItem('isMasterAdmin') === 'true'}
+                      />
+                    }
+                    requiredRole="professor"
+                  />
                 }
               />
               

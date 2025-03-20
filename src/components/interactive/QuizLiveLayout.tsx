@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Target, Users, ArrowLeft } from 'lucide-react';
 import { Sidebar } from '../layout/Sidebar';
+import { DashboardTab } from '../../types-dashboard';
 
 export function QuizLiveLayout() {
   const location = useLocation();
@@ -28,7 +29,7 @@ export function QuizLiveLayout() {
     navigate('/login', { replace: true });
   };
 
-  const handleTabChange = (tab: 'stats' | 'quizzes' | 'student-quiz' | 'access-codes' | 'profile' | 'videos' | 'quiz-studenti' | 'notifications' | 'subscriptions' | 'students' | 'quiz-live') => {
+  const handleTabChange = (tab: DashboardTab) => {
     if (tab === 'quiz-live') {
       navigate('/quiz-live');
     } else {

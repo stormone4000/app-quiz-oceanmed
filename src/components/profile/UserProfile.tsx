@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { ProfileLayout } from './ProfileLayout';
+import { useLocation } from 'react-router-dom';
 
 interface UserProfileProps {
   userEmail: string;
@@ -10,6 +11,7 @@ export function UserProfile({ userEmail, needsSubscription }: UserProfileProps) 
   const isInstructor = localStorage.getItem('isProfessor') === 'true';
   const isMasterAdmin = localStorage.getItem('isMasterAdmin') === 'true';
   const hasActiveAccess = localStorage.getItem('hasActiveAccess') === 'true';
+  const location = useLocation();
   
   // Aggiungiamo un log per debug
   useEffect(() => {
@@ -18,7 +20,8 @@ export function UserProfile({ userEmail, needsSubscription }: UserProfileProps) 
       isInstructor,
       isMasterAdmin,
       hasActiveAccess,
-      needsSubscription
+      needsSubscription,
+      pathname: location.pathname
     });
     
     // Caso speciale per istruttore1@io.it
@@ -47,14 +50,24 @@ export function UserProfile({ userEmail, needsSubscription }: UserProfileProps) 
       window.dispatchEvent(new Event('storage'));
       window.dispatchEvent(new Event('localStorageUpdated'));
     }
-  }, [userEmail, isInstructor, isMasterAdmin, hasActiveAccess, needsSubscription]);
+  }, [userEmail, isInstructor, isMasterAdmin, hasActiveAccess, needsSubscription, location]);
 
-  return (
-    <ProfileLayout
-      userEmail={userEmail}
-      isInstructor={isInstructor}
-      isMasterAdmin={isMasterAdmin}
-      needsSubscription={needsSubscription}
-    />
-  );
+  // Verifichiamo se siamo nella pagina del profilo "standalone"
+  const isStandaloneProfile = location.pathname.includes('/profile/');
+  
+  // Se siamo nella pagina profile standalone, utilizziamo ProfileLayout
+  if (isStandaloneProfile) {
+    return (
+      <ProfileLayout
+        userEmail={userEmail}
+        isInstructor={isInstructor}
+        isMasterAdmin={isMasterAdmin}
+        needsSubscription={needsSubscription}
+      />
+    );
+  }
+  
+  // Altrimenti, non renderizziamo nulla (il profilo è gestito da StudentDashboard)
+  // Questo è necessario per evitare di avere due visualizzazioni di profilo sovrapposte
+  return null;
 }

@@ -7,6 +7,13 @@ import { ConnectionStatus } from './ConnectionStatus';
 import { AnswerFeedback } from './AnswerFeedback';
 import { theme } from '../../config/theme';
 
+// Funzione per verificare se un valore è un UUID v4 valido
+function isValidUUID(id: string): boolean {
+  if (!id) return false;
+  const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidV4Regex.test(id);
+}
+
 interface QuizQuestion {
   id: string;
   question_text: string;
@@ -101,6 +108,14 @@ export function QuizPlay() {
     try {
       setLoading(true);
       setError(null);
+
+      // Verifica che l'ID sia un UUID valido
+      if (!id || !isValidUUID(id)) {
+        console.error("ID sessione non valido, non è un UUID:", id);
+        setError('ID sessione non valido. Si prega di utilizzare una sessione con un ID valido.');
+        setLoading(false);
+        return;
+      }
 
       const { data: sessionData, error: sessionError } = await supabase
         .from('live_quiz_sessions')

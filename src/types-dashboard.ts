@@ -18,7 +18,8 @@ export type DashboardTab =
   | 'quiz-history' 
   | 'student-access-codes' 
   | 'instructor-access-codes'
-  | 'pro-codes';
+  | 'pro-codes'
+  | 'my-videos';
 
 export interface MenuItem {
   id: DashboardTab;
@@ -26,6 +27,7 @@ export interface MenuItem {
   label: string;
   showFor: 'admin' | 'instructor' | 'student' | 'all';
   path?: string;
+  route?: string;
   requiresAccess?: boolean;
   lockedMessage?: string;
 } 

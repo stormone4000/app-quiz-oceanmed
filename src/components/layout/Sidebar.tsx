@@ -1,29 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, BookOpen, Users, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, Layers, Award, User, Bell, BarChart, Key, Briefcase, BookCheck, UserCheck, Target } from 'lucide-react';
+import { Home, BookOpen, Users, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, Layers, Award, User, Bell, BarChart, Key, Briefcase, BookCheck, UserCheck, Target, Film, Video } from 'lucide-react';
 import { NotificationBell } from '../notifications/NotificationBell';
 import { useTheme } from '../theme-provider';
 import { DashboardTab, MenuItem } from '../../types-dashboard';
+import { useNavigation } from '../../hooks/useNavigation';
+import { useAppSelector, useAppDispatch } from '../../redux/hooks';
+import { selectUi, toggleSidebar } from '../../redux/slices/uiSlice';
+import { ThemeToggle } from '../ThemeToggle';
 
 interface SidebarProps {
-  activeTab: DashboardTab;
-  onTabChange: (tab: DashboardTab) => void;
-  isSidebarOpen: boolean;
-  onToggleSidebar: () => void;
   onLogout: () => void;
   studentEmail?: string;
   isMaster?: boolean;
 }
 
 export function Sidebar({ 
-  activeTab, 
-  onTabChange, 
-  isSidebarOpen, 
-  onToggleSidebar, 
   onLogout,
   studentEmail,
   isMaster
-}: SidebarProps) {
+}: Omit<SidebarProps, 'activeTab' | 'onTabChange' | 'isSidebarOpen' | 'onToggleSidebar'>) {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const [isProfessor, setIsProfessor] = useState(false);
@@ -35,6 +31,15 @@ export function Sidebar({
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [businessName, setBusinessName] = useState<string | null>(null);
   const [imageKey, setImageKey] = useState(0);
+  
+  // Nuovi hook per Redux
+  const { activeTab, sidebarOpen } = useAppSelector(selectUi);
+  const dispatch = useAppDispatch();
+  const { navigateToTab } = useNavigation();
+
+  console.log("Sidebar renderizzata con isMaster prop:", isMaster, 
+              "isProfessor state:", isProfessor, 
+              "localIsMaster state:", localIsMaster);
 
   useEffect(() => {
     // Inizializza gli stati locali dai valori in localStorage
@@ -42,12 +47,24 @@ export function Sidebar({
       const isProfessorValue = localStorage.getItem('isProfessor') === 'true';
       const hasInstructorAccessValue = localStorage.getItem('hasInstructorAccess') === 'true';
       const hasActiveAccessValue = localStorage.getItem('hasActiveAccess') === 'true';
-      const isMasterValue = localStorage.getItem('isMasterAdmin') === 'true';
+      const isMasterValue = isMaster !== undefined ? isMaster : localStorage.getItem('isMasterAdmin') === 'true';
       const userEmailValue = localStorage.getItem('userEmail');
       const isCodeDeactivatedValue = localStorage.getItem('isCodeDeactivated') === 'true';
       const needsSubscriptionValue = localStorage.getItem('needsSubscription') === 'true';
       const profileImageUrlValue = localStorage.getItem('profileImageUrl');
       const businessNameValue = localStorage.getItem('businessName');
+
+      // Log completo dello stato
+      console.log('Sidebar - Aggiornamento stato:', {
+        isProfessorProp: isProfessorValue,
+        hasInstructorAccessProp: hasInstructorAccessValue,
+        hasActiveAccessProp: hasActiveAccessValue,
+        isMasterProp: isMaster,
+        isMasterLocalStorage: localStorage.getItem('isMasterAdmin') === 'true',
+        isMasterEffettivo: isMasterValue,
+        isProfessorLocalStorage: localStorage.getItem('isProfessor'),
+        isAuthenticated: localStorage.getItem('isAuthenticated')
+      });
 
       // Verifichiamo se l'immagine del profilo è cambiata
       if (profileImageUrlValue !== profileImageUrl) {
@@ -152,6 +169,12 @@ export function Sidebar({
       showFor: 'student',
     },
     {
+      id: 'my-videos',
+      icon: Video,
+      label: 'I Miei Video',
+      showFor: 'student',
+    },
+    {
       id: 'student-access-codes',
       icon: Key,
       label: 'Cronologia Codici',
@@ -227,12 +250,19 @@ export function Sidebar({
   ];
 
   const renderMenuItems = () => {
+    // Determina se l'utente è un amministratore: priorità alla prop isMaster
+    const isAdminUser = isMaster !== undefined ? isMaster : localIsMaster;
+    
+    console.log("renderMenuItems - isAdminUser:", isAdminUser, 
+                "isMaster prop:", isMaster, 
+                "localIsMaster:", localIsMaster);
+    
     return menuItems.filter(item => {
       // Filtra in base al ruolo
       if (item.showFor === 'all') return true;
-      if (item.showFor === 'admin' && (isMaster || localIsMaster)) return true;
+      if (item.showFor === 'admin' && isAdminUser) return true;
       if (item.showFor === 'instructor' && isProfessor) return true;
-      if (item.showFor === 'student' && !isProfessor && !localIsMaster) return true;
+      if (item.showFor === 'student' && !isProfessor) return true;
       return false;
     }).map(({ id, icon: Icon, label, requiresAccess, lockedMessage }) => {
       // Caso speciale per istruttore1@io.it
@@ -256,7 +286,7 @@ export function Sidebar({
       const isInstructorWithoutAccess = isProfessor && !hasInstructorAccess && !isIstruttore1;
       
       // Gli amministratori hanno sempre accesso a tutto
-      const adminHasAccess = isMaster || localIsMaster;
+      const adminHasAccess = isAdminUser;
       
       // Verifichiamo l'accesso usando sia le props che gli stati locali
       const hasAccess = adminHasAccess || // Gli admin hanno sempre accesso
@@ -277,81 +307,60 @@ export function Sidebar({
         <button
           key={id}
           onClick={() => {
-            // Se è un admin, ha sempre accesso
-            if (adminHasAccess) {
-              const menuItem = menuItems.find(item => item.id === id);
-              if (menuItem?.path) {
-                navigate(menuItem.path);
-              } else {
-                onTabChange(id);
-              }
-              if (window.innerWidth < 1024) onToggleSidebar();
-              return;
+            // Prima di navigare, assicuriamoci che lo stato di autenticazione sia mantenuto
+            localStorage.setItem('isAuthenticated', 'true');
+            
+            // Salviamo sempre anche l'email dell'utente corrente
+            if (userEmail) {
+              localStorage.setItem('userEmail', userEmail);
             }
             
-            // Se è istruttore1@io.it, garantiamo sempre l'accesso
-            if (isIstruttore1 && isProfessor) {
-              console.log('Garantiamo accesso per istruttore1@io.it');
-              localStorage.setItem('hasInstructorAccess', 'true');
-              localStorage.setItem('masterCode', '392673');
-              localStorage.setItem('hasActiveAccess', 'true');
-              localStorage.setItem('isCodeDeactivated', 'false');
-              localStorage.setItem('needsSubscription', 'false');
-              
-              // Forziamo un evento di storage per aggiornare tutti i componenti
-              window.dispatchEvent(new Event('localStorageUpdated'));
-              
-              const menuItem = menuItems.find(item => item.id === id);
-              if (menuItem?.path) {
-                navigate(menuItem.path);
-              } else {
-                onTabChange(id);
-              }
-              if (window.innerWidth < 1024) onToggleSidebar();
-              return;
+            // Usa il nuovo hook di navigazione
+            if (hasAccess) {
+              navigateToTab(id as DashboardTab);
+            } else if ((requiresAccess && !hasInstructorAccess && isProfessor) || isInstructorWithoutAccess) {
+              navigateToTab('profile');
             }
             
-            // Se è un istruttore senza accesso o istruttore1 con problemi, reindirizza al profilo
-            if ((requiresAccess && !hasInstructorAccess && isProfessor) || 
-                isInstructorWithoutAccess) {
-              onTabChange('profile');
-              return;
-            }
-            
-            const menuItem = menuItems.find(item => item.id === id);
-            if (menuItem?.path) {
-              navigate(menuItem.path);
-            } else {
-              onTabChange(id);
-            }
-            if (window.innerWidth < 1024) onToggleSidebar();
+            // Se siamo su mobile, chiudiamo la sidebar
+            if (window.innerWidth < 1024) dispatch(toggleSidebar());
           }}
-          className={`w-full p-3 flex text-sm items-center gap-3 rounded-lg my-1 mx-2 transition-all ${
+          className={`w-full p-3 ${
             activeTab === id
-              ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium'
-              : !hasAccess
-                ? 'text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800/40'
-                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/40'
-          }`}
-          disabled={!hasAccess}
-          style={{ opacity: hasAccess ? 1 : 0.5 }}
-          title={!hasAccess ? (isInstructorWithoutAccess ? 'Inserisci il codice di attivazione per accedere' : (lockedMessage || 'Inserisci il codice master per accedere')) : ''}
+              ? 'bg-blue-100 text-blue-600 dark:bg-slate-800/70 dark:text-blue-400'
+              : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/40'
+          } flex items-center gap-3 rounded-lg my-1 transition-colors relative`}
+          aria-label={label}
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              // Usa il nuovo hook di navigazione
+              if (hasAccess) {
+                navigateToTab(id as DashboardTab);
+              } else if ((requiresAccess && !hasInstructorAccess && isProfessor) || isInstructorWithoutAccess) {
+                navigateToTab('profile');
+              }
+              // Se siamo su mobile, chiudiamo la sidebar
+              if (window.innerWidth < 1024) dispatch(toggleSidebar());
+            }
+          }}
         >
           {id === 'notifications' && studentEmail ? (
-            <div className={`${!isSidebarOpen ? 'lg:mx-auto' : ''}`}>
+            <div className={`${!sidebarOpen ? 'lg:mx-auto' : ''}`}>
               <NotificationBell 
                 studentEmail={studentEmail} 
                 className={activeTab === id ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'} 
-                onViewAll={() => onTabChange('notifications')}
+                onViewAll={() => navigateToTab('notifications')}
               />
             </div>
           ) : (
             <Icon className={`w-5 h-5 flex-shrink-0 ${
-              !isSidebarOpen ? 'lg:mx-auto' : ''
+              !sidebarOpen ? 'lg:mx-auto' : ''
             }`} />
           )}
           <span className={`whitespace-nowrap transition-opacity duration-300 ${
-            !isSidebarOpen ? 'lg:hidden' : ''
+            !sidebarOpen ? 'lg:hidden' : ''
           }`}>
             {label}
           </span>
@@ -365,11 +374,11 @@ export function Sidebar({
       {/* Mobile Menu Button */}
       <div className="fixed top-4 left-4 z-50 lg:hidden flex items-center gap-4">
         <button
-          onClick={onToggleSidebar}
+          onClick={() => dispatch(toggleSidebar())}
           className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-          aria-label={isSidebarOpen ? 'Chiudi menu' : 'Apri menu'}
+          aria-label={sidebarOpen ? 'Chiudi menu' : 'Apri menu'}
         >
-          {isSidebarOpen ? (
+          {sidebarOpen ? (
             <X className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           ) : (
             <Menu className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -379,25 +388,25 @@ export function Sidebar({
           <div className="bg-white dark:bg-slate-800 p-2 rounded-lg shadow-lg">
             <NotificationBell 
               studentEmail={studentEmail} 
-              onViewAll={() => onTabChange('notifications')}
+              onViewAll={() => navigateToTab('notifications')}
             />
           </div>
         )}
       </div>
 
       {/* Overlay for mobile */}
-      {isSidebarOpen && (
+      {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-          onClick={onToggleSidebar}
+          onClick={() => dispatch(toggleSidebar())}
         />
       )}
 
       {/* Sidebar */}
       <aside
         className={`fixed top-0 left-0 h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 shadow-lg z-40 transition-all duration-300 ${
-          isSidebarOpen ? 'w-64' : 'w-0 lg:w-20'
-        } transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+          sidebarOpen ? 'w-64' : 'w-0 lg:w-20'
+        } transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
       >
         <div className="flex flex-col h-full">
           {/* Logo o Immagine del Profilo */}
@@ -405,14 +414,14 @@ export function Sidebar({
             {profileImageUrl && isProfessor ? (
               // Se c'è un'immagine di profilo e l'utente è un istruttore, la usiamo
               <div className={`relative mx-auto transition-all duration-300 ${
-                !isSidebarOpen ? 'lg:h-10 lg:w-10' : 'h-12 w-12'
+                !sidebarOpen ? 'lg:h-10 lg:w-10' : 'h-12 w-12'
               }`}>
                 <img
                   key={imageKey}
                   src={`${profileImageUrl}?t=${imageKey}`}
                   alt="Profilo Istruttore"
                   className={`h-full w-full mx-auto transition-all duration-300 rounded-full object-cover border-2 border-blue-500 ${
-                    !isSidebarOpen ? 'lg:h-10 lg:w-10' : 'h-12 w-12'
+                    !sidebarOpen ? 'lg:h-10 lg:w-10' : 'h-12 w-12'
                   }`}
                   onError={(e) => {
                     console.error('Errore caricamento immagine profilo:', e);
@@ -424,7 +433,7 @@ export function Sidebar({
                 {/* Logo di fallback in caso di errore nell'immagine, nascosto normalmente */}
                 <div className="hidden" id="fallbackLogo">
                   <img
-                    src={isSidebarOpen 
+                    src={sidebarOpen 
                       ? `https://uqutbomzymeklyowfewp.supabase.co/storage/v1/object/public/img//${
                           theme === 'dark' ? 'logo-white.svg' : 'logo.svg'
                         }`
@@ -434,7 +443,7 @@ export function Sidebar({
                     }
                     alt="OceanMed Logo"
                     className={`h-12 w-auto mx-auto transition-all duration-300 ${
-                      !isSidebarOpen ? 'lg:h-10' : ''
+                      !sidebarOpen ? 'lg:h-10' : ''
                     }`}
                   />
                 </div>
@@ -442,7 +451,7 @@ export function Sidebar({
             ) : (
               // Altrimenti, usiamo il logo predefinito
               <img
-                src={isSidebarOpen 
+                src={sidebarOpen 
                   ? `https://uqutbomzymeklyowfewp.supabase.co/storage/v1/object/public/img//${
                       theme === 'dark' ? 'logo-white.svg' : 'logo.svg'
                     }`
@@ -452,13 +461,13 @@ export function Sidebar({
                 }
                 alt="OceanMed Logo"
                 className={`h-12 w-auto mx-auto transition-all duration-300 ${
-                  !isSidebarOpen ? 'lg:h-10' : ''
+                  !sidebarOpen ? 'lg:h-10' : ''
                 }`}
               />
             )}
             
             {/* Nome dell'attività, mostrato solo se siamo istruttori e se esiste */}
-            {isProfessor && businessName && isSidebarOpen && (
+            {isProfessor && businessName && sidebarOpen && (
               <div className="mt-2 text-center">
                 <p className="text-sm font-medium text-blue-600 dark:text-blue-400 truncate max-w-full">
                   {businessName}
@@ -469,23 +478,57 @@ export function Sidebar({
 
           {/* Navigation */}
           <nav className="flex-1 px-2">
-            <div className={`${isSidebarOpen ? 'block' : 'hidden lg:block'}`}>
+            <div className={`${sidebarOpen ? 'block' : 'hidden lg:block'}`}>
               {renderMenuItems()}
             </div>
           </nav>
 
           {/* Bottom Actions */}
           <div className="mt-auto border-t border-slate-200 dark:border-slate-700">
+            {/* Theme Toggle Button */}
+            <div className="w-full p-3 flex items-center justify-start my-1 mx-2">
+              <div className={`flex items-center gap-3 ${!sidebarOpen ? 'lg:justify-center w-full' : ''}`}>
+                <ThemeToggle />
+                <span className={`whitespace-nowrap transition-opacity duration-300 ${
+                  !sidebarOpen ? 'lg:hidden' : ''
+                }`}>
+                  {useTheme().theme === 'dark' ? 'Tema Chiaro' : 'Tema Scuro'}
+                </span>
+              </div>
+            </div>
+            
             {/* Logout Button */}
             <button
-              onClick={onLogout}
+              onClick={() => {
+                // Pulire localStorage prima di chiamare il callback di logout
+                localStorage.removeItem('isAuthenticated');
+                localStorage.removeItem('userEmail');
+                localStorage.removeItem('isProfessor');
+                localStorage.removeItem('isStudent');
+                localStorage.removeItem('isMasterAdmin');
+                localStorage.removeItem('hasActiveAccess');
+                localStorage.removeItem('hasInstructorAccess');
+                localStorage.removeItem('firstName');
+                localStorage.removeItem('lastName');
+                localStorage.removeItem('needsSubscription');
+                localStorage.removeItem('masterCode');
+                localStorage.removeItem('email');
+                localStorage.removeItem('activeTab');
+                localStorage.removeItem('sidebarOpen');
+                
+                // Notificare altri componenti
+                window.dispatchEvent(new Event('localStorageUpdated'));
+                
+                // Chiamare il callback di logout
+                onLogout();
+              }}
               className="w-full p-3 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/40 transition-colors flex items-center gap-3 rounded-lg my-1 mx-2"
             >
               <LogOut className={`w-5 h-5 flex-shrink-0 ${
-                !isSidebarOpen ? 'lg:mx-auto' : ''
+                !sidebarOpen ? 'lg:mx-auto' : ''
               }`} />
               <span className={`whitespace-nowrap transition-opacity duration-300 ${
-                !isSidebarOpen ? 'lg:hidden' : ''
+                !sidebarOpen ? 'lg:hidden' : ''
               }`}>
                 Esci
               </span>
@@ -494,15 +537,22 @@ export function Sidebar({
             {/* Toggle Button for Desktop */}
             <div className="hidden lg:block border-t border-slate-200 dark:border-slate-700">
               <button
-                onClick={onToggleSidebar}
+                onClick={() => dispatch(toggleSidebar())}
                 className="w-full p-3 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/40 transition-colors flex items-center justify-center rounded-lg my-1 mx-2"
-                aria-label={isSidebarOpen ? 'Comprimi menu' : 'Espandi menu'}
+                aria-label={sidebarOpen ? 'Comprimi menu' : 'Espandi menu'}
               >
-                {isSidebarOpen ? (
-                  <ChevronLeft className="w-5 h-5" />
-                ) : (
-                  <ChevronRight className="w-5 h-5" />
-                )}
+                <div className="flex items-center gap-2">
+                  {sidebarOpen ? (
+                    <>
+                      <ChevronLeft className="w-5 h-5" />
+                      <span className="whitespace-nowrap transition-opacity duration-300">
+                        Comprimi menu
+                      </span>
+                    </>
+                  ) : (
+                    <ChevronRight className="w-5 h-5" />
+                  )}
+                </div>
               </button>
             </div>
           </div>

@@ -1,31 +1,43 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Sidebar } from './Sidebar';
 import { Footer } from './Footer';
-import { ThemeToggle } from '../ThemeToggle';
-import { DashboardTab } from '../../types-dashboard';
+import { useAppSelector } from '../../redux/hooks';
+import { selectUi } from '../../redux/slices/uiSlice';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
-  activeTab: DashboardTab;
-  onTabChange: (tab: DashboardTab) => void;
   onLogout: () => void;
   studentEmail?: string;
   isMaster?: boolean;
+  supabaseStatus?: 'checking' | 'connected' | 'error';
 }
 
-export function DashboardLayout({ children, activeTab, onTabChange, onLogout, studentEmail, isMaster }: DashboardLayoutProps) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+export function DashboardLayout({
+  children,
+  onLogout,
+  studentEmail,
+  isMaster,
+  supabaseStatus = 'connected'
+}: DashboardLayoutProps) {
+  const { activeTab, sidebarOpen } = useAppSelector(selectUi);
+
+  console.log("DashboardLayout renderizzato con isMaster:", isMaster);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 flex flex-col">
-      <div className="fixed top-4 right-4 z-50">
-        <ThemeToggle />
-      </div>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      {/* Mostra lo stato di connessione a Supabase se necessario */}
+      {supabaseStatus === 'checking' && (
+        <div className="fixed top-0 left-0 right-0 bg-yellow-500 text-white p-1 text-center text-xs z-50">
+          Connessione al database in corso...
+        </div>
+      )}
+      {supabaseStatus === 'error' && (
+        <div className="fixed top-0 left-0 right-0 bg-red-500 text-white p-1 text-center text-xs z-50">
+          Errore di connessione al database
+        </div>
+      )}
+      
       <Sidebar
-        activeTab={activeTab}
-        onTabChange={onTabChange}
-        isSidebarOpen={isSidebarOpen}
-        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         onLogout={onLogout}
         studentEmail={studentEmail}
         isMaster={isMaster}
@@ -33,19 +45,15 @@ export function DashboardLayout({ children, activeTab, onTabChange, onLogout, st
       
       <main 
         className={`transition-all duration-300 flex-1 ${
-          isSidebarOpen ? 'lg:pl-64' : 'lg:pl-20'
+          sidebarOpen ? 'lg:pl-64' : 'lg:pl-20'
         }`}
       >
         <div className="container mx-auto py-6 pt-20 lg:pt-6 dark:text-slate-50">
           {children}
         </div>
       </main>
-
-      <div className={`transition-all duration-300 ${
-        isSidebarOpen ? 'lg:pl-64' : 'lg:pl-20'
-      }`}>
-        <Footer />
-      </div>
+      
+      <Footer />
     </div>
   );
 }

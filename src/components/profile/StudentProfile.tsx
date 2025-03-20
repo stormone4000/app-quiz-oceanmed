@@ -6,9 +6,10 @@ import { useNavigate } from 'react-router-dom';
 
 interface StudentProfileProps {
   userEmail: string;
+  needsSubscription?: boolean;
 }
 
-export function StudentProfile({ userEmail }: StudentProfileProps) {
+export function StudentProfile({ userEmail, needsSubscription }: StudentProfileProps) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: '',
